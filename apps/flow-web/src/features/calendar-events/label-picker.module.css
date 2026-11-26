@@ -1,0 +1,99 @@
+/**
+ * Label picker: a wrapping radiogroup of colour-dot chips. Every chip
+ * carries its own colour as `--evt`; the selected chip borrows it for
+ * its border and a light fill, matching the pills on the grid.
+ */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
+.label {
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-medium);
+  color: var(--nf-color-fg);
+}
+
+/* Three chip rows, then the group scrolls. The inline padding keeps the
+   focus ring of an edge chip from being clipped by the scroll box. */
+.group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nf-space-2);
+  box-sizing: border-box;
+  padding: var(--nf-space-1);
+  max-block-size: calc(var(--nf-space-8) * 3 + var(--nf-space-2) * 2 + var(--nf-space-1) * 2);
+  overflow-y: auto;
+}
+
+.chip {
+  all: unset;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  block-size: var(--nf-space-8);
+  max-inline-size: 100%;
+  padding-inline: var(--nf-space-3);
+  border: 1px solid var(--nf-color-border);
+  border-radius: var(--nf-radius-pill);
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg);
+  cursor: pointer;
+  transition:
+    background var(--nf-duration-fast) var(--nf-ease-standard),
+    border-color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.chip:hover:not(:disabled) {
+  background: var(--nf-color-surface-hover);
+}
+
+.chip:focus-visible {
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.chip[aria-checked="true"] {
+  border-color: var(--evt);
+  background: color-mix(in oklch, var(--evt) 14%, transparent);
+}
+
+.chip:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.dot {
+  flex-shrink: 0;
+  /* nf-token-override: component dimension, not a spacing step */
+  inline-size: 0.625rem;
+  /* nf-token-override: component dimension, not a spacing step */
+  block-size: 0.625rem;
+  border-radius: var(--nf-radius-pill);
+  background: var(--evt);
+  box-shadow: inset 0 0 0 var(--nf-space-px)
+    color-mix(in oklch, var(--nf-color-fg) 12%, transparent);
+}
+
+.name {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hint,
+.error {
+  margin: 0;
+  font-size: var(--nf-text-xs);
+}
+
+.hint {
+  color: var(--nf-color-fg-muted);
+}
+
+.error {
+  color: var(--nf-color-danger-fg);
+}

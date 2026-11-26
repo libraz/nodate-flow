@@ -358,8 +358,19 @@
   white-space: nowrap;
 }
 
-.eventPill {
+.kindChip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+}
+
+/* Zero specificity: the shared pill class supplies fill and border and
+   must win over this reset whatever the stylesheet order. */
+:where(.eventPill) {
   all: unset;
+}
+
+.eventPill {
   box-sizing: border-box;
   block-size: var(--cal-pill-block-size);
   inline-size: 100%;
@@ -390,7 +401,6 @@
   inline-size: 0.5rem;
   /* nf-token-override: component dimension, not a spacing step */
   block-size: 0.5rem;
-  transform: rotate(45deg);
   flex-shrink: 0;
 }
 

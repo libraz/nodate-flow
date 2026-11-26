@@ -111,6 +111,11 @@ vi.mock('../../../lib/confirm-action', () => ({
   confirmAction: mocks.confirmAction,
 }));
 
+vi.mock('../../calendars/labels-api', () => ({
+  calendarLabelKeys: { list: () => ['labels'] },
+  useCalendarLabelsQuery: () => ({ data: [] }),
+}));
+
 vi.mock('../attendees-api', () => ({
   useAttendeesQuery: () => ({ data: [], isLoading: false }),
   useAddAttendeesMutation: () => ({ mutate: vi.fn(), isPending: false }),

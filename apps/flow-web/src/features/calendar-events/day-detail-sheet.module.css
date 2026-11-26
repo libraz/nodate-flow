@@ -35,8 +35,13 @@
  * `--nf-space-12` (3rem) is the first step of the scale at or above the
  * 44px bar.
  */
-.row {
+:where(.row) {
   all: unset;
+}
+
+/* The reset above has no specificity so an event row's pill fill and
+   border (a separate class) survive it whatever the stylesheet order. */
+.row {
   box-sizing: border-box;
   display: flex;
   align-items: center;
@@ -48,11 +53,22 @@
   border-radius: var(--nf-radius-md);
   color: var(--nf-color-fg);
   cursor: pointer;
-  transition: background var(--nf-duration-fast) var(--nf-ease-standard);
+  transition:
+    background-color var(--nf-duration-fast) var(--nf-ease-standard),
+    border-color var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
+/* Longhands only: the shorthand would wipe an event row's pill tint and
+   block-kind hatch. */
 .row:hover {
-  background: var(--nf-color-surface-hover);
+  background-color: var(--nf-color-surface-hover);
+}
+
+/* Event rows deepen their own tint instead of going neutral. */
+.row.eventRow:hover,
+.row.eventRow:focus-visible {
+  background-color: color-mix(in oklch, var(--evt) 24%, transparent);
+  border-color: color-mix(in oklch, var(--evt) 60%, transparent);
 }
 
 .row:focus-visible {
@@ -62,7 +78,7 @@
 
 /*
  * The hue of the chip the row came from, so a reader can tie a row here
- * back to the chip they tapped.
+ * back to the chip they tapped. Event rows resolve `--evt` from the row.
  */
 .marker {
   flex-shrink: 0;

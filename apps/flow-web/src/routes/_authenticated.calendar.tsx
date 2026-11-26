@@ -76,13 +76,19 @@ import EventDialog, {
   type EventDialogMode,
   type ItemKind,
 } from '../features/calendar-events/event-dialog';
+import {
+  eventColorStyle,
+  eventKindSampleClassName,
+  eventPillClassName,
+  eventPillMarkerClassName,
+} from '../features/calendar-events/event-pill';
 import type { CalendarDragPayload } from '../features/calendar-events/lib/drag-payload';
 import { eventDayKeys } from '../features/calendar-events/lib/event-days';
 import {
   type PointerDragHandle,
   usePointerDrag,
 } from '../features/calendar-events/lib/pointer-drag';
-import { shiftEventDays } from '../features/calendar-events/lib/shift-event';
+import { shiftAllDayEventDates, shiftEventDays } from '../features/calendar-events/lib/shift-event';
 import { useSlowPending } from '../features/calendar-events/lib/use-slow-pending';
 import MonthScroll from '../features/calendar-events/month-scroll';
 import RecurringScopeDialog from '../features/calendar-events/recurring-scope-dialog';
@@ -302,56 +308,6 @@ export function buildCalendarRange(
     holidayFrom: holidayStart,
     holidayTo: holidayEnd,
   };
-}
-
-/**
- * Differentiate calendar-event pills by kind. Returns inline style
- * fragments merged into the pill button, plus the 45-degree marker
- * colour rendered inside it. Every kind carries a full 1px border in its
- * own hue, so a rounded pill never ends in a one-sided stripe.
- *
- * - event: subtle fill.
- * - block: subtle fill + diagonal hatch (via repeating gradient).
- * - free: subtle fill + dashed border.
- * - milestone: subtle fill + a stronger border.
- */
-function pillStyleForKind(kind: string): {
-  background?: string;
-  border?: string;
-  backgroundImage?: string;
-  markerColor: string;
-} {
-  switch (kind) {
-    case 'block':
-      return {
-        background: 'var(--nf-cal-block-subtle)',
-        border: '1px solid color-mix(in oklch, var(--nf-cal-block-color) 30%, transparent)',
-        // The hatch has to darken a light canvas and lighten a dark one,
-        // so it is mixed from the theme's foreground rather than written
-        // as black: a flat 4% black is invisible on the dark themes.
-        backgroundImage:
-          'repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in oklch, var(--nf-color-fg) 4%, transparent) 6px 8px)',
-        markerColor: 'var(--nf-cal-block-color)',
-      };
-    case 'free':
-      return {
-        background: 'var(--nf-cal-free-subtle)',
-        border: '1px dashed var(--nf-cal-free-color)',
-        markerColor: 'var(--nf-cal-free-color)',
-      };
-    case 'milestone':
-      return {
-        background: 'var(--nf-cal-milestone-subtle)',
-        border: '1px solid color-mix(in oklch, var(--nf-cal-milestone-color) 55%, transparent)',
-        markerColor: 'var(--nf-cal-milestone-color)',
-      };
-    default:
-      return {
-        background: 'var(--nf-cal-event-subtle)',
-        border: '1px solid color-mix(in oklch, var(--nf-cal-event-color) 30%, transparent)',
-        markerColor: 'var(--nf-cal-event-color)',
-      };
-  }
 }
 
 /**
@@ -882,9 +838,20 @@ function CalendarRoute(): ReactElement {
     ): void => {
       const isSeries = scoped !== null && scoped.scope === 'series';
       const source = isSeries ? (storedEventsById.get(event.id) ?? event) : event;
-      const shifted = shiftEventDays(source, delta);
-      if (!shifted) return;
-      const body: PatchEventInput = { startAt: shifted.startAt, endAt: shifted.endAt };
+      // All-day rows are dates and are written as dates; timed rows are
+      // instants.
+      const body: PatchEventInput = {};
+      if (source.allDay === true) {
+        const shifted = shiftAllDayEventDates(source, delta);
+        if (!shifted) return;
+        body.startDate = shifted.startDate;
+        body.endDate = shifted.endDate;
+      } else {
+        const shifted = shiftEventDays(source, delta);
+        if (!shifted) return;
+        body.startAt = shifted.startAt;
+        body.endAt = shifted.endAt;
+      }
       if (scoped !== null) {
         body.scope = scoped.scope;
         // `series` names no occurrence, so sending one would describe an
@@ -1347,30 +1314,42 @@ function CalendarRoute(): ReactElement {
               <ToggleChip
                 pressed={layers.events}
                 onPressedChange={(v) => setLayers((s) => ({ ...s, events: v }))}
-                color="var(--nf-cal-event-color)"
+                label={t('calendar.layer.events')}
               >
-                {t('calendar.layer.events')}
+                <span className={styles.kindChip}>
+                  <span aria-hidden className={eventKindSampleClassName} data-kind="event" />
+                  {t('calendar.layer.events')}
+                </span>
               </ToggleChip>
               <ToggleChip
                 pressed={layers.blocks}
                 onPressedChange={(v) => setLayers((s) => ({ ...s, blocks: v }))}
-                color="var(--nf-cal-block-color)"
+                label={t('calendar.layer.blocks')}
               >
-                {t('calendar.layer.blocks')}
+                <span className={styles.kindChip}>
+                  <span aria-hidden className={eventKindSampleClassName} data-kind="block" />
+                  {t('calendar.layer.blocks')}
+                </span>
               </ToggleChip>
               <ToggleChip
                 pressed={layers.free}
                 onPressedChange={(v) => setLayers((s) => ({ ...s, free: v }))}
-                color="var(--nf-cal-free-color)"
+                label={t('calendar.layer.free')}
               >
-                {t('calendar.layer.free')}
+                <span className={styles.kindChip}>
+                  <span aria-hidden className={eventKindSampleClassName} data-kind="free" />
+                  {t('calendar.layer.free')}
+                </span>
               </ToggleChip>
               <ToggleChip
                 pressed={layers.milestone}
                 onPressedChange={(v) => setLayers((s) => ({ ...s, milestone: v }))}
-                color="var(--nf-cal-milestone-color)"
+                label={t('calendar.layer.milestone')}
               >
-                {t('calendar.layer.milestone')}
+                <span className={styles.kindChip}>
+                  <span aria-hidden className={eventKindSampleClassName} data-kind="milestone" />
+                  {t('calendar.layer.milestone')}
+                </span>
               </ToggleChip>
               {country ? (
                 <ToggleChip
@@ -1832,23 +1811,30 @@ function DayPillList({
   }
 
   function renderEventPill(ev: CalendarEvent): ReactElement {
-    const pill = pillStyleForKind(ev.kind);
     const sourceKey = `ev-${ev.id}@${cellKey}`;
     return (
       <button
         type="button"
         title={`${ev.title} · ${ev.workspaceName}\n${t('calendar.drag_to_reschedule')}`}
-        aria-label={t('calendar.event_detail.open_label', {
-          title: ev.title,
-          workspace: ev.workspaceName,
-        })}
+        aria-label={
+          ev.labelName
+            ? t('calendar.event_detail.open_label_with_label', {
+                title: ev.title,
+                label: ev.labelName,
+                workspace: ev.workspaceName,
+              })
+            : t('calendar.event_detail.open_label', {
+                title: ev.title,
+                workspace: ev.workspaceName,
+              })
+        }
         onPointerDown={(e) => {
           pointerDrag.pressSource(e, sourceKey, {
             type: 'event',
             event: ev,
             fromDate: cellKey,
             label: ev.title,
-            dotColor: pill.markerColor,
+            dotColor: ev.color,
           });
         }}
         onClick={(e) => {
@@ -1861,18 +1847,15 @@ function DayPillList({
         }}
         className={cx(
           styles.eventPill,
+          eventPillClassName(ev.kind),
           ev.viewerAttending && styles['eventPill--viewerAttending'],
           styles['eventPill--draggable'],
           pointerDrag.holdingKey === sourceKey && styles['pill--holding'],
           pointerDrag.drag?.sourceKey === sourceKey && styles['pill--lifted'],
         )}
-        style={pill}
+        style={eventColorStyle(ev.color)}
       >
-        <span
-          aria-hidden
-          className={styles.eventPill__marker}
-          style={{ background: pill.markerColor }}
-        />
+        <span aria-hidden className={cx(styles.eventPill__marker, eventPillMarkerClassName)} />
         <span className={styles.eventPill__title}>{ev.title}</span>
         {ev.attendeeCount > 0 ? (
           <span

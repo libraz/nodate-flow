@@ -127,6 +127,13 @@
   padding-block-start: var(--nf-space-4);
 }
 
+/* The pinned footer gets a hairline so it never reads as part of the
+   last field block. */
+.bodyScroll + * {
+  border-block-start: var(--nf-space-px) solid var(--nf-color-border);
+  padding-block-start: var(--nf-space-3);
+}
+
 /*
  * The "still waiting" line, between the destructive action and the
  * commit actions. Centred against the buttons rather than baseline-
@@ -165,6 +172,13 @@
 .inlineGrow {
   flex: 1;
   min-inline-size: 0;
+}
+
+/* The time trigger keeps its intrinsic width so the date takes the rest of
+   the row. Doubled selector outranks the primitive's full-width `.field`. */
+.inlineRow .timeField {
+  flex: 0 0 auto;
+  inline-size: auto;
 }
 
 .disclosureToggle {

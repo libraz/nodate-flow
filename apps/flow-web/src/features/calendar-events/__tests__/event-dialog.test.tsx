@@ -16,6 +16,7 @@ import type { i18n as I18nInstance } from 'i18next';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ApiError } from '../../../lib/api-error';
 import { wallClockToUnix } from '../../../lib/date-utils';
 import { formatDate } from '../../../lib/format';
 import EventDialog, {
@@ -45,12 +46,19 @@ const mocks = vi.hoisted(() => ({
   toastShow: vi.fn(),
   eventDetail: vi.fn(),
   confirmAction: vi.fn(),
+  labels: [] as { id: string; name: string; color: string }[],
+  invalidate: vi.fn(),
+}));
+
+vi.mock('../../calendars/labels-api', () => ({
+  calendarLabelKeys: { list: (ws: string, cal: string) => ['labels', ws, cal] },
+  useCalendarLabelsQuery: () => ({ data: mocks.labels }),
 }));
 
 vi.mock('../api', () => ({
   useCalendarsQuery: () => ({
     data: [
-      { id: 'cal-1', name: 'Primary', role: 'owner' },
+      { id: 'cal-1', name: 'Primary', role: 'owner', memberColor: '#2ECC87' },
       { id: 'cal-2', name: 'Team', role: 'editor' },
     ],
     isLoading: false,
@@ -236,6 +244,7 @@ beforeEach(() => {
   mocks.refreshCalendar.mockReset();
   mocks.toastShow.mockReset();
   mocks.confirmAction.mockReset().mockResolvedValue(true);
+  mocks.labels = [];
   // Create mode never fetches; edit-mode tests opt in via `withDetail`.
   mocks.eventDetail.mockReset().mockReturnValue({ data: undefined, isLoading: false });
 });
@@ -633,8 +642,26 @@ describe('<EventDialog>', () => {
 
     const args = mocks.createEvent.mock.calls[0]?.[0] as { body: CreateEventInput };
     expect(args.body.allDay).toBe(true);
-    expect(args.body.startAt).toBe(Date.UTC(2030, 5, 15) / 1000);
-    expect(args.body.endAt).toBe(Date.UTC(2030, 5, 16) / 1000);
+    expect(args.body.startDate).toBe('2030-06-15');
+    expect(args.body.endDate).toBe('2030-06-16');
+    expect('startAt' in args.body).toBe(false);
+    expect('endAt' in args.body).toBe(false);
+  });
+
+  it('saves a milestone with equal dates and no instants', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(renderDialog({ zone: eventZone }));
+
+    await user.type(screen.getByRole('textbox', { name: 'field.title' }), 'Launch');
+    await user.click(screen.getByRole('radio', { name: 'kind.milestone' }));
+    await user.click(screen.getByRole('button', { name: 'action.submit.create' }));
+
+    const args = mocks.createEvent.mock.calls[0]?.[0] as { body: CreateEventInput };
+    expect(args.body.allDay).toBe(true);
+    expect(args.body.startDate).toBe('2030-06-15');
+    expect(args.body.endDate).toBe(args.body.startDate);
+    expect('startAt' in args.body).toBe(false);
+    expect('endAt' in args.body).toBe(false);
   });
 
   it('shows a stored one-day all-day event as one day and saves it back unchanged', async () => {
@@ -656,8 +683,10 @@ describe('<EventDialog>', () => {
     await user.click(screen.getByRole('button', { name: 'action.submit.edit' }));
 
     const args = mocks.updateEvent.mock.calls[0]?.[0] as { body: PatchEventInput };
-    expect(args.body.startAt).toBe(startAt);
-    expect(args.body.endAt).toBe(endAt);
+    expect(args.body.startDate).toBe('2030-06-15');
+    expect(args.body.endDate).toBe('2030-06-16');
+    expect('startAt' in args.body).toBe(false);
+    expect('endAt' in args.body).toBe(false);
   });
 
   /* ── occurrence seeding ─────────────────────────────────────── */
@@ -1098,5 +1127,109 @@ describe('rruleToPreset', () => {
     // Selecting 'custom' has to be a no-op: it names a rule this control
     // did not write and cannot rebuild.
     expect(presetToRRule('custom', '2030-06-15')).toBeNull();
+  });
+});
+
+/** The PATCH body of the nth update call. */
+function patchBodyAt(n: number): PatchEventInput {
+  const call = mocks.updateEvent.mock.calls[n] as [{ body: PatchEventInput }] | undefined;
+  if (call === undefined) throw new Error(`no update call ${n}`);
+  return call[0].body;
+}
+
+describe('<EventDialog> label picker', () => {
+  const LABELS = [
+    { id: 'l1', name: 'Client', color: '#E73B3B' },
+    { id: 'l2', name: 'Internal', color: '#2273C9' },
+  ];
+
+  it('draws the none chip in the calendar member colour when creating', () => {
+    mocks.labels = LABELS;
+    renderWithProviders(renderDialog());
+    expect(
+      screen.getByRole('radio', { name: 'field.label_none' }).style.getPropertyValue('--evt'),
+    ).toBe('#2ECC87');
+  });
+
+  it('draws the none chip in the owner colour when editing', () => {
+    mocks.labels = LABELS;
+    withDetail({ ownerColor: '#B3261E' } as Partial<EventDetail>);
+    renderWithProviders(renderDialog({ mode: editMode({ ownerColor: '#B3261E' }) }));
+    expect(
+      screen.getByRole('radio', { name: 'field.label_none' }).style.getPropertyValue('--evt'),
+    ).toBe('#B3261E');
+  });
+
+  it('sends labelId on create only when one was picked', async () => {
+    const user = userEvent.setup();
+    mocks.labels = LABELS;
+    renderWithProviders(renderDialog());
+    await user.type(screen.getByRole('textbox', { name: 'field.title' }), 'Visit');
+    await user.click(screen.getByRole('radio', { name: 'Client' }));
+    await user.click(screen.getByRole('button', { name: 'action.submit.create' }));
+    const args = mocks.createEvent.mock.calls[0]?.[0] as { body: CreateEventInput };
+    expect(args.body.labelId).toBe('l1');
+  });
+
+  it('leaves the label out of a patch it did not change', async () => {
+    const user = userEvent.setup();
+    mocks.labels = LABELS;
+    withDetail({ labelId: 'l1' } as Partial<EventDetail>);
+    renderWithProviders(renderDialog({ mode: editMode({ labelId: 'l1' }) }));
+    const titleInput = screen.getByRole('textbox', { name: 'field.title' });
+    await user.clear(titleInput);
+    await user.type(titleInput, 'Renamed');
+    await user.click(screen.getByRole('button', { name: 'action.submit.edit' }));
+    const args = mocks.updateEvent.mock.calls[0]?.[0] as { body: PatchEventInput };
+    expect('labelId' in args.body).toBe(false);
+    expect(args.body.clear ?? []).not.toContain('labelId');
+  });
+
+  it('sends labelId when it changes and a clear when it is removed', async () => {
+    const user = userEvent.setup();
+    mocks.labels = LABELS;
+    withDetail({ labelId: 'l1' } as Partial<EventDetail>);
+    const { unmount } = renderWithProviders(renderDialog({ mode: editMode({ labelId: 'l1' }) }));
+    await user.click(screen.getByRole('radio', { name: 'Internal' }));
+    await user.click(screen.getByRole('button', { name: 'action.submit.edit' }));
+    expect(patchBodyAt(0).labelId).toBe('l2');
+    unmount();
+
+    renderWithProviders(renderDialog({ mode: editMode({ labelId: 'l1' }) }));
+    await user.click(screen.getByRole('radio', { name: 'field.label_none' }));
+    await user.click(screen.getByRole('button', { name: 'action.submit.edit' }));
+    const body = patchBodyAt(1);
+    expect(body.clear).toEqual(['labelId']);
+    expect('labelId' in body).toBe(false);
+  });
+
+  it('resets to none when the calendar changes', async () => {
+    const user = userEvent.setup();
+    mocks.labels = LABELS;
+    renderWithProviders(renderDialog());
+    await user.click(screen.getByRole('radio', { name: 'Client' }));
+    expect(screen.getByRole('radio', { name: 'Client' }).getAttribute('aria-checked')).toBe('true');
+    await user.click(screen.getByRole('combobox', { name: 'field.calendar' }));
+    await user.click(await screen.findByRole('option', { name: 'Team' }));
+    expect(
+      screen.getByRole('radio', { name: 'field.label_none' }).getAttribute('aria-checked'),
+    ).toBe('true');
+  });
+
+  it('falls back to none and explains when the label no longer exists', async () => {
+    const user = userEvent.setup();
+    mocks.labels = LABELS;
+    mocks.createEvent.mockRejectedValue(
+      new ApiError('CALENDAR.EVENT.LABEL_UNKNOWN', 'label gone', 422),
+    );
+    renderWithProviders(renderDialog());
+    await user.type(screen.getByRole('textbox', { name: 'field.title' }), 'Visit');
+    await user.click(screen.getByRole('radio', { name: 'Client' }));
+    await user.click(screen.getByRole('button', { name: 'action.submit.create' }));
+    expect(await screen.findByText('validation.label_unknown')).toBeTruthy();
+    expect(
+      screen.getByRole('radio', { name: 'field.label_none' }).getAttribute('aria-checked'),
+    ).toBe('true');
+    expect(mocks.toastShow).not.toHaveBeenCalled();
   });
 });

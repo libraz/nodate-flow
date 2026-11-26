@@ -4,7 +4,8 @@ import { describe, expect, it } from 'vitest';
 import fixtures from '../../../../../sql/core/all-day/fixtures.json';
 import {
   allDayLastDateKey,
-  allDayRangeToUnix,
+  allDayRangeToDates,
+  allDayToUnix,
   dateKey,
   endOfDayUnix,
   eventDateKey,
@@ -142,15 +143,28 @@ describe('all-day range conversion', () => {
   const secs = (iso: string): number => Date.parse(iso) / 1000;
 
   it('stores end as the day after the last day', () => {
-    expect(allDayRangeToUnix('2026-03-10', '2026-03-10')).toEqual({
-      startAt: secs('2026-03-10T00:00:00Z'),
-      endAt: secs('2026-03-11T00:00:00Z'),
+    expect(allDayRangeToDates('2026-03-10', '2026-03-10')).toEqual({
+      startDate: '2026-03-10',
+      endDate: '2026-03-11',
+    });
+  });
+
+  it('spans several days and clamps a last day before the first', () => {
+    expect(allDayRangeToDates('2026-02-27', '2026-03-01')).toEqual({
+      startDate: '2026-02-27',
+      endDate: '2026-03-02',
+    });
+    expect(allDayRangeToDates('2026-03-10', '2026-03-08')).toEqual({
+      startDate: '2026-03-10',
+      endDate: '2026-03-11',
     });
   });
 
   it('stores a milestone as a point', () => {
-    const r = allDayRangeToUnix('2026-03-10', '2026-03-10', true);
-    expect(r.endAt).toBe(r.startAt);
+    expect(allDayRangeToDates('2026-03-10', '2026-03-10', true)).toEqual({
+      startDate: '2026-03-10',
+      endDate: '2026-03-10',
+    });
   });
 
   it('displays the last day as end minus one day', () => {
@@ -172,8 +186,12 @@ describe('all-day range conversion', () => {
           const milestone = c.kind === 'milestone';
           expect(eventDateKey(startAt, true, zone)).toBe(v.firstDate);
           expect(allDayLastDateKey(startAt, endAt)).toBe(v.lastDate);
-          expect(allDayRangeToUnix(v.firstDate, v.lastDate, milestone)).toEqual({ startAt, endAt });
-          expect(allDayRangeToUnix(v.startDate, v.lastDate, milestone).endAt).toBe(endAt);
+          const dates = allDayRangeToDates(v.firstDate, v.lastDate, milestone);
+          expect(allDayToUnix(dates.startDate)).toBe(startAt);
+          expect(allDayToUnix(dates.endDate)).toBe(endAt);
+          expect(allDayToUnix(allDayRangeToDates(v.startDate, v.lastDate, milestone).endDate)).toBe(
+            endAt,
+          );
         });
       }
     }

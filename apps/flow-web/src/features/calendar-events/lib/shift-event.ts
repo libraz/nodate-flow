@@ -7,7 +7,10 @@
  * which is exactly the kind a rendered-component test never reaches.
  */
 
+import { Day, Zone } from '@nodate-flow/ui/time';
 import { DateTime } from 'luxon';
+
+import { eventDateKey } from '../../../lib/date-utils';
 
 /** The fields a day-shift needs from an event row. */
 export interface ShiftableEvent {
@@ -46,5 +49,32 @@ export function shiftEventDays(
   return {
     startAt: shift(event.startAt),
     endAt: shift(typeof event.endAt === 'number' ? event.endAt : event.startAt),
+  };
+}
+
+/**
+ * Shift an all-day event by whole days, as the `startDate` / `endDate`
+ * the server expects for an all-day write.
+ *
+ * Stored all-day rows sit at UTC midnight, so the shift is plain date
+ * arithmetic on the UTC dates. A normal row's stored `endAt` is already
+ * the exclusive end and a milestone has `endAt == startAt`, so shifting
+ * both ends keeps each shape intact.
+ *
+ * Returns null for an undated event.
+ */
+export function shiftAllDayEventDates(
+  event: ShiftableEvent,
+  dayDelta: number,
+): { startDate: string; endDate: string } | null {
+  if (typeof event.startAt !== 'number') return null;
+  const utc = Zone.utc();
+  const shift = (seconds: number): string => {
+    const key = eventDateKey(seconds, true, utc);
+    return (Day.parse(key) ?? Day.of(1970, 1, 1)).addDays(dayDelta).toString();
+  };
+  return {
+    startDate: shift(event.startAt),
+    endDate: shift(typeof event.endAt === 'number' ? event.endAt : event.startAt),
   };
 }

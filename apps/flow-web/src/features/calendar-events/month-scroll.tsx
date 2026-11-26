@@ -62,8 +62,8 @@ import {
 import { useTranslation } from 'react-i18next';
 
 import { dateKey, todayKey as todayKeyIn } from '../../lib/date-utils';
+import { eventColorStyle, eventPillClassName } from './event-pill';
 import type { CalendarDragPayload } from './lib/drag-payload';
-import { markerColorForKind } from './lib/kind-color';
 import type { PointerDragHandle } from './lib/pointer-drag';
 import {
   eventStartKey,
@@ -393,6 +393,7 @@ function WeekRow({
                 key={`${p.event.id}-${p.startCol}`}
                 className={cx(
                   styles.bar,
+                  eventPillClassName(p.event.kind),
                   p.continuesLeft && styles['bar--clipStart'],
                   p.continuesRight && styles['bar--clipEnd'],
                   drag?.holdingKey === sourceKey && styles['pill--holding'],
@@ -403,7 +404,7 @@ function WeekRow({
                     insetInlineStart: insetStart,
                     inlineSize: width,
                     insetBlockStart: `${p.track * TRACK_REM}rem`,
-                    '--chip-hue': markerColorForKind(p.event.kind),
+                    ...eventColorStyle(p.event.color),
                   } as CSSProperties
                 }
                 title={`${p.event.title} · ${p.event.workspaceName}`}
@@ -413,7 +414,7 @@ function WeekRow({
                     event: p.event,
                     fromDate: dateKey(addDays(weekStart, grabbedColumn(e, p))),
                     label: p.event.title,
-                    dotColor: markerColorForKind(p.event.kind),
+                    dotColor: p.event.color,
                   });
                 }}
                 onClick={(e) => {
@@ -553,10 +554,11 @@ function WeekRow({
                       key={tc.key}
                       className={cx(
                         styles.chip,
+                        eventPillClassName(evt.kind),
                         drag?.holdingKey === sourceKey && styles['pill--holding'],
                         drag?.drag?.sourceKey === sourceKey && styles['pill--lifted'],
                       )}
-                      style={{ '--chip-hue': markerColorForKind(evt.kind) } as CSSProperties}
+                      style={eventColorStyle(evt.color)}
                       title={`${evt.title} · ${evt.workspaceName}`}
                       onPointerDown={(e) => {
                         drag?.pressSource(e, sourceKey, {
@@ -564,7 +566,7 @@ function WeekRow({
                           event: evt,
                           fromDate: key,
                           label: evt.title,
-                          dotColor: markerColorForKind(evt.kind),
+                          dotColor: evt.color,
                         });
                       }}
                     >

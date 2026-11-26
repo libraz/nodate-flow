@@ -139,22 +139,24 @@ export function allDayToUnix(dayKey: string): number {
 const SECONDS_PER_DAY = 86_400;
 
 /**
- * The stored `{ startAt, endAt }` for an all-day range given as the
- * first and last displayed day (both inclusive).
+ * The `{ startDate, endDate }` body fields for an all-day range given
+ * as the first and last displayed day (both inclusive).
  *
- * The server keeps an all-day row half-open: `endAt` is UTC midnight of
- * the day after the last day, so a one-day event spans 24 hours. A
- * milestone is the one point, with `endAt = startAt`.
+ * The server takes an all-day window as dates, never instants, and
+ * keeps it half-open: `endDate` is the day after the last day, so a
+ * one-day event spans one date. A milestone is the one point, with
+ * `endDate = startDate`.
  */
-export function allDayRangeToUnix(
+export function allDayRangeToDates(
   firstDayKey: string,
   lastDayKey: string,
   milestone = false,
-): { startAt: number; endAt: number } {
-  const startAt = allDayToUnix(firstDayKey);
-  if (milestone) return { startAt, endAt: startAt };
-  const lastAt = allDayToUnix(lastDayKey < firstDayKey ? firstDayKey : lastDayKey);
-  return { startAt, endAt: lastAt + SECONDS_PER_DAY };
+): { startDate: string; endDate: string } {
+  const first = Day.parse(firstDayKey) ?? Day.of(1970, 1, 1);
+  if (milestone) return { startDate: first.toString(), endDate: first.toString() };
+  const last = Day.parse(lastDayKey) ?? first;
+  const end = (last.toString() < first.toString() ? first : last).addDays(1);
+  return { startDate: first.toString(), endDate: end.toString() };
 }
 
 /**

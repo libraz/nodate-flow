@@ -1,7 +1,7 @@
 import { DateTime } from 'luxon';
 import { describe, expect, it } from 'vitest';
 
-import { shiftEventDays } from '../lib/shift-event';
+import { shiftAllDayEventDates, shiftEventDays } from '../lib/shift-event';
 
 /**
  * A helper that reads the shifted result back in the event's own zone,
@@ -80,5 +80,31 @@ describe('shiftEventDays', () => {
     const start = DateTime.fromISO('2027-06-01T10:00', { zone: 'UTC' }).toSeconds();
     const shifted = shiftOrFail({ startAt: start, timezone: 'UTC' }, 1);
     expect(shifted.endAt).toBe(shifted.startAt);
+  });
+});
+
+describe('shiftAllDayEventDates', () => {
+  const utcSecs = (iso: string): number => Date.parse(`${iso}T00:00:00Z`) / 1000;
+
+  it('shifts a multi-day row and keeps the exclusive end', () => {
+    expect(
+      shiftAllDayEventDates({ startAt: utcSecs('2027-03-10'), endAt: utcSecs('2027-03-13') }, 3),
+    ).toEqual({ startDate: '2027-03-13', endDate: '2027-03-16' });
+  });
+
+  it('keeps a milestone as one date', () => {
+    const at = utcSecs('2027-02-27');
+    expect(shiftAllDayEventDates({ startAt: at, endAt: at }, 2)).toEqual({
+      startDate: '2027-03-01',
+      endDate: '2027-03-01',
+    });
+  });
+
+  it('shifts backwards and returns null when undated', () => {
+    expect(shiftAllDayEventDates({ startAt: utcSecs('2027-03-10') }, -1)).toEqual({
+      startDate: '2027-03-09',
+      endDate: '2027-03-09',
+    });
+    expect(shiftAllDayEventDates({}, 1)).toBeNull();
   });
 });

@@ -229,11 +229,8 @@
   block-size: 1.125rem;
   margin-block: var(--nf-space-px);
   padding-inline: var(--nf-space-1);
-  /* `--chip-hue` is the kind colour, set inline per chip. A full hairline
-     and a light tint, never a one-sided stripe on a rounded chip. */
-  border: var(--nf-space-px) solid color-mix(in oklch, var(--chip-hue) 40%, transparent);
+  /* Fill, border and kind line come from the shared pill class. */
   border-radius: var(--nf-radius-sm);
-  background: color-mix(in oklch, var(--chip-hue) 14%, transparent);
   font-size: var(--nf-cal-text-cell);
   color: var(--nf-color-fg);
   overflow: hidden;
@@ -282,9 +279,7 @@
   display: flex;
   align-items: center;
   padding-inline: var(--nf-space-1);
-  border: var(--nf-space-px) solid color-mix(in oklch, var(--chip-hue) 45%, transparent);
   border-radius: var(--nf-radius-sm);
-  background: color-mix(in oklch, var(--chip-hue) 18%, transparent);
   font-size: var(--nf-cal-text-cell);
   font-weight: var(--nf-weight-medium);
   color: var(--nf-color-fg);
@@ -421,5 +416,34 @@
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
+  }
+}
+
+/* ───── phone chips: fade instead of ellipsis ───── */
+
+/*
+ * At this width an ellipsis costs one to two characters of a title that
+ * only has a handful. The title fades out over its last step instead, and
+ * the attendee count (already hidden from assistive tech) gives way.
+ */
+@media (max-width: 767px) {
+  .chip,
+  .taskChip {
+    padding-inline: var(--nf-space-1);
+  }
+
+  .chipAttendees {
+    display: none;
+  }
+
+  .chipTitle,
+  .taskTitle {
+    text-overflow: clip;
+    mask-image: linear-gradient(to right, black calc(100% - var(--nf-space-3)), transparent);
+  }
+
+  .chipTitle:dir(rtl),
+  .taskTitle:dir(rtl) {
+    mask-image: linear-gradient(to left, black calc(100% - var(--nf-space-3)), transparent);
   }
 }

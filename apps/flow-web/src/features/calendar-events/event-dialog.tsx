@@ -35,6 +35,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { ToggleChip, ToggleChipGroup } from '@nodate-flow/ui/primitives/toggle-chip';
 import Tooltip from '@nodate-flow/ui/primitives/tooltip';
 import type { Zone } from '@nodate-flow/ui/time';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   ArrowRight,
   CalendarCheck,
@@ -55,11 +56,11 @@ import {
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-import { formatApiError } from '../../lib/api-error';
+import { ApiError, formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import {
   allDayLastDateKey,
-  allDayRangeToUnix,
+  allDayRangeToDates,
   eventDateKey,
   todayKey,
   unixToWallClock,
@@ -68,6 +69,7 @@ import {
 import { formatDate } from '../../lib/format';
 import { useWeekStart } from '../../lib/use-week-start';
 import { selectUser, useAuth } from '../auth/auth-store';
+import { calendarLabelKeys } from '../calendars/labels-api';
 import { TASK_PRIORITIES, type TaskPriority } from '../tasks/api';
 import { PRIORITY_KEY } from '../tasks/constants';
 import {
@@ -87,6 +89,7 @@ import {
 import AttendeesSection from './attendees-section';
 import CreatorChip from './creator-chip';
 import styles from './event-dialog.module.css';
+import LabelPicker from './label-picker';
 import { useSlowPending } from './lib/use-slow-pending';
 import RecurringScopeDialog from './recurring-scope-dialog';
 
@@ -579,6 +582,7 @@ type TrackedField =
   | 'endTime'
   | 'allDay'
   | 'calendarId'
+  | 'labelId'
   | 'projectId'
   | 'priority'
   | 'showAs'
@@ -741,6 +745,14 @@ export default function EventDialog({
     if (defaultCalId) setCalendarId(defaultCalId);
   }, [calendarId, defaultCalId]);
 
+  // Label on the selected calendar; '' is "none". Labels are per calendar,
+  // so moving to another calendar drops the selection.
+  const queryClient = useQueryClient();
+  const [labelId, setLabelId] = useState<string>(
+    mode.kind === 'edit' ? (mode.event.labelId ?? '') : '',
+  );
+  const [labelError, setLabelError] = useState<string | null>(null);
+
   // Task-only.
   const [projectId, setProjectId] = useState<string>(projects[0]?.id ?? '');
   const [priority, setPriority] = useState<TaskPriority>(2);
@@ -816,6 +828,7 @@ export default function EventDialog({
 
     if (!dirty.has('title')) setTitle(detail.title);
     if (!dirty.has('memo')) setMemo(detail.memo ?? '');
+    if (!dirty.has('labelId')) setLabelId(detail.labelId ?? '');
     if (!dirty.has('location')) setLocation(detail.location ?? '');
     if (!dirty.has('showAs')) setShowAs((detail.showAs as ShowAs) || 'busy');
     if (!dirty.has('flexibility')) setFlexibility((detail.flexibility as Flexibility) || 'fixed');
@@ -991,6 +1004,42 @@ export default function EventDialog({
     [calendarsQuery.data],
   );
 
+  /** The row being edited, preferring the authoritative detail. */
+  const editedEvent = mode.kind === 'edit' ? mode.event : null;
+  const originalLabelId = detail?.labelId ?? editedEvent?.labelId ?? '';
+  // Colour the event shows with no label: its owner's when editing, the
+  // viewer's own colour on the selected calendar when creating.
+  const noneLabelColor = isEdit
+    ? (detail?.ownerColor ?? editedEvent?.ownerColor)
+    : calendarsQuery.data?.find((c) => c.id === calendarId)?.memberColor;
+
+  function handleCalendarChange(id: string): void {
+    markDirty('calendarId');
+    setCalendarId(id);
+    if (id !== calendarId) {
+      markDirty('labelId');
+      setLabelId('');
+      setLabelError(null);
+    }
+  }
+
+  function handleLabelChange(id: string): void {
+    markDirty('labelId');
+    setLabelId(id);
+    setLabelError(null);
+  }
+
+  /** A deleted label: reload the list, fall back to none, say so. */
+  function handleLabelUnknown(err: unknown): boolean {
+    if (!(err instanceof ApiError) || err.code !== 'CALENDAR.EVENT.LABEL_UNKNOWN') return false;
+    void queryClient.invalidateQueries({
+      queryKey: calendarLabelKeys.list(workspaceId, calendarId),
+    });
+    setLabelId('');
+    setLabelError(t('validation.label_unknown'));
+    return true;
+  }
+
   /* ── submit ─── */
 
   function validate(): boolean {
@@ -1079,6 +1128,7 @@ export default function EventDialog({
       }
       onSaved();
     } catch (err) {
+      if (handleLabelUnknown(err)) return;
       toaster.show({
         tone: 'danger',
         message: formatApiError(err, t, isCreate ? 'toast.createFailed' : 'toast.updateFailed'),
@@ -1123,6 +1173,7 @@ export default function EventDialog({
       // typed refusals a scope can earn, which name a condition the user
       // can act on by choosing differently.
       setScopePrompt(null);
+      if (handleLabelUnknown(err)) return;
       toaster.show({
         tone: 'danger',
         message: formatApiError(err, t, 'toast.updateFailed'),
@@ -1142,9 +1193,9 @@ export default function EventDialog({
     };
     if (calKind === 'milestone') {
       // Backend enforces (StartAt == nil) != (EndAt == nil); set both.
-      Object.assign(body, allDayRangeToUnix(startDate, startDate, true));
+      Object.assign(body, allDayRangeToDates(startDate, startDate, true));
     } else if (allDay) {
-      Object.assign(body, allDayRangeToUnix(startDate, endDate));
+      Object.assign(body, allDayRangeToDates(startDate, endDate));
     } else {
       body.startAt = wallClockToUnix(startDate, startTime, zone);
       body.endAt = wallClockToUnix(endDate, endTime, zone);
@@ -1164,6 +1215,7 @@ export default function EventDialog({
     const minutes = presetToMinutes(notification);
     if (minutes !== null) body.notificationOffset = minutes;
     if (memo.trim()) body.memo = memo.trim();
+    if (labelId) body.labelId = labelId;
     return body;
   }
 
@@ -1187,9 +1239,9 @@ export default function EventDialog({
       body.allDay = calKind === 'milestone' ? true : allDay;
       if (calKind === 'milestone') {
         // Backend enforces (StartAt == nil) != (EndAt == nil); set both.
-        Object.assign(body, allDayRangeToUnix(startDate, startDate, true));
+        Object.assign(body, allDayRangeToDates(startDate, startDate, true));
       } else if (allDay) {
-        Object.assign(body, allDayRangeToUnix(startDate, endDate));
+        Object.assign(body, allDayRangeToDates(startDate, endDate));
       } else {
         body.startAt = wallClockToUnix(startDate, startTime, zone);
         body.endAt = wallClockToUnix(endDate, endTime, zone);
@@ -1223,6 +1275,10 @@ export default function EventDialog({
       if (minutes !== null) body.notificationOffset = minutes;
     }
     if (anyDirty('memo')) body.memo = memo.trim();
+    if (anyDirty('labelId') && labelId !== originalLabelId) {
+      if (labelId === '') body.clear = [...(body.clear ?? []), 'labelId'];
+      else body.labelId = labelId;
+    }
     return body;
   }
 
@@ -1371,11 +1427,24 @@ export default function EventDialog({
                   <Combobox
                     options={calendarOptions}
                     value={calendarId}
-                    onChange={editing('calendarId', setCalendarId)}
+                    onChange={handleCalendarChange}
                     aria-label={t('field.calendar')}
                   />
                 )}
               </FormField>
+            ) : null}
+
+            {showCalendar && calendarId ? (
+              <LabelPicker
+                workspaceId={workspaceId}
+                calendarId={calendarId}
+                value={labelId}
+                onChange={handleLabelChange}
+                noneColor={noneLabelColor}
+                detailsHidden={detail?.detailsHidden ?? editedEvent?.detailsHidden ?? false}
+                {...(detail?.canEdit === undefined ? {} : { canEdit: detail.canEdit })}
+                error={labelError}
+              />
             ) : null}
 
             {/* Time row — morphs by kind */}
@@ -1488,6 +1557,7 @@ export default function EventDialog({
                             aria-describedby={control['aria-describedby']}
                             aria-invalid={control['aria-invalid']}
                             variant="field"
+                            className={styles.timeField}
                             value={startTime}
                             listLabel={t('field.startTime')}
                             onChange={editing('startTime', setStartTime)}
@@ -1528,6 +1598,7 @@ export default function EventDialog({
                             aria-describedby={control['aria-describedby']}
                             aria-invalid={control['aria-invalid']}
                             variant="field"
+                            className={styles.timeField}
                             value={endTime}
                             listLabel={t('field.endTime')}
                             onChange={editing('endTime', setEndTime)}
@@ -1804,18 +1875,18 @@ export default function EventDialog({
                 </FormField>
               </div>
             </Collapse>
-          </div>
 
-          {mode.kind === 'edit' &&
-          (mode.initialKind === 'event' || mode.initialKind === 'milestone') ? (
-            <AttendeesSection
-              workspaceId={workspaceId}
-              calendarId={mode.calendarId}
-              eventId={mode.eventId}
-              ownerUserId={mode.event.ownerUserId ?? null}
-              selfUserId={selfUserId}
-            />
-          ) : null}
+            {mode.kind === 'edit' &&
+            (mode.initialKind === 'event' || mode.initialKind === 'milestone') ? (
+              <AttendeesSection
+                workspaceId={workspaceId}
+                calendarId={mode.calendarId}
+                eventId={mode.eventId}
+                ownerUserId={mode.event.ownerUserId ?? null}
+                selfUserId={selfUserId}
+              />
+            ) : null}
+          </div>
 
           {/* Footer — sibling of the scrolling body so it stays anchored. */}
           <div className={styles.footer}>

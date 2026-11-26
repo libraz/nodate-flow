@@ -21,15 +21,16 @@
 
 import type { HolidayEntry } from '@nodate-flow/holidays';
 import type { components } from '@nodate-flow/sdk';
+import { cx } from '@nodate-flow/ui/lib/cx';
 import Button from '@nodate-flow/ui/primitives/button';
 import Drawer from '@nodate-flow/ui/primitives/drawer';
 import EmptyState from '@nodate-flow/ui/primitives/empty-state';
 import type { Zone } from '@nodate-flow/ui/time';
-import { type ReactElement, useMemo } from 'react';
+import { type CSSProperties, type ReactElement, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import styles from './day-detail-sheet.module.css';
-import { markerColorForKind } from './lib/kind-color';
+import { eventColorStyle, eventPillClassName } from './event-pill';
 
 type CalendarTask = components['schemas']['MyTaskListItem'];
 type CalendarEvent = components['schemas']['MyCalendarEventResponse'];
@@ -83,7 +84,14 @@ interface DayRow {
   timeLabel: string;
   title: string;
   workspaceName: string;
+  /** Label the event carries, when it has one. */
+  labelName?: string | undefined;
+  /** Accessible name for the open action. */
+  ariaLabel?: string | undefined;
   markerColor: string;
+  /** Pill treatment for event rows; tasks carry none. */
+  pillClassName?: string;
+  pillStyle?: CSSProperties;
   onOpen: () => void;
 }
 
@@ -136,7 +144,20 @@ export default function DayDetailSheet({
           : timeFormat.format((evt.startAt ?? 0) * 1000),
         title: evt.title,
         workspaceName: evt.workspaceName,
-        markerColor: markerColorForKind(evt.kind),
+        labelName: evt.labelName || undefined,
+        ariaLabel: evt.labelName
+          ? t('calendar.event_detail.open_label_with_label', {
+              title: evt.title,
+              label: evt.labelName,
+              workspace: evt.workspaceName,
+            })
+          : t('calendar.event_detail.open_label', {
+              title: evt.title,
+              workspace: evt.workspaceName,
+            }),
+        markerColor: 'var(--evt)',
+        pillClassName: eventPillClassName(evt.kind),
+        pillStyle: eventColorStyle(evt.color),
         onOpen: () => onEventOpen(evt),
       };
       if (isAllDay) allDay.push(row);
@@ -181,8 +202,10 @@ export default function DayDetailSheet({
             <li key={row.key}>
               <button
                 type="button"
-                className={styles.row}
+                className={cx(styles.row, row.pillClassName, row.pillClassName && styles.eventRow)}
+                style={row.pillStyle}
                 title={`${row.title} · ${row.workspaceName}`}
+                aria-label={row.ariaLabel}
                 onClick={row.onOpen}
               >
                 <span
@@ -193,7 +216,9 @@ export default function DayDetailSheet({
                 <span className={styles.time}>{row.timeLabel}</span>
                 <span className={styles.rowBody}>
                   <span className={styles.rowTitle}>{row.title}</span>
-                  <span className={styles.rowMeta}>{row.workspaceName}</span>
+                  <span className={styles.rowMeta}>
+                    {row.labelName ? `${row.workspaceName} · ${row.labelName}` : row.workspaceName}
+                  </span>
                 </span>
               </button>
             </li>
