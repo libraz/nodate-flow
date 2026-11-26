@@ -37,6 +37,7 @@
     "allDay": "All day (no start or end time)",
     "location": "Location",
     "memo": "Notes",
+    "detailsHidden": "This event's details are hidden, so its location and notes can't be edited.",
     "blockLabel": "Block label",
     "showAs": "Availability shown to others",
     "recurrence": "Recurrence",

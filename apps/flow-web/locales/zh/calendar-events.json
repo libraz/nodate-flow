@@ -37,6 +37,7 @@
     "allDay": "全天（不设开始和结束时间）",
     "location": "地点",
     "memo": "备注",
+    "detailsHidden": "此日程的详细信息已隐藏，无法编辑地点和备注。",
     "blockLabel": "时间块标签",
     "showAs": "对他人显示的状态",
     "recurrence": "重复",

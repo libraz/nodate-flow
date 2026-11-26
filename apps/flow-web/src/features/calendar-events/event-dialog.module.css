@@ -210,3 +210,9 @@
     display: none;
   }
 }
+
+.hiddenHint {
+  margin: 0;
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}

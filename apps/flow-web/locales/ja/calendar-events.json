@@ -37,6 +37,7 @@
     "allDay": "終日（開始・終了の時刻なし）",
     "location": "場所",
     "memo": "メモ",
+    "detailsHidden": "この予定の詳細は非表示のため、場所とメモは編集できません。",
     "blockLabel": "ブロックの種別",
     "showAs": "他の人に見える状態",
     "recurrence": "繰り返し",

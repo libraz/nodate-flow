@@ -479,6 +479,65 @@ describe('<EventDialog>', () => {
     expect('startAt' in args.body).toBe(false);
   });
 
+  it('does not send the location when only the kind changed', async () => {
+    const user = userEvent.setup();
+    withDetail({ location: 'Room 4' });
+    renderWithProviders(
+      renderDialog({ mode: editMode({ location: 'Room 4' } as Partial<CalEventLike>) }),
+    );
+
+    // Out to another kind and back: the dialog ends on Event with kind dirty.
+    await user.click(screen.getByRole('radio', { name: 'kind.block' }));
+    await user.click(screen.getByRole('radio', { name: 'kind.event' }));
+    await user.click(screen.getByRole('button', { name: 'action.submit.edit' }));
+
+    const args = mocks.updateEvent.mock.calls[0]?.[0] as { body: PatchEventInput };
+    expect('location' in args.body).toBe(false);
+  });
+
+  it('sends the location once the user edits it', async () => {
+    const user = userEvent.setup();
+    withDetail({ location: 'Room 4' });
+    renderWithProviders(
+      renderDialog({ mode: editMode({ location: 'Room 4' } as Partial<CalEventLike>) }),
+    );
+
+    const box = screen.getByRole('textbox', { name: 'field.location' });
+    await user.clear(box);
+    await user.type(box, 'Room 9');
+    await user.click(screen.getByRole('button', { name: 'action.submit.edit' }));
+
+    const args = mocks.updateEvent.mock.calls[0]?.[0] as { body: PatchEventInput };
+    expect(args.body.location).toBe('Room 9');
+  });
+
+  it('locks location and memo on an event whose details are hidden', async () => {
+    const user = userEvent.setup();
+    withDetail({ detailsHidden: true });
+    renderWithProviders(
+      renderDialog({
+        mode: editMode({ detailsHidden: true } as Partial<CalEventLike>),
+      }),
+    );
+
+    expect(screen.getByText('field.detailsHidden')).toBeDefined();
+    const location = screen.getByRole('textbox', { name: 'field.location' });
+    expect((location as HTMLInputElement).disabled).toBe(true);
+    await user.click(screen.getByRole('button', { name: 'action.moreOptions' }));
+    const memo = await screen.findByRole('textbox', { name: 'field.memo' });
+    expect((memo as HTMLTextAreaElement).disabled).toBe(true);
+
+    const titleInput = screen.getByRole('textbox', { name: 'field.title' });
+    await user.clear(titleInput);
+    await user.type(titleInput, 'Renamed event');
+    await user.click(screen.getByRole('button', { name: 'action.submit.edit' }));
+
+    const args = mocks.updateEvent.mock.calls[0]?.[0] as { body: PatchEventInput };
+    expect(args.body.title).toBe('Renamed event');
+    for (const key of ['location', 'memo', 'url']) expect(key in args.body).toBe(false);
+    expect(args.body.clear ?? []).toEqual([]);
+  });
+
   it('skips the request entirely when nothing was edited', async () => {
     const user = userEvent.setup();
     const onSaved = vi.fn();

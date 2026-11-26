@@ -912,10 +912,9 @@ export default function EventDialog({
       setBlockPreset('working');
       setBlockCustomLabel('');
     }
-    // Leaving Event clears event-only fields (location kept unhelpful elsewhere).
-    if (prev === 'event' && kind !== 'event') {
-      setLocation('');
-    }
+    // Location is deliberately kept when leaving Event: both payload
+    // builders only send it for Event, and clearing it here would make a
+    // round trip through another kind look like an edit.
     // Milestone collapses to single date — align end to start so a
     // subsequent re-selection of Event starts from a sensible pair.
     if (kind === 'milestone') {
@@ -1007,6 +1006,8 @@ export default function EventDialog({
   /** The row being edited, preferring the authoritative detail. */
   const editedEvent = mode.kind === 'edit' ? mode.event : null;
   const originalLabelId = detail?.labelId ?? editedEvent?.labelId ?? '';
+  const originalLocation = detail?.location ?? editedEvent?.location ?? '';
+  const detailsHidden = detail?.detailsHidden ?? editedEvent?.detailsHidden ?? false;
   // Colour the event shows with no label: its owner's when editing, the
   // viewer's own colour on the selected calendar when creating.
   const noneLabelColor = isEdit
@@ -1232,6 +1233,8 @@ export default function EventDialog({
   function buildPatchBody(): PatchEventInput {
     const calKind = kind as CalEventKind;
     const body: PatchEventInput = {};
+    // Hidden details come back null, so nothing here may be written back.
+    const hidden = detailsHidden;
 
     if (anyDirty('title')) body.title = title.trim();
 
@@ -1250,7 +1253,11 @@ export default function EventDialog({
     if (calKind === 'event') {
       if (anyDirty('showAs', 'kind')) body.showAs = showAs;
       if (anyDirty('flexibility', 'kind')) body.flexibility = flexibility;
-      if (anyDirty('location', 'kind')) body.location = location.trim();
+      // A kind change alone only counts when it left a different location
+      // than the one the dialog was seeded with.
+      const locationChanged =
+        anyDirty('location') || (anyDirty('kind') && location.trim() !== originalLocation.trim());
+      if (!hidden && locationChanged) body.location = location.trim();
     }
     if (calKind === 'block' && anyDirty('blockPreset', 'blockCustomLabel', 'kind')) {
       body.blockLabel = blockPreset === 'custom' ? blockCustomLabel.trim() : blockPreset;
@@ -1274,7 +1281,7 @@ export default function EventDialog({
       const minutes = presetToMinutes(notification);
       if (minutes !== null) body.notificationOffset = minutes;
     }
-    if (anyDirty('memo')) body.memo = memo.trim();
+    if (!hidden && anyDirty('memo')) body.memo = memo.trim();
     if (anyDirty('labelId') && labelId !== originalLabelId) {
       if (labelId === '') body.clear = [...(body.clear ?? []), 'labelId'];
       else body.labelId = labelId;
@@ -1441,11 +1448,13 @@ export default function EventDialog({
                 value={labelId}
                 onChange={handleLabelChange}
                 noneColor={noneLabelColor}
-                detailsHidden={detail?.detailsHidden ?? editedEvent?.detailsHidden ?? false}
+                detailsHidden={detailsHidden}
                 {...(detail?.canEdit === undefined ? {} : { canEdit: detail.canEdit })}
                 error={labelError}
               />
             ) : null}
+
+            {detailsHidden ? <p className={styles.hiddenHint}>{t('field.detailsHidden')}</p> : null}
 
             {/* Time row — morphs by kind */}
             <div className={styles.timeRow}>
@@ -1718,6 +1727,7 @@ export default function EventDialog({
                       <Input
                         {...control}
                         value={location}
+                        disabled={detailsHidden}
                         onChange={(e) => {
                           markDirty('location');
                           setLocation(e.currentTarget.value);
@@ -1868,7 +1878,7 @@ export default function EventDialog({
                       // lands would mark the field edited and send that
                       // fragment over the real one, so the control stays
                       // inert until it holds the actual value.
-                      disabled={detailLoading}
+                      disabled={detailLoading || detailsHidden}
                       aria-busy={detailLoading || undefined}
                     />
                   )}
