@@ -155,8 +155,7 @@ export function ProfilePage(): ReactElement {
   // exists is what let "Saturday" turn back into "Sunday" on reload and
   // then overwrite the real setting on the next save.
   const persistedWeekStart = user?.weekStart as WeekStart | undefined;
-  const userLocale = (user?.locale ?? 'en') as SupportedLanguage | string;
-  const fallbackWeekStart: WeekStart = userLocale === 'ja' || userLocale === 'zh' ? 'mon' : 'sun';
+  const fallbackWeekStart: WeekStart = 'sun';
 
   // `values` keeps the form in sync with the auth store; essential because
   // the user profile may populate asynchronously after the form mounts.
@@ -217,7 +216,7 @@ export function ProfilePage(): ReactElement {
     if (!currentWeekStart || currentWeekStart === persistedWeekStart) {
       const weekStartMap: Record<SupportedLanguage, WeekStart> = {
         en: 'sun',
-        ja: 'mon',
+        ja: 'sun',
         zh: 'mon',
       };
       const nextWeekStart: WeekStart = weekStartMap[next];

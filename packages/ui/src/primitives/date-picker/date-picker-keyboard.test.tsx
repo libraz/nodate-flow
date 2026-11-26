@@ -151,8 +151,8 @@ describe('DatePicker keyboard grid', () => {
   });
 
   it('moves to the ends of the week row with Home and End', async () => {
-    // 2026-06-15 is a Monday; the week starts on Monday by default.
-    render(<DatePicker value="2026-06-17" onChange={vi.fn()} {...NAV_LABELS} />);
+    // 2026-06-15 is a Monday; the week starts on Monday here.
+    render(<DatePicker value="2026-06-17" onChange={vi.fn()} weekStart="monday" {...NAV_LABELS} />);
     const user = await openWithKeyboard('2026-06-17');
     (tabbableDays()[0] as HTMLElement).focus();
 

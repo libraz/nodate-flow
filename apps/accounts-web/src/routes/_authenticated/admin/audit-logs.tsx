@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next';
 
 import PageHeader from '../../../components/page-header';
 import TableRegion from '../../../components/table-region';
+import { selectUser, useAuth } from '../../../features/auth/auth-store';
 import { apiRequest } from '../../../lib/api';
 import { formatTimestamp } from '../../../lib/format-timestamp';
 
@@ -35,11 +36,21 @@ function formatIsoDate(iso: string, locale: string): string {
   }
 }
 
+const WEEK_START_DAY = { sun: 'sunday', mon: 'monday', sat: 'saturday' } as const;
+const WEEK_START_DOW = { sunday: 0, monday: 1, saturday: 6 } as const;
+
 function AuditLogsPage(): ReactElement {
   const { t } = useTranslation('admin');
   const { t: tCommon, i18n } = useTranslation('common');
   const locale = i18n.resolvedLanguage ?? 'en';
-  const weekdayLabels = tCommon('common.date.weekdays', { returnObjects: true }) as string[];
+  const user = useAuth(selectUser);
+  const weekStart = WEEK_START_DAY[(user?.weekStart as keyof typeof WEEK_START_DAY) ?? 'sun'];
+  // The shared labels are Monday-first; rotate them to match the grid.
+  const mondayFirstLabels = tCommon('common.date.weekdays', { returnObjects: true }) as string[];
+  const shift = (WEEK_START_DOW[weekStart] + 6) % 7;
+  const weekdayLabels = mondayFirstLabels.map(
+    (_, i) => mondayFirstLabels[(i + shift) % 7] as string,
+  );
   const formatMonthYear = (year: number, month: number): string =>
     tCommon('common.date.monthYear', { year, month });
   const [entries, setEntries] = useState<AuditLogEntry[]>([]);
@@ -143,6 +154,7 @@ function AuditLogsPage(): ReactElement {
               value={fromDate}
               onChange={handleFromChange}
               weekdayLabels={weekdayLabels}
+              weekStart={weekStart}
               formatMonthYear={formatMonthYear}
               prevLabel={tCommon('common.date.prev_month')}
               nextLabel={tCommon('common.date.next_month')}
@@ -157,6 +169,7 @@ function AuditLogsPage(): ReactElement {
               value={toDate}
               onChange={handleToChange}
               weekdayLabels={weekdayLabels}
+              weekStart={weekStart}
               formatMonthYear={formatMonthYear}
               prevLabel={tCommon('common.date.prev_month')}
               nextLabel={tCommon('common.date.next_month')}

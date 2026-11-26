@@ -28,8 +28,8 @@ export interface DatePickerProps {
   minDate?: string;
   /**
    * Short weekday labels (7 items). The order MUST match `weekStart`:
-   * - `weekStart='monday'` (default) -> `['Mon','Tue','Wed','Thu','Fri','Sat','Sun']`
-   * - `weekStart='sunday'`           -> `['Sun','Mon','Tue','Wed','Thu','Fri','Sat']`
+   * - `weekStart='sunday'` (default) -> `['Sun','Mon','Tue','Wed','Thu','Fri','Sat']`
+   * - `weekStart='monday'`           -> `['Mon','Tue','Wed','Thu','Fri','Sat','Sun']`
    */
   weekdayLabels?: string[];
   /** Format function for the month/year header. Receives (year, month 1-12). */
@@ -46,8 +46,8 @@ export interface DatePickerProps {
   nextLabel: string;
   /**
    * First day of the week shown in the weekday row and grid layout.
-   * Defaults to `'monday'` to match the Japanese / most-of-Europe
-   * convention. Saturday is included because the product offers it as a
+   * Defaults to `'sunday'`, matching the schema default for the
+   * user preference. Saturday is included because the product offers it as a
    * user preference, and a picker that cannot express the setting the
    * user saved just renders somebody else's week.
    */
@@ -208,7 +208,7 @@ export default function DatePicker({
   formatMonthYear = defaultFormatMonthYear,
   prevLabel,
   nextLabel,
-  weekStart = 'monday',
+  weekStart = 'sunday',
   triggerLabel,
   variant = 'pill',
   className,

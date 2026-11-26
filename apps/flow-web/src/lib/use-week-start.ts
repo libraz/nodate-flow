@@ -28,11 +28,11 @@ const TO_WEEK_START_DAY: Record<StoredWeekStart, WeekStartDay> = {
 /**
  * Map a stored preference onto the primitive's vocabulary.
  *
- * Falls back to Monday, which is what the picker already defaulted to —
- * an account with no stored preference keeps rendering exactly as before.
+ * Falls back to Sunday, the schema default for `users.week_start`, so an
+ * account with no stored preference renders the same week as a new one.
  */
 export function toWeekStartDay(stored: string | undefined): WeekStartDay {
-  return TO_WEEK_START_DAY[stored as StoredWeekStart] ?? 'monday';
+  return TO_WEEK_START_DAY[stored as StoredWeekStart] ?? 'sunday';
 }
 
 /** The current user's week-start preference for DatePicker. */

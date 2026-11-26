@@ -186,3 +186,17 @@ describe('<ProfilePage> empty-workspaces CTA (W6)', () => {
     });
   });
 });
+
+describe('<ProfilePage> week-start fallback', () => {
+  it('selects Sunday for a Japanese account with no stored value', async () => {
+    authStore
+      .getState()
+      .setSession('tok', makeUser({ locale: 'ja', workspaces: [{ id: 'ws-1' }] }));
+    mountProfile();
+
+    const sunday = await screen.findByRole('radio', { name: enAuth.profile.week_start.sun });
+    expect(sunday.getAttribute('aria-checked')).toBe('true');
+    const monday = screen.getByRole('radio', { name: enAuth.profile.week_start.mon });
+    expect(monday.getAttribute('aria-checked')).toBe('false');
+  });
+});

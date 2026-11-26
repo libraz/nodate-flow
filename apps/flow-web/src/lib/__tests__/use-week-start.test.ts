@@ -22,13 +22,12 @@ describe('toWeekStartDay', () => {
   });
 
   it('falls back to the picker default when the session has no preference', () => {
-    // Matches DatePicker's own default, so an account without a stored
-    // value renders exactly as the picker does on its own.
-    expect(toWeekStartDay(undefined)).toBe('monday');
-    expect(toWeekStartDay('')).toBe('monday');
+    // Matches DatePicker's own default and the schema default.
+    expect(toWeekStartDay(undefined)).toBe('sunday');
+    expect(toWeekStartDay('')).toBe('sunday');
   });
 
   it('does not invent a value from an unrecognised input', () => {
-    expect(toWeekStartDay('tuesday')).toBe('monday');
+    expect(toWeekStartDay('tuesday')).toBe('sunday');
   });
 });

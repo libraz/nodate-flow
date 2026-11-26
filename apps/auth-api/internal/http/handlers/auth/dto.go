@@ -342,7 +342,7 @@ type MeBody struct {
 	// string when unset.
 	Country string `json:"country"`
 	// WeekStart is the user's preferred first day of the week for calendar grids.
-	// One of "mon" (default), "sun", "sat".
+	// One of "sun" (default), "mon", "sat".
 	WeekStart       string `json:"weekStart" enum:"mon,sun,sat"`
 	ThemePreference string `json:"themePreference" enum:"glass-light,glass-dark,modern-light,modern-dark,washi-light,washi-dark,classic-light,classic-dark,nothing-light,nothing-dark,system"`
 	// CalendarShiftDefault controls how shifting a calendar event behaves

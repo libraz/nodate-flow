@@ -713,7 +713,7 @@ function CalendarRoute(): ReactElement {
   // `weekStart` may be undefined when the running auth-api binary predates
   // the column rollout; fall back to the schema default so the grid keeps
   // rendering against an older backend until the binary is restarted.
-  const weekStart: WeekStart = me.weekStart ?? 'mon';
+  const weekStart: WeekStart = me.weekStart ?? 'sun';
   const weekdayKeys = WEEKDAY_KEYS_BY_START[weekStart];
 
   // Memoize provider by country code so identity is stable until country
