@@ -235,6 +235,8 @@
       }
     },
     "filters": {
+      "button": "絞り込み",
+      "button_label": "{count, plural, =0 {絞り込み} other {絞り込み（# 件適用中）}}",
       "search_hint": "すべてのワークスペースの自分のタスクのタイトルを検索します。",
       "workspace": "ワークスペース",
       "workspace_all": "すべてのワークスペース",
@@ -827,6 +829,7 @@
       "chip_assignee": "担当者: {value}",
       "chip_search": "検索: {value}",
       "chip_priority": "優先度: {value}",
+      "chip_remove": "絞り込みを解除: {label}",
       "search_hint": "このプロジェクト内のタスクのタイトルを検索します。状態、優先度、担当者のフィルターと組み合わせられます。"
     },
     "validation": {
