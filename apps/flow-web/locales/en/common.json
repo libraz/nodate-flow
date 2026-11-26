@@ -177,6 +177,8 @@
     "modern-dark": "Modern Dark",
     "washi-light": "Washi Light",
     "washi-dark": "Washi Dark",
+    "sakura-light": "Sakura Light",
+    "sakura-dark": "Sakura Dark",
     "classic-light": "Classic Light",
     "classic-dark": "Classic Dark",
     "nothing-light": "Nothing Light",
@@ -186,6 +188,7 @@
       "glass": "Glass",
       "modern": "Modern",
       "washi": "Washi",
+      "sakura": "Sakura",
       "classic": "Classic",
       "nothing": "Nothing"
     },
@@ -342,13 +345,15 @@
       "delete_confirm": "Delete this event? This cannot be undone.",
       "deleted": "Event deleted",
       "delete_failed": "Could not delete the event. Please try again.",
-      "open_label": "Open event: {title} in {workspace}"
+      "open_label": "Open event: {title} in {workspace}",
+      "open_label_with_label": "Open event: {title} ({label}) in {workspace}"
     },
     "settings": {
       "title": "Calendar settings",
       "tab": {
         "general": "General",
-        "members": "Members"
+        "members": "Members",
+        "labels": "Labels"
       },
       "general": {
         "name_label": "Name",
@@ -406,7 +411,13 @@
           "manager": "Manager",
           "editor": "Editor",
           "viewer": "Viewer"
-        }
+        },
+        "color": "Color",
+        "color_change": "Change color for {name}",
+        "color_static": "Color of {name}",
+        "color_custom": "Custom (#RRGGBB)",
+        "color_in_use": "Used by {names}",
+        "color_error": "The color could not be changed."
       }
     },
     "memos": {
@@ -431,7 +442,37 @@
       "body_show": "Show notes",
       "body_collapse": "Hide notes"
     },
-    "layerHint": "Blocks: time you set aside. Free: time you marked as available. Milestones: date markers."
+    "layerHint": "Blocks: time you set aside. Free: time you marked as available. Milestones: date markers.",
+    "labels": {
+      "count": "{count} / {max}",
+      "add": "Add label",
+      "limit_reached": "A calendar can have up to {max} labels.",
+      "readonly_hint": "Owners and managers can add and edit labels.",
+      "empty_title": "No labels yet",
+      "empty_body": "Labels color events by what they are. Everyone on this calendar sees the same colors.",
+      "load_failed": "Labels could not be loaded.",
+      "retry": "Try again",
+      "name": "Name",
+      "name_placeholder": "e.g. Client visit",
+      "name_remaining": "{count, plural, one {# character left} other {# characters left}}",
+      "name_taken": "Another label on this calendar already has this name.",
+      "color": "Color",
+      "custom_color": "Custom (#RRGGBB)",
+      "custom_color_invalid": "Enter a color as #RRGGBB.",
+      "swatch": "Color {hex}",
+      "in_use": "Used by {names}",
+      "preview": "Preview",
+      "preview_title": "Sample event",
+      "save": "Save",
+      "edit": "Edit {name}",
+      "delete": "Delete {name}",
+      "delete_title": "Delete the label \"{name}\"?",
+      "delete_body": "Events with this label go back to their owner's color.",
+      "delete_confirm": "Delete",
+      "create_failed": "The label could not be created.",
+      "update_failed": "The label could not be saved.",
+      "delete_failed": "The label could not be deleted."
+    }
   },
   "calendars_rail": {
     "title": "Calendars",

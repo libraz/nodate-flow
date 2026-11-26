@@ -53,7 +53,10 @@
     "taskDatesHint": "The end date becomes the task's due date.",
     "calendarHint": "Who can see this item depends on the calendar you choose.",
     "recurrenceHint": "When you edit or delete a repeating event, you will be asked whether the change applies to this event, this and following, or all events.",
-    "notificationHint": "Sends you a reminder before the event starts."
+    "notificationHint": "Sends you a reminder before the event starts.",
+    "label": "Label",
+    "label_none": "None",
+    "label_disabled": "You can't change this event's label."
   },
   "placeholder": {
     "title": {
@@ -143,7 +146,8 @@
     "titleRequired": "Title is required",
     "endBeforeStart": "End time must be after start time",
     "calendarRequired": "Choose a calendar",
-    "projectRequired": "Choose a project"
+    "projectRequired": "Choose a project",
+    "label_unknown": "That label no longer exists. The label was cleared."
   },
   "action": {
     "submit": {

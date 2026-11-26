@@ -177,6 +177,8 @@
     "modern-dark": "Modern ダーク",
     "washi-light": "和 ライト",
     "washi-dark": "和 ダーク",
+    "sakura-light": "桜 ライト",
+    "sakura-dark": "桜 ダーク",
     "classic-light": "Classic ライト",
     "classic-dark": "Classic ダーク",
     "nothing-light": "Nothing ライト",
@@ -186,6 +188,7 @@
       "glass": "Glass",
       "modern": "Modern",
       "washi": "和",
+      "sakura": "桜",
       "classic": "Classic",
       "nothing": "Nothing"
     },
@@ -342,13 +345,15 @@
       "delete_confirm": "このイベントを削除しますか？この操作は取り消せません。",
       "deleted": "イベントを削除しました",
       "delete_failed": "イベントを削除できませんでした。もう一度お試しください。",
-      "open_label": "イベントを開く: {title}（{workspace}）"
+      "open_label": "イベントを開く: {title}（{workspace}）",
+      "open_label_with_label": "イベントを開く: {title}・{label}（{workspace}）"
     },
     "settings": {
       "title": "カレンダー設定",
       "tab": {
         "general": "一般",
-        "members": "メンバー"
+        "members": "メンバー",
+        "labels": "ラベル"
       },
       "general": {
         "name_label": "名前",
@@ -406,7 +411,13 @@
           "manager": "マネージャー",
           "editor": "編集者",
           "viewer": "閲覧者"
-        }
+        },
+        "color": "色",
+        "color_change": "{name} の色を変更",
+        "color_static": "{name} の色",
+        "color_custom": "カスタム（#RRGGBB）",
+        "color_in_use": "使用中: {names}",
+        "color_error": "色を変更できませんでした。"
       }
     },
     "memos": {
@@ -431,7 +442,37 @@
       "body_show": "本文を表示",
       "body_collapse": "本文を非表示"
     },
-    "layerHint": "ブロック: 確保した時間。空き: 対応できると示した時間。マイルストーン: 日付の目印。"
+    "layerHint": "ブロック: 確保した時間。空き: 対応できると示した時間。マイルストーン: 日付の目印。",
+    "labels": {
+      "count": "{count} / {max}",
+      "add": "ラベルを追加",
+      "limit_reached": "1 つのカレンダーに作れるラベルは {max} 件までです。",
+      "readonly_hint": "ラベルの追加と編集は、オーナーとマネージャーが行えます。",
+      "empty_title": "ラベルはまだありません",
+      "empty_body": "ラベルを付けると、予定を内容ごとに色分けできます。色はこのカレンダーのメンバー全員に同じように表示されます。",
+      "load_failed": "ラベルを読み込めませんでした。",
+      "retry": "再試行",
+      "name": "名前",
+      "name_placeholder": "例: 客先訪問",
+      "name_remaining": "残り {count} 文字",
+      "name_taken": "このカレンダーには同じ名前のラベルがあります。",
+      "color": "色",
+      "custom_color": "カスタム（#RRGGBB）",
+      "custom_color_invalid": "#RRGGBB の形式で入力してください。",
+      "swatch": "色 {hex}",
+      "in_use": "使用中: {names}",
+      "preview": "プレビュー",
+      "preview_title": "予定の例",
+      "save": "保存",
+      "edit": "{name} を編集",
+      "delete": "{name} を削除",
+      "delete_title": "ラベル「{name}」を削除しますか？",
+      "delete_body": "このラベルの予定は、所有者の色に戻ります。",
+      "delete_confirm": "削除",
+      "create_failed": "ラベルを作成できませんでした。",
+      "update_failed": "ラベルを保存できませんでした。",
+      "delete_failed": "ラベルを削除できませんでした。"
+    }
   },
   "calendars_rail": {
     "title": "カレンダー",

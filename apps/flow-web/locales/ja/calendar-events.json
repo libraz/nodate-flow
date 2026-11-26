@@ -53,7 +53,10 @@
     "taskDatesHint": "終了日がタスクの期限日になります。",
     "calendarHint": "この項目を誰が見られるかは、選んだカレンダーによって決まります。",
     "recurrenceHint": "繰り返しの予定を編集・削除するときは、その回だけか、以降すべてか、全件かを選びます。",
-    "notificationHint": "開始の前にあなたへ通知します。"
+    "notificationHint": "開始の前にあなたへ通知します。",
+    "label": "ラベル",
+    "label_none": "なし",
+    "label_disabled": "この予定のラベルは変更できません。"
   },
   "placeholder": {
     "title": {
@@ -143,7 +146,8 @@
     "titleRequired": "タイトルを入力してください",
     "endBeforeStart": "終了時刻は開始時刻より後にしてください",
     "calendarRequired": "カレンダーを選択してください",
-    "projectRequired": "プロジェクトを選択してください"
+    "projectRequired": "プロジェクトを選択してください",
+    "label_unknown": "そのラベルは削除されています。ラベルを外しました。"
   },
   "action": {
     "submit": {

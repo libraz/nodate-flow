@@ -53,7 +53,10 @@
     "taskDatesHint": "结束日期将作为任务的截止日期。",
     "calendarHint": "谁能看到该项取决于你选择的日历。",
     "recurrenceHint": "编辑或删除重复日程时，会询问更改适用于仅此次、此次及之后，还是全部。",
-    "notificationHint": "在开始前向你发送提醒。"
+    "notificationHint": "在开始前向你发送提醒。",
+    "label": "标签",
+    "label_none": "无",
+    "label_disabled": "你无法更改此事件的标签。"
   },
   "placeholder": {
     "title": {
@@ -143,7 +146,8 @@
     "titleRequired": "请填写标题",
     "endBeforeStart": "结束时间必须晚于开始时间",
     "calendarRequired": "请选择日历",
-    "projectRequired": "请选择项目"
+    "projectRequired": "请选择项目",
+    "label_unknown": "该标签已不存在，已移除标签。"
   },
   "action": {
     "submit": {

@@ -210,7 +210,11 @@
     "project_delete": "{actor}がプロジェクトを削除しました",
     "project_deleted": "{actor}がプロジェクトを削除しました",
     "project_disabled": "{actor}がプロジェクトを無効化しました",
-    "workspace_updated": "{actor}がワークスペースを更新しました"
+    "workspace_updated": "{actor}がワークスペースを更新しました",
+    "calendar_label_created": "{actor}がカレンダーのラベルを作成しました",
+    "calendar_label_updated": "{actor}がカレンダーのラベルを更新しました",
+    "calendar_label_deleted": "{actor}がカレンダーのラベルを削除しました",
+    "calendar_member_updated": "{actor}がカレンダーメンバーの色を変更しました"
   },
   "event_kind": {
     "task_created": "タスク作成",
@@ -375,7 +379,11 @@
     "project_delete": "プロジェクト",
     "project_deleted": "プロジェクト",
     "project_disabled": "プロジェクト",
-    "workspace_updated": "ワークスペース"
+    "workspace_updated": "ワークスペース",
+    "calendar_label_created": "カレンダーラベル作成",
+    "calendar_label_updated": "カレンダーラベル更新",
+    "calendar_label_deleted": "カレンダーラベル削除",
+    "calendar_member_updated": "カレンダーメンバー色変更"
   },
   "payload": {
     "auto_action_label": "自動アクション",

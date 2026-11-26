@@ -177,6 +177,8 @@
     "modern-dark": "Modern 深色",
     "washi-light": "和 浅色",
     "washi-dark": "和 深色",
+    "sakura-light": "樱 浅色",
+    "sakura-dark": "樱 深色",
     "classic-light": "Classic 浅色",
     "classic-dark": "Classic 深色",
     "nothing-light": "Nothing 浅色",
@@ -186,6 +188,7 @@
       "glass": "Glass",
       "modern": "Modern",
       "washi": "和",
+      "sakura": "樱",
       "classic": "Classic",
       "nothing": "Nothing"
     },
@@ -342,13 +345,15 @@
       "delete_confirm": "确定删除此事件？此操作不可恢复。",
       "deleted": "已删除事件",
       "delete_failed": "无法删除事件，请重试。",
-      "open_label": "打开事件：{workspace} 的 {title}"
+      "open_label": "打开事件：{workspace} 的 {title}",
+      "open_label_with_label": "打开事件：{workspace} 的 {title}（{label}）"
     },
     "settings": {
       "title": "日历设置",
       "tab": {
         "general": "常规",
-        "members": "成员"
+        "members": "成员",
+        "labels": "标签"
       },
       "general": {
         "name_label": "名称",
@@ -406,7 +411,13 @@
           "manager": "管理员",
           "editor": "编辑者",
           "viewer": "查看者"
-        }
+        },
+        "color": "颜色",
+        "color_change": "更改 {name} 的颜色",
+        "color_static": "{name} 的颜色",
+        "color_custom": "自定义（#RRGGBB）",
+        "color_in_use": "已被使用：{names}",
+        "color_error": "无法更改颜色。"
       }
     },
     "memos": {
@@ -431,7 +442,37 @@
       "body_show": "显示备注",
       "body_collapse": "隐藏备注"
     },
-    "layerHint": "时段：预留的时间。空闲：标记为可安排的时间。里程碑：日期标记。"
+    "layerHint": "时段：预留的时间。空闲：标记为可安排的时间。里程碑：日期标记。",
+    "labels": {
+      "count": "{count} / {max}",
+      "add": "添加标签",
+      "limit_reached": "每个日历最多可创建 {max} 个标签。",
+      "readonly_hint": "所有者和管理员可以添加和编辑标签。",
+      "empty_title": "还没有标签",
+      "empty_body": "标签可按内容为事件着色。此日历的所有成员看到的颜色相同。",
+      "load_failed": "无法加载标签。",
+      "retry": "重试",
+      "name": "名称",
+      "name_placeholder": "例如：客户拜访",
+      "name_remaining": "{count, plural, other {还可输入 # 个字符}}",
+      "name_taken": "此日历中已有同名标签。",
+      "color": "颜色",
+      "custom_color": "自定义（#RRGGBB）",
+      "custom_color_invalid": "请按 #RRGGBB 格式输入颜色。",
+      "swatch": "颜色 {hex}",
+      "in_use": "已被使用：{names}",
+      "preview": "预览",
+      "preview_title": "示例事件",
+      "save": "保存",
+      "edit": "编辑 {name}",
+      "delete": "删除 {name}",
+      "delete_title": "删除标签“{name}”？",
+      "delete_body": "带有此标签的事件将恢复为所有者的颜色。",
+      "delete_confirm": "删除",
+      "create_failed": "无法创建标签。",
+      "update_failed": "无法保存标签。",
+      "delete_failed": "无法删除标签。"
+    }
   },
   "calendars_rail": {
     "title": "日历",

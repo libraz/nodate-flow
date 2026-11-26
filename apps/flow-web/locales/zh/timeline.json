@@ -210,7 +210,11 @@
     "project_delete": "{actor} 删除了一个项目",
     "project_deleted": "{actor} 删除了一个项目",
     "project_disabled": "{actor} 停用了一个项目",
-    "workspace_updated": "{actor} 更新了工作区"
+    "workspace_updated": "{actor} 更新了工作区",
+    "calendar_label_created": "{actor} 创建了日历标签",
+    "calendar_label_updated": "{actor} 更新了日历标签",
+    "calendar_label_deleted": "{actor} 删除了日历标签",
+    "calendar_member_updated": "{actor} 更改了日历成员的颜色"
   },
   "event_kind": {
     "task_created": "任务创建",
@@ -375,7 +379,11 @@
     "project_delete": "项目",
     "project_deleted": "项目",
     "project_disabled": "项目",
-    "workspace_updated": "工作区"
+    "workspace_updated": "工作区",
+    "calendar_label_created": "日历标签已创建",
+    "calendar_label_updated": "日历标签已更新",
+    "calendar_label_deleted": "日历标签已删除",
+    "calendar_member_updated": "日历成员颜色已更改"
   },
   "payload": {
     "auto_action_label": "自动操作",

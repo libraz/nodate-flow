@@ -210,7 +210,11 @@
     "project_delete": "{actor} deleted a project",
     "project_deleted": "{actor} deleted a project",
     "project_disabled": "{actor} disabled a project",
-    "workspace_updated": "{actor} updated the workspace"
+    "workspace_updated": "{actor} updated the workspace",
+    "calendar_label_created": "{actor} created a calendar label",
+    "calendar_label_updated": "{actor} updated a calendar label",
+    "calendar_label_deleted": "{actor} deleted a calendar label",
+    "calendar_member_updated": "{actor} changed a calendar member's color"
   },
   "event_kind": {
     "task_created": "Task created",
@@ -375,7 +379,11 @@
     "project_delete": "Project",
     "project_deleted": "Project",
     "project_disabled": "Project",
-    "workspace_updated": "Workspace"
+    "workspace_updated": "Workspace",
+    "calendar_label_created": "Calendar label created",
+    "calendar_label_updated": "Calendar label updated",
+    "calendar_label_deleted": "Calendar label deleted",
+    "calendar_member_updated": "Calendar member color changed"
   },
   "payload": {
     "auto_action_label": "auto action",
