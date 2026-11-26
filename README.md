@@ -33,7 +33,7 @@ A self-hosted task platform built on Go, MySQL and React. Task state is never ed
 - **Inbox and intake** — Notifications with snooze, source triage that turns captured sources into tasks, a weekly digest, and live updates over server-sent events.
 - **Webhooks and data** — HMAC-signed outbound webhooks, CSV and JSON export, CSV import, and `Idempotency-Key` on task and calendar event writes.
 - **Accounts and access** — Argon2id passwords, OIDC sign-in with Google, GitHub and Microsoft, TOTP with recovery codes, an OIDC-only mode, and workspaces with role-based access. Profile, avatar, theme and sessions are managed in accounts-web. [Deployment](https://github.com/libraz/nodate-flow/blob/main/docs/en/deployment.md)
-- **Themes, languages and help** — Five theme families (glass, modern, washi, classic, nothing) in light, dark or system mode; English, Japanese and Chinese; in-context help and an onboarding checklist.
+- **Themes, languages and help** — Six theme families (glass, modern, washi, sakura, classic, nothing) in light, dark or system mode; English, Japanese and Chinese; in-context help and an onboarding checklist.
 - **Shared database with nodate-time** — nodate-flow and the separate nodate-time calendar product can point at one MySQL and share users, groups and calendar data through a published schema contract, with no code dependency. [Introduction](https://github.com/libraz/nodate-flow/blob/main/docs/en/introduction.md) · [Architecture](https://github.com/libraz/nodate-flow/blob/main/docs/en/architecture.md)
 
 ## Getting started

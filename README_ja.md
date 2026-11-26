@@ -33,7 +33,7 @@ Go、MySQL、React で作られた自前ホスト型のタスク基盤です。�
 - **受信トレイと取り込み** — スヌーズ付きの通知、取り込んだソースをタスクにするトリアージ、週次ダイジェスト、Server-Sent Events によるリアルタイム更新。
 - **Webhook とデータ** — HMAC 署名つきの送信 Webhook、CSV と JSON のエクスポート、CSV のインポート、タスクとカレンダーイベントの書き込みでの `Idempotency-Key`。
 - **アカウントとアクセス** — Argon2id のパスワード、Google・GitHub・Microsoft の OIDC サインイン、リカバリーコード付きの TOTP、OIDC 専用モード、ロールベースのアクセス制御を持つワークスペース。プロフィール、アバター、テーマ、セッションは accounts-web で管理します。[デプロイ](https://github.com/libraz/nodate-flow/blob/main/docs/ja/deployment.md)
-- **テーマ、言語、ヘルプ** — 5 つのテーマファミリー（glass、modern、washi、classic、nothing）とライト・ダーク・システム連動のモード。英語、日本語、中国語。画面ごとのヘルプとオンボーディングのチェックリスト。
+- **テーマ、言語、ヘルプ** — 6 つのテーマファミリー（glass、modern、washi、sakura、classic、nothing）とライト・ダーク・システム連動のモード。英語、日本語、中国語。画面ごとのヘルプとオンボーディングのチェックリスト。
 - **nodate-time との共有データベース** — nodate-flow と、別プロダクトのカレンダー nodate-time は、1 つの MySQL に向けると、公開されたスキーマ契約を通してユーザー、グループ、カレンダーのデータを共有できます。コードの依存はありません。[概要](https://github.com/libraz/nodate-flow/blob/main/docs/ja/introduction.md) · [アーキテクチャ](https://github.com/libraz/nodate-flow/blob/main/docs/ja/architecture.md)
 
 ## はじめに
