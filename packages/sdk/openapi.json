@@ -1300,6 +1300,37 @@
         "required": ["format", "count", "tasks"],
         "type": "object"
       },
+      "CalendarLabelResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/CalendarLabelResponse.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "color": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["id", "name", "color", "createdAt", "updatedAt"],
+        "type": "object"
+      },
       "CalendarRemoveMemberOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -2111,6 +2142,7 @@
             "description": "Display color (hex)",
             "maxLength": 7,
             "minLength": 1,
+            "pattern": "^#[0-9A-Fa-f]{6}$",
             "type": "string"
           },
           "coverUrl": {
@@ -2141,6 +2173,32 @@
           }
         },
         "required": ["kind", "name", "color"],
+        "type": "object"
+      },
+      "CreateCalendarLabelInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/CreateCalendarLabelInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "color": {
+            "description": "Label colour as #RRGGBB",
+            "maxLength": 7,
+            "pattern": "^#[0-9A-Fa-f]{6}$",
+            "type": "string"
+          },
+          "name": {
+            "description": "Label name; surrounding whitespace is trimmed",
+            "maxLength": 50,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": ["name", "color"],
         "type": "object"
       },
       "CreateChecklistItemInputBody": {
@@ -2247,6 +2305,10 @@
           "kind": {
             "description": "Event kind",
             "enum": ["event", "block", "free", "milestone"],
+            "type": "string"
+          },
+          "labelId": {
+            "description": "Calendar label public ID; empty means no label",
             "type": "string"
           },
           "location": {
@@ -3222,9 +3284,15 @@
           "calendarId": {
             "type": "string"
           },
+          "color": {
+            "type": "string"
+          },
           "createdAt": {
             "format": "int64",
             "type": "integer"
+          },
+          "detailsHidden": {
+            "type": "boolean"
           },
           "endAt": {
             "format": "int64",
@@ -3239,6 +3307,12 @@
           "kind": {
             "type": "string"
           },
+          "labelId": {
+            "type": ["string", "null"]
+          },
+          "labelName": {
+            "type": ["string", "null"]
+          },
           "location": {
             "type": "string"
           },
@@ -3248,6 +3322,9 @@
               "type": "string"
             },
             "type": ["array", "null"]
+          },
+          "ownerColor": {
+            "type": "string"
           },
           "recurrenceEnd": {
             "format": "int64",
@@ -3286,7 +3363,12 @@
           "title",
           "allDay",
           "timezone",
-          "createdAt"
+          "createdAt",
+          "color",
+          "ownerColor",
+          "labelId",
+          "labelName",
+          "detailsHidden"
         ],
         "type": "object"
       },
@@ -4347,6 +4429,12 @@
           "blockLabel": {
             "type": "string"
           },
+          "canEdit": {
+            "type": "boolean"
+          },
+          "color": {
+            "type": "string"
+          },
           "createdAt": {
             "format": "int64",
             "type": "integer"
@@ -4359,6 +4447,9 @@
           },
           "creatorId": {
             "type": "string"
+          },
+          "detailsHidden": {
+            "type": "boolean"
           },
           "endAt": {
             "format": "int64",
@@ -4373,6 +4464,12 @@
           "kind": {
             "type": "string"
           },
+          "labelId": {
+            "type": ["string", "null"]
+          },
+          "labelName": {
+            "type": ["string", "null"]
+          },
           "location": {
             "type": "string"
           },
@@ -4382,6 +4479,9 @@
           "notificationOffset": {
             "format": "int32",
             "type": "integer"
+          },
+          "ownerColor": {
+            "type": "string"
           },
           "recurrenceEnd": {
             "format": "int64",
@@ -4422,7 +4522,13 @@
           "title",
           "allDay",
           "timezone",
-          "createdAt"
+          "createdAt",
+          "color",
+          "ownerColor",
+          "labelId",
+          "labelName",
+          "detailsHidden",
+          "canEdit"
         ],
         "type": "object"
       },
@@ -5555,6 +5661,26 @@
           }
         },
         "required": ["events"],
+        "type": "object"
+      },
+      "ListCalendarLabelsOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListCalendarLabelsOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "labels": {
+            "items": {
+              "$ref": "#/components/schemas/CalendarLabelResponse"
+            },
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["labels"],
         "type": "object"
       },
       "ListCalendarsOutputBody": {
@@ -7597,6 +7723,9 @@
           "calendarId": {
             "type": "string"
           },
+          "color": {
+            "type": "string"
+          },
           "createdAt": {
             "format": "int64",
             "type": "integer"
@@ -7609,6 +7738,9 @@
           },
           "creatorId": {
             "type": "string"
+          },
+          "detailsHidden": {
+            "type": "boolean"
           },
           "endAt": {
             "format": "int64",
@@ -7623,6 +7755,12 @@
           "kind": {
             "type": "string"
           },
+          "labelId": {
+            "type": ["string", "null"]
+          },
+          "labelName": {
+            "type": ["string", "null"]
+          },
           "location": {
             "type": "string"
           },
@@ -7632,6 +7770,9 @@
               "type": "string"
             },
             "type": ["array", "null"]
+          },
+          "ownerColor": {
+            "type": "string"
           },
           "ownerUserId": {
             "type": "string"
@@ -7687,7 +7828,12 @@
           "title",
           "allDay",
           "timezone",
-          "createdAt"
+          "createdAt",
+          "color",
+          "ownerColor",
+          "labelId",
+          "labelName",
+          "detailsHidden"
         ],
         "type": "object"
       },
@@ -8252,6 +8398,7 @@
           "color": {
             "description": "Display color",
             "maxLength": 7,
+            "pattern": "^#[0-9A-Fa-f]{6}$",
             "type": "string"
           },
           "coverUrl": {
@@ -8320,7 +8467,8 @@
                 "recurrenceRule",
                 "recurrenceEnd",
                 "recurrenceExceptions",
-                "notificationOffset"
+                "notificationOffset",
+                "labelId"
               ],
               "type": "string"
             },
@@ -8344,6 +8492,10 @@
           "kind": {
             "description": "Event kind",
             "enum": ["event", "block", "free", "milestone"],
+            "type": "string"
+          },
+          "labelId": {
+            "description": "Calendar label public ID to file the event under",
             "type": "string"
           },
           "location": {
@@ -8563,6 +8715,7 @@
           "displayColor": {
             "description": "Caller-specific display color (hex)",
             "maxLength": 7,
+            "pattern": "^#[0-9A-Fa-f]{6}$",
             "type": "string"
           },
           "sortWeight": {
@@ -12837,6 +12990,31 @@
         "required": ["ok"],
         "type": "object"
       },
+      "UpdateCalendarLabelInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/UpdateCalendarLabelInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "color": {
+            "description": "New label colour as #RRGGBB",
+            "maxLength": 7,
+            "pattern": "^#[0-9A-Fa-f]{6}$",
+            "type": "string"
+          },
+          "name": {
+            "description": "New label name; surrounding whitespace is trimmed",
+            "maxLength": 50,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "UpdateChecklistItemInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -12910,6 +13088,26 @@
           },
           "sort": {}
         },
+        "type": "object"
+      },
+      "UpdateMemberColorInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/UpdateMemberColorInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "color": {
+            "description": "Member colour as #RRGGBB",
+            "maxLength": 7,
+            "pattern": "^#[0-9A-Fa-f]{6}$",
+            "type": "string"
+          }
+        },
+        "required": ["color"],
         "type": "object"
       },
       "UpdateMemberRoleInputBody": {
@@ -27038,6 +27236,263 @@
         "tags": ["CalendarInvite"]
       }
     },
+    "/workspaces/{wsId}/calendars/{calId}/labels": {
+      "get": {
+        "description": "Returns every label of the calendar in creation order. Any calendar member may read them.",
+        "operationId": "calendar-labels-list",
+        "parameters": [
+          {
+            "description": "Workspace public ID",
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "description": "Workspace public ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Calendar public ID",
+            "in": "path",
+            "name": "calId",
+            "required": true,
+            "schema": {
+              "description": "Calendar public ID",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListCalendarLabelsOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List a calendar's labels",
+        "tags": ["Calendar"]
+      },
+      "post": {
+        "description": "Adds a label (name and colour) to the calendar. Requires calendar manager or above and a non-system calendar. A calendar holds at most 50 labels, and names are unique within it.",
+        "operationId": "calendar-labels-create",
+        "parameters": [
+          {
+            "description": "Workspace public ID",
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "description": "Workspace public ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Calendar public ID",
+            "in": "path",
+            "name": "calId",
+            "required": true,
+            "schema": {
+              "description": "Calendar public ID",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCalendarLabelInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarLabelResponse"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Create a calendar label",
+        "tags": ["Calendar"]
+      }
+    },
+    "/workspaces/{wsId}/calendars/{calId}/labels/{labelId}": {
+      "delete": {
+        "description": "Removes a label; events that carried it fall back to their owner's colour. Requires calendar manager or above and a non-system calendar.",
+        "operationId": "calendar-labels-delete",
+        "parameters": [
+          {
+            "description": "Workspace public ID",
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "description": "Workspace public ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Calendar public ID",
+            "in": "path",
+            "name": "calId",
+            "required": true,
+            "schema": {
+              "description": "Calendar public ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Label public ID",
+            "in": "path",
+            "name": "labelId",
+            "required": true,
+            "schema": {
+              "description": "Label public ID",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Delete a calendar label",
+        "tags": ["Calendar"]
+      },
+      "patch": {
+        "description": "Renames or recolours a label. Requires calendar manager or above and a non-system calendar. A request that changes nothing returns the current label.",
+        "operationId": "calendar-labels-update",
+        "parameters": [
+          {
+            "description": "Workspace public ID",
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "description": "Workspace public ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Calendar public ID",
+            "in": "path",
+            "name": "calId",
+            "required": true,
+            "schema": {
+              "description": "Calendar public ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Label public ID",
+            "in": "path",
+            "name": "labelId",
+            "required": true,
+            "schema": {
+              "description": "Label public ID",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCalendarLabelInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarLabelResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Update a calendar label",
+        "tags": ["Calendar"]
+      }
+    },
     "/workspaces/{wsId}/calendars/{calId}/members": {
       "get": {
         "description": "Lists every member of the calendar with their role and join time. Used by the calendar settings members panel.",
@@ -27299,6 +27754,83 @@
           }
         ],
         "summary": "Update a member's role",
+        "tags": ["Calendar"]
+      }
+    },
+    "/workspaces/{wsId}/calendars/{calId}/members/{userId}/color": {
+      "put": {
+        "description": "Sets the colour a calendar member is drawn in. A member may change their own colour at any role; changing another member's needs calendar manager or above. Sending the colour the member already has changes nothing.",
+        "operationId": "calendar-member-color-update",
+        "parameters": [
+          {
+            "description": "Workspace public ID",
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "description": "Workspace public ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Calendar public ID",
+            "in": "path",
+            "name": "calId",
+            "required": true,
+            "schema": {
+              "description": "Calendar public ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "User public ID",
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "description": "User public ID",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMemberColorInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Set a member's colour on a calendar",
         "tags": ["Calendar"]
       }
     },

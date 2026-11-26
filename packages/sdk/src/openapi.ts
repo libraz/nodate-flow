@@ -3706,6 +3706,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspaces/{wsId}/calendars/{calId}/labels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List a calendar's labels
+         * @description Returns every label of the calendar in creation order. Any calendar member may read them.
+         */
+        get: operations["calendar-labels-list"];
+        put?: never;
+        /**
+         * Create a calendar label
+         * @description Adds a label (name and colour) to the calendar. Requires calendar manager or above and a non-system calendar. A calendar holds at most 50 labels, and names are unique within it.
+         */
+        post: operations["calendar-labels-create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/calendars/{calId}/labels/{labelId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete a calendar label
+         * @description Removes a label; events that carried it fall back to their owner's colour. Requires calendar manager or above and a non-system calendar.
+         */
+        delete: operations["calendar-labels-delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update a calendar label
+         * @description Renames or recolours a label. Requires calendar manager or above and a non-system calendar. A request that changes nothing returns the current label.
+         */
+        patch: operations["calendar-labels-update"];
+        trace?: never;
+    };
     "/workspaces/{wsId}/calendars/{calId}/members": {
         parameters: {
             query?: never;
@@ -3752,6 +3800,26 @@ export interface paths {
          * @description Changes a calendar member's role. Refuses to demote the last admin so the calendar stays manageable.
          */
         patch: operations["members-update-role"];
+        trace?: never;
+    };
+    "/workspaces/{wsId}/calendars/{calId}/members/{userId}/color": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set a member's colour on a calendar
+         * @description Sets the colour a calendar member is drawn in. A member may change their own colour at any role; changing another member's needs calendar manager or above. Sending the colour the member already has changes nothing.
+         */
+        put: operations["calendar-member-color-update"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/workspaces/{wsId}/calendars/{calId}/memos": {
@@ -5771,6 +5839,21 @@ export interface components {
             format: string;
             tasks: components["schemas"]["ExportedTask"][] | null;
         };
+        CalendarLabelResponse: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CalendarLabelResponse.json
+             */
+            readonly $schema?: string;
+            color: string;
+            /** Format: int64 */
+            createdAt: number;
+            id: string;
+            name: string;
+            /** Format: int64 */
+            updatedAt: number;
+        };
         CalendarRemoveMemberOutputBody: {
             /**
              * Format: uri
@@ -6158,6 +6241,18 @@ export interface components {
             /** @description System calendar slug */
             systemSlug?: string;
         };
+        CreateCalendarLabelInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CreateCalendarLabelInputBody.json
+             */
+            readonly $schema?: string;
+            /** @description Label colour as #RRGGBB */
+            color: string;
+            /** @description Label name; surrounding whitespace is trimmed */
+            name: string;
+        };
         CreateChecklistItemInputBody: {
             /**
              * Format: uri
@@ -6223,6 +6318,8 @@ export interface components {
              * @enum {string}
              */
             kind: "event" | "block" | "free" | "milestone";
+            /** @description Calendar label public ID; empty means no label */
+            labelId?: string;
             /** @description Location */
             location?: string;
             /** @description Memo / notes */
@@ -6696,16 +6793,21 @@ export interface components {
             allDay: boolean;
             blockLabel?: string;
             calendarId: string;
+            color: string;
             /** Format: int64 */
             createdAt: number;
+            detailsHidden: boolean;
             /** Format: int64 */
             endAt?: number;
             flexibility: string;
             id: string;
             kind: string;
+            labelId: string | null;
+            labelName: string | null;
             location?: string;
             /** @description Occurrence starts a separate override row already stands in for (RFC 3339 UTC). Recurring masters only. */
             overriddenStarts?: string[] | null;
+            ownerColor: string;
             /** Format: int64 */
             recurrenceEnd?: number;
             recurrenceExceptions?: unknown;
@@ -7237,20 +7339,26 @@ export interface components {
             readonly $schema?: string;
             allDay: boolean;
             blockLabel?: string;
+            canEdit: boolean;
+            color: string;
             /** Format: int64 */
             createdAt: number;
             creatorAvatarUrl?: string;
             creatorDisplayName?: string;
             creatorId?: string;
+            detailsHidden: boolean;
             /** Format: int64 */
             endAt?: number;
             flexibility: string;
             id: string;
             kind: string;
+            labelId: string | null;
+            labelName: string | null;
             location?: string;
             memo?: string;
             /** Format: int32 */
             notificationOffset?: number;
+            ownerColor: string;
             /** Format: int64 */
             recurrenceEnd?: number;
             recurrenceExceptions?: unknown;
@@ -7792,6 +7900,15 @@ export interface components {
              */
             readonly $schema?: string;
             events: components["schemas"]["CrossCalendarEventResponse"][] | null;
+        };
+        ListCalendarLabelsOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListCalendarLabelsOutputBody.json
+             */
+            readonly $schema?: string;
+            labels: components["schemas"]["CalendarLabelResponse"][] | null;
         };
         ListCalendarsOutputBody: {
             /**
@@ -8709,19 +8826,24 @@ export interface components {
             attendeeCount: number;
             blockLabel?: string;
             calendarId: string;
+            color: string;
             /** Format: int64 */
             createdAt: number;
             creatorAvatarUrl?: string;
             creatorDisplayName?: string;
             creatorId?: string;
+            detailsHidden: boolean;
             /** Format: int64 */
             endAt?: number;
             flexibility: string;
             id: string;
             kind: string;
+            labelId: string | null;
+            labelName: string | null;
             location?: string;
             /** @description Occurrence starts a separate override row already stands in for (RFC 3339 UTC). Recurring masters only. */
             overriddenStarts?: string[] | null;
+            ownerColor: string;
             ownerUserId: string;
             /** Format: int64 */
             recurrenceEnd?: number;
@@ -8998,7 +9120,7 @@ export interface components {
             /** @description Block label */
             blockLabel?: string;
             /** @description Nullable fields to clear. Takes precedence over a value sent for the same field in this request. */
-            clear?: ("location" | "memo" | "url" | "blockLabel" | "recurrenceRule" | "recurrenceEnd" | "recurrenceExceptions" | "notificationOffset")[] | null;
+            clear?: ("location" | "memo" | "url" | "blockLabel" | "recurrenceRule" | "recurrenceEnd" | "recurrenceExceptions" | "notificationOffset" | "labelId")[] | null;
             /**
              * Format: int64
              * @description End time as unix seconds (UTC). Not accepted for an all-day event.
@@ -9016,6 +9138,8 @@ export interface components {
              * @enum {string}
              */
             kind?: "event" | "block" | "free" | "milestone";
+            /** @description Calendar label public ID to file the event under */
+            labelId?: string;
             /** @description Location */
             location?: string;
             /** @description Memo */
@@ -11070,6 +11194,18 @@ export interface components {
             readonly $schema?: string;
             ok: boolean;
         };
+        UpdateCalendarLabelInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/UpdateCalendarLabelInputBody.json
+             */
+            readonly $schema?: string;
+            /** @description New label colour as #RRGGBB */
+            color?: string;
+            /** @description New label name; surrounding whitespace is trimmed */
+            name?: string;
+        };
         UpdateChecklistItemInputBody: {
             /**
              * Format: uri
@@ -11110,6 +11246,16 @@ export interface components {
             isDefault?: boolean;
             name?: string;
             sort?: unknown;
+        };
+        UpdateMemberColorInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/UpdateMemberColorInputBody.json
+             */
+            readonly $schema?: string;
+            /** @description Member colour as #RRGGBB */
+            color: string;
         };
         UpdateMemberRoleInputBody: {
             /**
@@ -19232,6 +19378,152 @@ export interface operations {
             };
         };
     };
+    "calendar-labels-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListCalendarLabelsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "calendar-labels-create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCalendarLabelInputBody"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarLabelResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "calendar-labels-delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+                /** @description Label public ID */
+                labelId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "calendar-labels-update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+                /** @description Label public ID */
+                labelId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCalendarLabelInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarLabelResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "members-list": {
         parameters: {
             query?: never;
@@ -19367,6 +19659,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UpdateMemberRoleOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "calendar-member-color-update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+                /** @description User public ID */
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateMemberColorInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberResponse"];
                 };
             };
             /** @description Error */
