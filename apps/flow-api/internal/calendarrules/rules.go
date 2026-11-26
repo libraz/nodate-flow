@@ -185,6 +185,16 @@ func RequireAllDayInput(allDay, instants, dates bool) *apierrors.APIError {
 	return nil
 }
 
+// RequireDetailsVisible refuses a write to an event's details (location,
+// memo, url or label) by a viewer who cannot see them. visible is the
+// caller's eventacl.CanSeeDetails answer for the row being written.
+func RequireDetailsVisible(visible bool) *apierrors.APIError {
+	if visible {
+		return nil
+	}
+	return apierrors.New(apierrors.CalendarEventDetailsHidden)
+}
+
 // AllDayEndExclusive turns the last day a caller names into the stored end,
 // the midnight after it. A milestone is a point, so its end is its start.
 func AllDayEndExclusive(kind string, lastDay time.Time) time.Time {

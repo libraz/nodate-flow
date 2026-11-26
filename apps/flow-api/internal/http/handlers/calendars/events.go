@@ -1373,11 +1373,22 @@ func patchIsLabelOnly(input *PatchEventInput) bool {
 	return reflect.ValueOf(body).IsZero()
 }
 
-// resolvePatchLabel turns the request's label members into a Change, in the
-// order the MCP tools use: the viewer must be able to see the target row's
-// details, then the label must belong to the calendar. Clear wins over a
-// value. The target is the override for an occurrence scope when one
-// exists, else the series.
+// patchTouchesDetails reports whether the request writes or clears location,
+// memo or url.
+func patchTouchesDetails(input *PatchEventInput) bool {
+	body := input.Body
+	return body.Location != nil || body.Memo != nil || body.URL != nil ||
+		slices.ContainsFunc(body.Clear, func(name string) bool {
+			return name == "location" || name == "memo" || name == "url"
+		})
+}
+
+// resolvePatchLabel enforces the details-visibility rule and turns the
+// request's label members into a Change, in the order the MCP tools use: a
+// write to location, memo, url or the label needs a viewer who can see the
+// target row's details, then the label must belong to the calendar. Clear
+// wins over a value. The target is the override for an occurrence scope when
+// one exists, else the series.
 func resolvePatchLabel(
 	ctx context.Context,
 	deps Deps,
@@ -1389,7 +1400,7 @@ func resolvePatchLabel(
 	input *PatchEventInput,
 ) (calendarlabels.Change, error) {
 	clearLabel := slices.Contains(input.Body.Clear, "labelId")
-	if input.Body.LabelID == nil && !clearLabel {
+	if input.Body.LabelID == nil && !clearLabel && !patchTouchesDetails(input) {
 		return calendarlabels.Change{}, nil
 	}
 	target, targetAttendee := evt, evtAttendee
@@ -1425,8 +1436,11 @@ func resolvePatchLabel(
 		},
 		eventacl.Actor{UserID: actorID, IsAttendee: targetAttendee != nil},
 	)
-	if refusal := calendarlabels.RequireDetailsVisible(visible); refusal != nil {
+	if refusal := calendarrules.RequireDetailsVisible(visible); refusal != nil {
 		return calendarlabels.Change{}, handlerutil.HTTPErrFromAPIError(refusal)
+	}
+	if input.Body.LabelID == nil && !clearLabel {
+		return calendarlabels.Change{}, nil
 	}
 	if clearLabel {
 		return calendarlabels.Change{Mode: calendarlabels.ChangeClear}, nil

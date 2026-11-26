@@ -70,15 +70,6 @@ func ResolveLabel(ctx context.Context, q Querier, calendarID uint32, raw string)
 	return row.ID, nil, nil
 }
 
-// RequireDetailsVisible refuses a label write by a viewer who cannot see
-// the event's details.
-func RequireDetailsVisible(visible bool) *apierrors.APIError {
-	if visible {
-		return nil
-	}
-	return apierrors.New(apierrors.CalendarEventDetailsHidden)
-}
-
 // CurrentLabel is the label id an event row carries, or 0 for none.
 func CurrentLabel(ctx context.Context, q Querier, eventID uint32) (uint32, error) {
 	id, err := q.GetEventLabel(ctx, eventID)

@@ -148,7 +148,10 @@ func updateCalendarEventOccurrences(
 	if err := requireOccurrenceScope(scope, in.OccurrenceStart, evt, parentID); err != nil {
 		return nil, err
 	}
-	label, err := resolveEventLabelChange(ctx, deps, s, scope, calendarID, evt, in)
+	if err := requireDetailsWritable(ctx, deps, s, scope, calendarID, evt, in); err != nil {
+		return nil, err
+	}
+	label, err := resolveEventLabelChange(ctx, deps, calendarID, in)
 	if err != nil {
 		return nil, err
 	}
@@ -224,12 +227,15 @@ func updateCalendarEventOccurrences(
 	return map[string]any{"success": true, "eventId": writtenPub.String()}, nil
 }
 
-// resolveEventLabelChange turns the labelId argument into a Change, in the
-// order REST uses: the caller must be able to see the target row's details,
-// then the label must belong to the calendar. An empty string clears. The
-// target is the override for an occurrence scope when one exists, else the
-// series. A call without labelId resolves to ChangeKeep.
-func resolveEventLabelChange(
+// requireDetailsWritable refuses an update that sets or clears location or
+// memo, or changes the label, when the caller cannot see the target row's
+// details. There is no url argument, so those three are the whole set. It
+// runs after the edit-permission check and ahead of label resolution, as in
+// REST; an update touching only other fields passes without a lookup.
+//
+// The target is the override for an occurrence scope when one exists, else
+// the series. Visibility is decided once, here.
+func requireDetailsWritable(
 	ctx context.Context,
 	deps Deps,
 	s *session,
@@ -237,9 +243,9 @@ func resolveEventLabelChange(
 	calendarID uint32,
 	evt calendar.FindCalendarEventByPublicIdRow,
 	in *updateCalendarEventArgs,
-) (calendarlabels.Change, error) {
-	if in.LabelID == nil {
-		return calendarlabels.Change{}, nil
+) error {
+	if in.Location == nil && in.Memo == nil && in.LabelID == nil {
+		return nil
 	}
 	target := evt
 	if scope == scopeOccurrence {
@@ -256,19 +262,19 @@ func resolveEventLabelChange(
 				WorkspaceID: s.workspaceID,
 			})
 			if err != nil {
-				return calendarlabels.Change{}, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+				return apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 			}
 		case !stderrors.Is(err, sql.ErrNoRows):
-			return calendarlabels.Change{}, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+			return apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 		}
 	}
 	attendee, err := actorIsAttendee(ctx, deps, s, target)
 	if err != nil {
-		return calendarlabels.Change{}, err
+		return err
 	}
 	calDefault, err := calendarDefaultVisibility(ctx, deps, s, calendarID)
 	if err != nil {
-		return calendarlabels.Change{}, err
+		return err
 	}
 	visible := eventacl.CanSeeDetails(
 		eventacl.Event{
@@ -279,8 +285,24 @@ func resolveEventLabelChange(
 		},
 		eventacl.Actor{UserID: s.userID, IsAttendee: attendee},
 	)
-	if refusal := calendarlabels.RequireDetailsVisible(visible); refusal != nil {
-		return calendarlabels.Change{}, refusal
+	if refusal := calendarrules.RequireDetailsVisible(visible); refusal != nil {
+		return refusal
+	}
+	return nil
+}
+
+// resolveEventLabelChange turns the labelId argument into a Change: the label
+// must belong to the calendar, and an empty string clears. Whether the caller
+// may change the label at all is [requireDetailsWritable]'s question, asked
+// before this. A call without labelId resolves to ChangeKeep.
+func resolveEventLabelChange(
+	ctx context.Context,
+	deps Deps,
+	calendarID uint32,
+	in *updateCalendarEventArgs,
+) (calendarlabels.Change, error) {
+	if in.LabelID == nil {
+		return calendarlabels.Change{}, nil
 	}
 	if *in.LabelID == "" {
 		return calendarlabels.Change{Mode: calendarlabels.ChangeClear}, nil

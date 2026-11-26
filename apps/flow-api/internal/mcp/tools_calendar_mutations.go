@@ -338,7 +338,10 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	if scope != scopeSeries {
 		return updateCalendarEventOccurrences(ctx, deps, s, scope, owner.CalendarID, eventPub, evt, &in)
 	}
-	label, err := resolveEventLabelChange(ctx, deps, s, scope, owner.CalendarID, evt, &in)
+	if err := requireDetailsWritable(ctx, deps, s, scope, owner.CalendarID, evt, &in); err != nil {
+		return nil, err
+	}
+	label, err := resolveEventLabelChange(ctx, deps, owner.CalendarID, &in)
 	if err != nil {
 		return nil, err
 	}

@@ -525,9 +525,29 @@ func TestCalendarLabels(t *testing.T) {
 		requireDenied(t, status, raw, http.StatusForbidden, "CALENDAR.EVENT.DETAILS_HIDDEN", "the visibility check precedes label resolution")
 		require.Empty(t, linkedLabelPublicID(t, evtID))
 
+		for _, field := range []string{"location", "memo", "url"} {
+			status, raw = patchLabelEventStatus(t, manager, f.calID, evtID, map[string]any{field: "x"})
+			requireDenied(t, status, raw, http.StatusForbidden, "CALENDAR.EVENT.DETAILS_HIDDEN", "manager setting "+field)
+			status, raw = patchLabelEventStatus(t, manager, f.calID, evtID, map[string]any{"clear": []string{field}})
+			requireDenied(t, status, raw, http.StatusForbidden, "CALENDAR.EVENT.DETAILS_HIDDEN", "manager clearing "+field)
+		}
+
+		series := postLabelEvent(t, owner, f.calID, labelEventBody("Private weekly "+randomHex(3), labelSeriesStart,
+			map[string]any{"visibility": "private", "recurrenceRule": weeklyRule()}))
+		seriesID := eventIDOf(t, series)
+		status, raw = patchLabelEventStatus(t, manager, f.calID, seriesID, map[string]any{
+			"scope": "occurrence", "occurrenceStart": labelOccurrence(1).Unix(), "location": "x"})
+		requireDenied(t, status, raw, http.StatusForbidden, "CALENDAR.EVENT.DETAILS_HIDDEN", "manager setting a location on an occurrence")
+
+		// A body that leaves the details alone still goes through.
+		status, raw = patchLabelEventStatus(t, manager, f.calID, evtID, map[string]any{"title": "Retitled " + randomHex(3), "kind": "block"})
+		require.Equal(t, http.StatusOK, status, string(raw))
+
 		// The party who may see the details can still label it.
 		labelled := patchLabelEvent(t, owner, f.calID, evtID, map[string]any{"labelId": a.ID})
 		require.Equal(t, a.ID, labelled["labelId"])
+		withLocation := patchLabelEvent(t, owner, f.calID, evtID, map[string]any{"location": "Room 1"})
+		require.Equal(t, "Room 1", withLocation["location"])
 	})
 
 	t.Run("series", func(t *testing.T) {
