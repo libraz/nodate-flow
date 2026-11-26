@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"context"
 	"net/http"
 	"testing"
 	"time"
@@ -124,6 +125,62 @@ func TestInboxLifecycle(t *testing.T) {
 		testServerURL+"/inbox/"+signal.ID+"/archive?workspaceId="+tt.WorkspacePublicID,
 		tt.AccessToken, nil)
 	require.Equal(t, http.StatusOK, status)
+}
+
+// TestInboxExcludesSchedulerTicks verifies that a calendar-source signal,
+// which only the judge consumes, stays out of both inbox feeds and their
+// totals while an ordinary signal in the same workspace still lists.
+func TestInboxExcludesSchedulerTicks(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	tt := newTenant(t)
+
+	var manual struct {
+		ID string `json:"id"`
+	}
+	doJSON(t, http.MethodPost, testServerURL+"/signals", tt.AccessToken, map[string]any{
+		"workspaceId": tt.WorkspacePublicID,
+		"source":      "manual",
+		"kind":        "manual",
+	}, &manual)
+	require.NotEmpty(t, manual.ID)
+
+	type feed struct {
+		Total int64 `json:"total"`
+		Items []struct {
+			ID string `json:"id"`
+		} `json:"items"`
+	}
+	workspaceURL := testServerURL + "/inbox?workspaceId=" + tt.WorkspacePublicID
+	var workspaceBefore, crossBefore feed
+	doJSON(t, http.MethodGet, workspaceURL, tt.AccessToken, nil, &workspaceBefore)
+	doJSON(t, http.MethodGet, testServerURL+"/inbox", tt.AccessToken, nil, &crossBefore)
+
+	// The worker posts ticks with a service token; the row is what matters here.
+	ctx := context.Background()
+	res, err := testDB.ExecContext(ctx, `
+		INSERT INTO signals (public_id, workspace_id, source, kind, payload_json, received_at, subject_type)
+		VALUES (UUID_TO_BIN(UUID(), 0), ?, 'calendar', 'calendar.event_day_arrived', JSON_OBJECT(), NOW(3), 'workspace')`,
+		internalWorkspaceID(t, testDB, tt.WorkspacePublicID))
+	require.NoError(t, err)
+	tickInternalID, err := res.LastInsertId()
+	require.NoError(t, err)
+	var tickID string
+	require.NoError(t, testDB.QueryRowContext(ctx,
+		`SELECT BIN_TO_UUID(public_id, 0) FROM signals WHERE id = ?`, tickInternalID).Scan(&tickID))
+
+	var workspaceAfter, crossAfter feed
+	doJSON(t, http.MethodGet, workspaceURL, tt.AccessToken, nil, &workspaceAfter)
+	doJSON(t, http.MethodGet, testServerURL+"/inbox", tt.AccessToken, nil, &crossAfter)
+
+	require.Contains(t, inboxItemIDs(workspaceAfter.Items), manual.ID)
+	require.NotContains(t, inboxItemIDs(workspaceAfter.Items), tickID,
+		"a scheduler tick must not list in the workspace Inbox")
+	require.NotContains(t, inboxItemIDs(crossAfter.Items), tickID,
+		"a scheduler tick must not list in the cross-workspace Inbox")
+	require.Equal(t, workspaceBefore.Total, workspaceAfter.Total)
+	require.Equal(t, crossBefore.Total, crossAfter.Total)
 }
 
 func inboxItemIDs(items []struct {
