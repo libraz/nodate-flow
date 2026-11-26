@@ -30,7 +30,6 @@
     }
   },
   "cost_today": {
-    "label": "AI",
     "tooltip": "本工作区今日的 AI 使用消费"
   },
   "providers": {

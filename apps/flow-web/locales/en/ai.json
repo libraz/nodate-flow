@@ -30,7 +30,6 @@
     }
   },
   "cost_today": {
-    "label": "AI",
     "tooltip": "Today's AI spend across this workspace"
   },
   "providers": {
