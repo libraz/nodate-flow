@@ -71,19 +71,25 @@ function AssigneePicker({
   );
 }
 
-/** Resolve the assignee display name for an active chip. */
-function AssigneeChipLabel({
+/** Active assignee chip; resolves the display name. */
+function AssigneeChip({
   workspaceId,
   assigneeId,
+  onDismiss,
 }: {
   workspaceId: string;
   assigneeId: string;
+  onDismiss: () => void;
 }): ReactElement {
   const { t } = useTranslation('common');
   const { data: users } = useWorkspaceUsersQuery(workspaceId);
   const user = users.find((u) => u.id === assigneeId);
-  const name = user?.displayName ?? assigneeId;
-  return <>{t('tasks.filters.chip_assignee', { value: name })}</>;
+  const text = t('tasks.filters.chip_assignee', { value: user?.displayName ?? assigneeId });
+  return (
+    <Chip onDismiss={onDismiss} dismissLabel={t('tasks.filters.chip_remove', { label: text })}>
+      {text}
+    </Chip>
+  );
 }
 
 export default function TaskFiltersBar({
@@ -115,6 +121,8 @@ export default function TaskFiltersBar({
   const activeStates = filters.states != null && filters.states.length > 0;
   const activeAssignee = filters.assigneeId != null && filters.assigneeId.length > 0;
   const activePriority = filters.priority != null && filters.priority.length > 0;
+  const assigneeChipText = t('tasks.filters.chip_assignee', { value: filters.assigneeId });
+  const searchChipText = t('tasks.filters.chip_search', { value: filters.search });
   const hasActiveFilter = activeSearch || activeStates || activeAssignee || activePriority;
 
   return (
@@ -223,57 +231,64 @@ export default function TaskFiltersBar({
               onDismiss={() => {
                 setTaskFilterSearch(projectId, '');
               }}
+              dismissLabel={t('tasks.filters.chip_remove', { label: searchChipText })}
             >
-              {t('tasks.filters.chip_search', { value: filters.search })}
+              {searchChipText}
             </Chip>
           ) : null}
           {activeStates
-            ? (filters.states ?? []).map((state) => (
-                <Chip
-                  key={`state-${state}`}
-                  onDismiss={() => {
-                    const next = (filters.states ?? []).filter((s) => s !== state);
-                    setTaskFilterStates(projectId, next);
-                  }}
-                >
-                  {t('tasks.filters.chip_status', { value: t(STATE_KEY[state]) })}
-                </Chip>
-              ))
+            ? (filters.states ?? []).map((state) => {
+                const text = t('tasks.filters.chip_status', { value: t(STATE_KEY[state]) });
+                return (
+                  <Chip
+                    key={`state-${state}`}
+                    onDismiss={() => {
+                      const next = (filters.states ?? []).filter((s) => s !== state);
+                      setTaskFilterStates(projectId, next);
+                    }}
+                    dismissLabel={t('tasks.filters.chip_remove', { label: text })}
+                  >
+                    {text}
+                  </Chip>
+                );
+              })
             : null}
           {activePriority
-            ? (filters.priority ?? []).map((p) => (
-                <Chip
-                  key={`priority-${String(p)}`}
-                  onDismiss={() => {
-                    const next = (filters.priority ?? []).filter((v) => v !== p);
-                    setTaskFilterPriority(projectId, next);
-                  }}
-                >
-                  {t('tasks.filters.chip_priority', { value: t(PRIORITY_KEY[p]) })}
-                </Chip>
-              ))
+            ? (filters.priority ?? []).map((p) => {
+                const text = t('tasks.filters.chip_priority', { value: t(PRIORITY_KEY[p]) });
+                return (
+                  <Chip
+                    key={`priority-${String(p)}`}
+                    onDismiss={() => {
+                      const next = (filters.priority ?? []).filter((v) => v !== p);
+                      setTaskFilterPriority(projectId, next);
+                    }}
+                    dismissLabel={t('tasks.filters.chip_remove', { label: text })}
+                  >
+                    {text}
+                  </Chip>
+                );
+              })
             : null}
           {activeAssignee ? (
             workspaceId !== undefined ? (
               <Suspense fallback={null}>
-                <Chip
+                <AssigneeChip
+                  workspaceId={workspaceId}
+                  assigneeId={filters.assigneeId ?? ''}
                   onDismiss={() => {
                     setTaskFilterAssignee(projectId, '');
                   }}
-                >
-                  <AssigneeChipLabel
-                    workspaceId={workspaceId}
-                    assigneeId={filters.assigneeId ?? ''}
-                  />
-                </Chip>
+                />
               </Suspense>
             ) : (
               <Chip
                 onDismiss={() => {
                   setTaskFilterAssignee(projectId, '');
                 }}
+                dismissLabel={t('tasks.filters.chip_remove', { label: assigneeChipText })}
               >
-                {t('tasks.filters.chip_assignee', { value: filters.assigneeId })}
+                {assigneeChipText}
               </Chip>
             )
           ) : null}
