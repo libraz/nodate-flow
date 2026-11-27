@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 )
 
 const (
@@ -173,6 +174,52 @@ func (p *anthropicProvider) Complete(ctx context.Context, req Request) (*Respons
 		CostMicros:   costMicros,
 		CostCents:    costMicros / 10_000,
 	}, nil
+}
+
+type anthropicModelList struct {
+	Data []struct {
+		ID string `json:"id"`
+	} `json:"data"`
+	Error *struct {
+		Type string `json:"type"`
+	} `json:"error,omitempty"`
+}
+
+// ListModels implements [ModelLister] against the Models API, which sits
+// beside the configured Messages endpoint. An endpoint not ending in
+// /messages has no known models sibling, so it yields no candidates.
+func (p *anthropicProvider) ListModels(ctx context.Context) ([]string, error) {
+	endpoint := chooseBaseURL(p.endpoint, anthropicEndpoint)
+	if !strings.HasSuffix(endpoint, "/messages") {
+		return []string{}, nil
+	}
+	listURL := strings.TrimSuffix(endpoint, "/messages") + "/models?limit=1000"
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, listURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("anthropic: build request: %w", err)
+	}
+	httpReq.Header.Set("anthropic-version", anthropicAPIVersion)
+
+	plain, err := p.dec.Decrypt(p.cfg.EncryptedKey)
+	if err != nil {
+		return nil, fmt.Errorf("anthropic: decrypt key: %w: %w", ErrKeyDecryptFailed, err)
+	}
+	httpReq.Header.Set("x-api-key", string(plain))
+	zero(plain)
+
+	var list anthropicModelList
+	status, err := fetchModelList(ctx, DestAnthropic, httpReq, &list)
+	if err != nil {
+		return nil, err
+	}
+	if list.Error != nil {
+		return nil, &UpstreamError{Sentinel: ErrUpstreamRequestRejected, Status: status}
+	}
+	ids := make([]string, 0, len(list.Data))
+	for _, m := range list.Data {
+		ids = append(ids, m.ID)
+	}
+	return normalizeModelIDs(ids), nil
 }
 
 func anthropicOutputConfigFor(model, endpoint string, spec *OutputSpec) (OutputMode, *anthropicOutputConfig) {

@@ -195,6 +195,46 @@ func (p *openAIProvider) Complete(ctx context.Context, req Request) (*Response, 
 	return out, nil
 }
 
+type openAIModelList struct {
+	Data []struct {
+		ID string `json:"id"`
+	} `json:"data"`
+	Error *struct {
+		Message string `json:"message"`
+	} `json:"error,omitempty"`
+}
+
+// ListModels implements [ModelLister] with GET {baseURL}/models, the same
+// path for the official API and OpenAI-compatible gateways.
+func (p *openAIProvider) ListModels(ctx context.Context) ([]string, error) {
+	listURL := strings.TrimRight(p.baseURL, "/") + "/models"
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, listURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("openai: build request: %w", err)
+	}
+
+	plain, err := p.dec.Decrypt(p.cfg.EncryptedKey)
+	if err != nil {
+		return nil, fmt.Errorf("openai: decrypt key: %w: %w", ErrKeyDecryptFailed, err)
+	}
+	httpReq.Header.Set("Authorization", "Bearer "+string(plain))
+	zero(plain)
+
+	var list openAIModelList
+	status, err := fetchModelList(ctx, DestOpenAI, httpReq, &list)
+	if err != nil {
+		return nil, err
+	}
+	if list.Error != nil {
+		return nil, &UpstreamError{Sentinel: ErrUpstreamRequestRejected, Status: status}
+	}
+	ids := make([]string, 0, len(list.Data))
+	for _, m := range list.Data {
+		ids = append(ids, m.ID)
+	}
+	return normalizeModelIDs(ids), nil
+}
+
 func classifyOpenAICompletion(choice openAIChoice) (Termination, string) {
 	if choice.Message.Refusal != nil {
 		return TerminationRefused, "refusal"

@@ -133,6 +133,38 @@ func (p *ollamaProvider) Complete(ctx context.Context, req Request) (*Response, 
 	}, nil
 }
 
+type ollamaTags struct {
+	Models []struct {
+		Name string `json:"name"`
+	} `json:"models"`
+	Error string `json:"error,omitempty"`
+}
+
+// ListModels implements [ModelLister] with GET {base}/api/tags, the
+// locally pulled models. Like Complete it sends no credentials.
+func (p *ollamaProvider) ListModels(ctx context.Context) ([]string, error) {
+	base := chooseBaseURL(p.cfg.BaseURL, defaultOllamaBaseURL)
+	listURL := strings.TrimRight(base, "/") + "/api/tags"
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, listURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("ollama: build request: %w", err)
+	}
+
+	var tags ollamaTags
+	status, err := fetchModelList(ctx, DestOllama, httpReq, &tags)
+	if err != nil {
+		return nil, err
+	}
+	if tags.Error != "" {
+		return nil, &UpstreamError{Sentinel: ErrUpstreamRequestRejected, Status: status}
+	}
+	ids := make([]string, 0, len(tags.Models))
+	for _, m := range tags.Models {
+		ids = append(ids, m.Name)
+	}
+	return normalizeModelIDs(ids), nil
+}
+
 func classifyOllamaCompletion(done *bool, reason string) (Termination, string) {
 	if done == nil || !*done {
 		return TerminationUnknown, boundedStopReason(reason)

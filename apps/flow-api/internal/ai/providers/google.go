@@ -8,6 +8,8 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
+	"strings"
 )
 
 const (
@@ -201,6 +203,77 @@ func (p *googleProvider) Complete(ctx context.Context, req Request) (*Response, 
 	out.Text = text
 	out.Termination, out.StopReason = classifyGoogleCompletion(finishReason, gr.PromptFeedback.BlockReason, parts)
 	return out, nil
+}
+
+type googleModelList struct {
+	Models []struct {
+		Name                       string   `json:"name"`
+		SupportedGenerationMethods []string `json:"supportedGenerationMethods"`
+	} `json:"models"`
+	NextPageToken string `json:"nextPageToken"`
+	Error         *struct {
+		Code int `json:"code"`
+	} `json:"error,omitempty"`
+}
+
+// ListModels implements [ModelLister] against the models collection that
+// is also the generateContent base. It keeps only models that support
+// generateContent, and stops paging once [maxListedModels] IDs are held.
+func (p *googleProvider) ListModels(ctx context.Context) ([]string, error) {
+	base, perr := url.Parse(chooseBaseURL(p.baseURL, googleBaseURL))
+	if perr != nil {
+		return nil, fmt.Errorf("google: build request: %w", perr)
+	}
+	var ids []string
+	pageToken := ""
+	for {
+		page, err := p.listModelsPage(ctx, *base, pageToken)
+		if err != nil {
+			return nil, err
+		}
+		for _, m := range page.Models {
+			if slices.Contains(m.SupportedGenerationMethods, "generateContent") {
+				ids = append(ids, strings.TrimPrefix(m.Name, "models/"))
+			}
+		}
+		// An empty page or a repeated token would otherwise page forever.
+		if len(ids) >= maxListedModels || page.NextPageToken == "" ||
+			page.NextPageToken == pageToken || len(page.Models) == 0 {
+			break
+		}
+		pageToken = page.NextPageToken
+	}
+	return normalizeModelIDs(ids), nil
+}
+
+func (p *googleProvider) listModelsPage(ctx context.Context, u url.URL, pageToken string) (*googleModelList, error) {
+	q := u.Query()
+	q.Set("pageSize", "1000")
+	if pageToken != "" {
+		q.Set("pageToken", pageToken)
+	}
+	u.RawQuery = q.Encode()
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("google: build request: %w", err)
+	}
+
+	plain, err := p.dec.Decrypt(p.cfg.EncryptedKey)
+	if err != nil {
+		return nil, fmt.Errorf("google: decrypt key: %w: %w", ErrKeyDecryptFailed, err)
+	}
+	httpReq.Header.Set(googleAPIKeyHeader, string(plain))
+	zero(plain)
+
+	var page googleModelList
+	status, err := fetchModelList(ctx, DestGoogle, httpReq, &page)
+	if err != nil {
+		return nil, err
+	}
+	if page.Error != nil {
+		return nil, &UpstreamError{Sentinel: ErrUpstreamRequestRejected, Status: status}
+	}
+	return &page, nil
 }
 
 func googlePromptBlocked(reason string) bool {
