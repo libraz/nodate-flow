@@ -170,3 +170,37 @@ func TestValidateActorRequiresExclusiveHumanOrAgent(t *testing.T) {
 		t.Fatalf("validateActor rejected a system actor: %v", err)
 	}
 }
+
+func TestCheckTransition(t *testing.T) {
+	t.Parallel()
+
+	states := []generated.TasksDerivedState{
+		generated.TasksDerivedStateOpen, generated.TasksDerivedStateWaiting, generated.TasksDerivedStateReview,
+		generated.TasksDerivedStateDone, generated.TasksDerivedStateCancelled,
+	}
+	policies := []generated.TasksCompletionPolicy{
+		generated.TasksCompletionPolicyManual, generated.TasksCompletionPolicyReviewRequired,
+	}
+	verbs := []string{
+		TransitionStart, TransitionBlock, TransitionUnblock, TransitionSubmit,
+		TransitionComplete, TransitionReopen, TransitionCancel,
+	}
+	for _, st := range states {
+		for _, pol := range policies {
+			for _, v := range verbs {
+				var want error
+				if _, ok := NextState(st, v); !ok {
+					want = ErrTransitionRejected
+				} else if v == TransitionComplete && pol == generated.TasksCompletionPolicyReviewRequired {
+					want = ErrCompletionNeedsApproval
+				}
+				if got := CheckTransition(st, pol, v); got != want {
+					t.Errorf("CheckTransition(%s, %s, %s) = %v, want %v", st, pol, v, got, want)
+				}
+			}
+		}
+	}
+	if got := CheckTransition(generated.TasksDerivedStateOpen, generated.TasksCompletionPolicyManual, "nope"); got != ErrTransitionUnknown {
+		t.Errorf("unknown verb = %v", got)
+	}
+}

@@ -38,6 +38,10 @@ var ErrTaskNotFound = errors.New("taskupdate: task not found")
 // stored due date differs from it.
 var ErrDueOnConflict = errors.New("taskupdate: stored due date differs from the expected one")
 
+// ErrPriorityConflict is returned when [Patch.ExpectedPriority] is set and
+// the stored priority differs from it.
+var ErrPriorityConflict = errors.New("taskupdate: stored priority differs from the expected one")
+
 // ErrParentCycle is returned when the proposed parent is the task itself,
 // one of its descendants, or sits in a chain deeper than [MaxParentDepth].
 var ErrParentCycle = errors.New("taskupdate: parent would make the task its own ancestor")
@@ -81,6 +85,9 @@ type Patch struct {
 	// ExpectedDueOn, when non-nil, makes the update conditional on the
 	// stored due date equalling it (invalid = no due date).
 	ExpectedDueOn *sql.NullTime
+	// ExpectedPriority, when non-nil, makes the update conditional on the
+	// stored priority equalling it.
+	ExpectedPriority *int32
 	// Parent, when non-nil, re-parents the task; a nil ParentID clears the
 	// link. The caller has already authorized the parent for the actor.
 	Parent *ParentChange
@@ -128,6 +135,10 @@ type Args struct {
 	Actor mutationlog.Actor
 	// Via, when set, is recorded in the task.updated payload ("mcp").
 	Via string
+	// ExtraPayload is merged into the task.updated payload after the
+	// standard keys are written; like taskstate.ApplyParams.ExtraPayload, a
+	// colliding key overwrites. Values must be public ids, never internal ones.
+	ExtraPayload map[string]any
 	// RestoredFrom, when set, makes this the restore of that description
 	// version: the description is snapshotted and its mentions re-derived
 	// even when unchanged, the dates are written back unchecked, and the
@@ -154,13 +165,13 @@ type Result struct {
 //
 // Rule violations come back as [taskrules] errors, itemkit refusals as
 // [*ItemkitError], and a vanished row or a failed due-date precondition as
-// [ErrTaskNotFound] / [ErrDueOnConflict]. SQL errors are returned as they
+// [ErrTaskNotFound] / [ErrDueOnConflict] / [ErrPriorityConflict]. SQL errors are returned as they
 // are so dbretry can retry the transient ones.
 func Apply(ctx context.Context, tx *dbretry.Tx, args Args) (Result, error) {
 	restoring := args.RestoredFrom != (types.PublicID{})
 	p := args.Patch
 	if restoring && (p.Description == nil || p.Title != nil || p.Priority != nil || p.DueOn != nil ||
-		p.StartOn != nil || p.SortWeight != nil || p.Visibility != nil || p.ExpectedDueOn != nil || p.Parent != nil) {
+		p.StartOn != nil || p.SortWeight != nil || p.Visibility != nil || p.ExpectedDueOn != nil || p.ExpectedPriority != nil || p.Parent != nil) {
 		return Result{}, errRestoreShape
 	}
 	if args.Actor.UserID != 0 && args.Actor.AgentID != 0 {
@@ -191,6 +202,9 @@ func Apply(ctx context.Context, tx *dbretry.Tx, args Args) (Result, error) {
 	}
 	if p.ExpectedDueOn != nil && !sameDate(current.DueOn, *p.ExpectedDueOn) {
 		return Result{}, ErrDueOnConflict
+	}
+	if p.ExpectedPriority != nil && current.Priority != *p.ExpectedPriority {
+		return Result{}, ErrPriorityConflict
 	}
 
 	newTitle, err := taskrules.PatchTitle(current.Title, p.Title)
@@ -408,6 +422,9 @@ func Apply(ctx context.Context, tx *dbretry.Tx, args Args) (Result, error) {
 	}
 	if args.Via != "" {
 		res.Payload["via"] = args.Via
+	}
+	for k, v := range args.ExtraPayload {
+		res.Payload[k] = v
 	}
 	taskID := int64(args.TaskID)
 	if err := eventbus.Append(ctx, tx, eventbus.Event{

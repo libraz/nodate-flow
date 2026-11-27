@@ -322,6 +322,33 @@ func ApplyTransitionTx(ctx context.Context, tx *dbretry.Tx, p ApplyParams) (Appl
 	return ApplyResult{FromState: locked.DerivedState, ToState: next}, nil, nil
 }
 
+// Errors returned by [CheckTransition].
+var (
+	// ErrTransitionUnknown is returned for a verb outside the state machine.
+	ErrTransitionUnknown = stderrors.New("taskstate: unknown transition")
+	// ErrTransitionRejected is returned when the current state has no such edge.
+	ErrTransitionRejected = stderrors.New("taskstate: transition not allowed from the current state")
+	// ErrCompletionNeedsApproval is returned for a direct complete under review_required.
+	ErrCompletionNeedsApproval = stderrors.New("taskstate: completion needs review approval")
+)
+
+// CheckTransition reports whether a transition is plainly inapplicable: an
+// unknown verb, an edge the state machine lacks, or a direct complete under
+// a policy that does not allow it. It reads no rows and evaluates no
+// constraints; the verdict that counts is [ApplyTransitionTx]'s.
+func CheckTransition(current generated.TasksDerivedState, policy generated.TasksCompletionPolicy, transition string) error {
+	if !IsKnownTransition(transition) {
+		return ErrTransitionUnknown
+	}
+	if _, ok := NextState(current, transition); !ok {
+		return ErrTransitionRejected
+	}
+	if transition == TransitionComplete && !completionAllowed(policy, false) {
+		return ErrCompletionNeedsApproval
+	}
+	return nil
+}
+
 // completionAllowed preserves the existing direct-completion behavior for
 // manual tasks while failing closed for unknown future policy values.
 func completionAllowed(policy generated.TasksCompletionPolicy, reviewGate bool) bool {
