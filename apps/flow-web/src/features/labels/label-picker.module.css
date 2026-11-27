@@ -33,7 +33,7 @@
   display: flex;
   align-items: center;
   gap: var(--nf-space-2);
-  min-block-size: 2rem;
+  min-block-size: var(--nf-space-8);
   padding-inline: var(--nf-space-2);
   border-radius: var(--nf-radius-sm);
   font-size: var(--nf-text-sm);
@@ -48,8 +48,8 @@
 
 .dot {
   flex: none;
-  inline-size: 0.5rem;
-  block-size: 0.5rem;
+  inline-size: var(--nf-space-2);
+  block-size: var(--nf-space-2);
   border-radius: var(--nf-radius-pill);
   background: var(--dot-color);
   box-shadow: 0 0 0 2px color-mix(in oklab, var(--dot-color) 28%, transparent);
@@ -92,7 +92,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--nf-space-1);
-  min-block-size: 1.5rem;
+  min-block-size: var(--nf-space-6);
   padding-inline: var(--nf-space-2);
   border: var(--nf-space-px) dashed var(--nf-color-border-control);
   border-radius: var(--nf-radius-pill);

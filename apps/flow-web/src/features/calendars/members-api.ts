@@ -36,7 +36,7 @@ import {
 } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { apiRequest } from '../../lib/api';
-import type { ApiError } from '../../lib/api-error';
+import { type ApiError, formatApiError } from '../../lib/api-error';
 import { calendarEventKeys, eventDetailKeys } from '../events/api';
 
 export type CalendarMember = components['schemas']['MemberResponse'];
@@ -214,9 +214,12 @@ export function useUpdateMemberColor(): UseMutationResult<
       );
       return { previous };
     },
-    onError: (_err, { wsId, calId }, context) => {
+    onError: (err, { wsId, calId }, context) => {
       qc.setQueryData(calendarMembersKeys.list(wsId, calId), context?.previous);
-      toaster.show({ tone: 'danger', message: t('calendar.settings.members.color_error') });
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'calendar.settings.members.color_error'),
+      });
     },
     onSuccess: (_data, { wsId, calId }) => {
       void qc.invalidateQueries({ queryKey: calendarMembersKeys.list(wsId, calId) });

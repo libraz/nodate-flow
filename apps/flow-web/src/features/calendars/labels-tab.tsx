@@ -319,7 +319,7 @@ function LabelForm({
     labels.filter((l) => l.id !== editingId && sameColor(l.color, hex)).map((l) => l.name);
 
   const selectedIndex = SWATCHES.findIndex((hex) => sameColor(hex, color));
-  const tabbableIndex = selectedIndex >= 0 ? selectedIndex : 0;
+  const tabbableIndex = Math.max(selectedIndex, 0);
 
   const handleSwatchKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number): void => {
     let next = index;

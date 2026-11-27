@@ -144,7 +144,7 @@ describe('MemberColorPopover', () => {
   });
 
   it('rolls the list back and toasts when saving fails', async () => {
-    mocks.put.mockResolvedValue({ error: new Error('boom') });
+    mocks.put.mockResolvedValue({ error: { status: 500, title: 'boom' } });
     const { qc } = setup(ana, true);
     await userEvent.click(screen.getByRole('button', { name: 'Change color for Ana' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Color #2ECC87' }));

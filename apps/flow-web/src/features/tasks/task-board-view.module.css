@@ -16,6 +16,7 @@
    * page once and the board spans the screen, each column scrolling inside it.
    */
   grid-template-rows: minmax(0, 1fr);
+  /* nf-token-override: shortest board that still shows a few cards per column */
   block-size: max(24rem, calc(100dvh - var(--nf-topbar-height) - var(--nf-dock-clearance)));
 }
 
