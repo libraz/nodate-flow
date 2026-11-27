@@ -323,6 +323,102 @@ resources:
         description: "Returned when starting or resuming an agent run would push the agent's accumulated spend past ai_agents.monthly_cost_cap_cents for the current billing month."
         userAction: "Wait for the next billing month, or hand the task off to another agent or user."
 
+      task_not_workable:
+        code: WS.TASK_AGENT.TASK_NOT_WORKABLE
+        reserved: "returned by the agent task-work handlers being added in the same change"
+        status: 422
+        message: "An agent cannot work on this task"
+        message_ja: "このタスクではエージェントを動かせません"
+        message_zh: "代理无法处理此任务"
+        description: "Returned when an agent run or proposal targets a task that is private, project-visible only, done, cancelled, or archived."
+        userAction: "Reopen the task or make it visible to the workspace, then try again."
+
+      kind_not_assignable:
+        code: WS.TASK_AGENT.KIND_NOT_ASSIGNABLE
+        reserved: "returned by the agent task-work handlers being added in the same change"
+        status: 422
+        message: "This kind of agent cannot be assigned to tasks"
+        message_ja: "この種類のエージェントはタスクに割り当てられません"
+        message_zh: "此类代理无法分配给任务"
+        description: "Returned when a signal_judge agent is assigned to a task. Only task agents can be assignees."
+        userAction: "Choose a task agent instead."
+
+      no_grants:
+        code: WS.TASK_AGENT.NO_GRANTS
+        reserved: "returned by the agent task-work handlers being added in the same change"
+        status: 422
+        message: "This agent has not been allowed to do anything yet"
+        message_ja: "このエージェントにはまだ許可された操作がありません"
+        message_zh: "此代理尚未被允许执行任何操作"
+        description: "Returned when a run is requested for an agent whose allowed operations are empty."
+        userAction: "Ask a workspace admin to choose what the agent can do in its settings."
+
+  agent_proposal:
+    breadcrumb: "Workspace > Task > Agent Proposal"
+    errors:
+      not_found:
+        code: WS.AGENT_PROPOSAL.NOT_FOUND
+        reserved: "returned by the agent task-work handlers being added in the same change"
+        status: 404
+        message: "Proposal not found"
+        message_ja: "提案が見つかりません"
+        message_zh: "未找到提案"
+        description: "Returned when the proposal does not exist on the task or the actor cannot see it."
+        userAction: "Reload the task and check the proposal list."
+
+      already_decided:
+        code: WS.AGENT_PROPOSAL.ALREADY_DECIDED
+        reserved: "returned by the agent task-work handlers being added in the same change"
+        status: 409
+        message: "This proposal has already been decided"
+        message_ja: "この提案は既に判断済みです"
+        message_zh: "此提案已被处理"
+        description: "Returned when approving or rejecting a proposal that was already approved, rejected, or withdrawn."
+        userAction: "Reload the task to see the current state."
+
+      stale:
+        code: WS.AGENT_PROPOSAL.STALE
+        reserved: "returned by the agent task-work handlers being added in the same change"
+        status: 409
+        message: "The task changed since this was proposed, so it was not applied"
+        message_ja: "提案後にタスクが変更されたため、適用されませんでした"
+        message_zh: "提案后任务已发生变化，因此未应用"
+        description: "Returned when approving a proposal whose target value changed after the proposal was made. Nothing is applied."
+        userAction: "Review the task as it is now and ask the agent to propose again if the change is still wanted."
+
+      expired:
+        code: WS.AGENT_PROPOSAL.EXPIRED
+        reserved: "returned by the agent task-work handlers being added in the same change"
+        status: 410
+        message: "This proposal has expired"
+        message_ja: "この提案は期限切れです"
+        message_zh: "此提案已过期"
+        description: "Returned when approving or rejecting a proposal after its expiry time."
+        userAction: "Ask the agent to propose again."
+
+  agent_tools:
+    breadcrumb: "Workspace > Agent > Tools"
+    errors:
+      unknown_entry:
+        code: WS.AGENT_TOOLS.UNKNOWN_ENTRY
+        reserved: "returned by the agent task-work handlers being added in the same change"
+        status: 422
+        message: "One of the agent's permissions is not recognized"
+        message_ja: "エージェントの許可設定に認識できない項目があります"
+        message_zh: "代理的权限设置中有无法识别的项目"
+        description: "Returned when the tools object names an unknown operation, an unknown mode, or has a null value."
+        userAction: "Choose from the operations and modes shown in the settings."
+
+      kind_not_grantable:
+        code: WS.AGENT_TOOLS.KIND_NOT_GRANTABLE
+        reserved: "returned by the agent task-work handlers being added in the same change"
+        status: 422
+        message: "Permissions cannot be set for this kind of agent"
+        message_ja: "この種類のエージェントには許可設定ができません"
+        message_zh: "无法为此类代理设置权限"
+        description: "Returned when tools are set on a signal_judge agent, which cannot be granted operations."
+        userAction: "Choose a task agent instead."
+
   member:
     breadcrumb: "Workspace > Member"
     errors:

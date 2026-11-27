@@ -4,6 +4,18 @@ package errors
 
 // Error codes and specs.
 var (
+	// WS.AGENT_PROPOSAL.ALREADY_DECIDED — This proposal has already been decided
+	WsAgentProposalAlreadyDecided = &Spec{Code: "WS.AGENT_PROPOSAL.ALREADY_DECIDED", Status: 409, Message: "This proposal has already been decided", Description: "Returned when approving or rejecting a proposal that was already approved, rejected, or withdrawn.", UserAction: "Reload the task to see the current state."}
+	// WS.AGENT_PROPOSAL.EXPIRED — This proposal has expired
+	WsAgentProposalExpired = &Spec{Code: "WS.AGENT_PROPOSAL.EXPIRED", Status: 410, Message: "This proposal has expired", Description: "Returned when approving or rejecting a proposal after its expiry time.", UserAction: "Ask the agent to propose again."}
+	// WS.AGENT_PROPOSAL.NOT_FOUND — Proposal not found
+	WsAgentProposalNotFound = &Spec{Code: "WS.AGENT_PROPOSAL.NOT_FOUND", Status: 404, Message: "Proposal not found", Description: "Returned when the proposal does not exist on the task or the actor cannot see it.", UserAction: "Reload the task and check the proposal list."}
+	// WS.AGENT_PROPOSAL.STALE — The task changed since this was proposed, so it was not applied
+	WsAgentProposalStale = &Spec{Code: "WS.AGENT_PROPOSAL.STALE", Status: 409, Message: "The task changed since this was proposed, so it was not applied", Description: "Returned when approving a proposal whose target value changed after the proposal was made. Nothing is applied.", UserAction: "Review the task as it is now and ask the agent to propose again if the change is still wanted."}
+	// WS.AGENT_TOOLS.KIND_NOT_GRANTABLE — Permissions cannot be set for this kind of agent
+	WsAgentToolsKindNotGrantable = &Spec{Code: "WS.AGENT_TOOLS.KIND_NOT_GRANTABLE", Status: 422, Message: "Permissions cannot be set for this kind of agent", Description: "Returned when tools are set on a signal_judge agent, which cannot be granted operations.", UserAction: "Choose a task agent instead."}
+	// WS.AGENT_TOOLS.UNKNOWN_ENTRY — One of the agent's permissions is not recognized
+	WsAgentToolsUnknownEntry = &Spec{Code: "WS.AGENT_TOOLS.UNKNOWN_ENTRY", Status: 422, Message: "One of the agent's permissions is not recognized", Description: "Returned when the tools object names an unknown operation, an unknown mode, or has a null value.", UserAction: "Choose from the operations and modes shown in the settings."}
 	// WS.COMMENT.NOT_FOUND — Comment not found
 	WsCommentNotFound = &Spec{Code: "WS.COMMENT.NOT_FOUND", Status: 404, Message: "Comment not found", Description: "Returned when a comment with the given public_id does not exist in this workspace, or has already been deleted.", UserAction: "Refresh the discussion and try again."}
 	// WS.DASHBOARD_WIDGET.NOT_FOUND — Widget not found
@@ -114,8 +126,14 @@ var (
 	WsTaskAgentCostCapExceeded = &Spec{Code: "WS.TASK_AGENT.COST_CAP_EXCEEDED", Status: 422, Message: "Agent monthly cost cap has been reached", Description: "Returned when starting or resuming an agent run would push the agent's accumulated spend past ai_agents.monthly_cost_cap_cents for the current billing month.", UserAction: "Wait for the next billing month, or hand the task off to another agent or user."}
 	// WS.TASK_AGENT.HANDOFF_LOOP_DETECTED — Handoff bounced between agent and user too many times
 	WsTaskAgentHandoffLoopDetected = &Spec{Code: "WS.TASK_AGENT.HANDOFF_LOOP_DETECTED", Status: 422, Message: "Handoff bounced between agent and user too many times", Description: "Returned when the recent agent.task.handoff_* event history shows the task ping-ponging between agent and user beyond the configured threshold (NF_AGENT_HANDOFF_LOOP_LIMIT). Protects against runaway autoaction cycles.", UserAction: "Open the task and resolve the underlying disagreement manually; the loop limit resets after a cool-down window or admin override."}
+	// WS.TASK_AGENT.KIND_NOT_ASSIGNABLE — This kind of agent cannot be assigned to tasks
+	WsTaskAgentKindNotAssignable = &Spec{Code: "WS.TASK_AGENT.KIND_NOT_ASSIGNABLE", Status: 422, Message: "This kind of agent cannot be assigned to tasks", Description: "Returned when a signal_judge agent is assigned to a task. Only task agents can be assignees.", UserAction: "Choose a task agent instead."}
 	// WS.TASK_AGENT.NOT_ASSIGNED — Task has no agent assignee
 	WsTaskAgentNotAssigned = &Spec{Code: "WS.TASK_AGENT.NOT_ASSIGNED", Status: 422, Message: "Task has no agent assignee", Description: "Returned when an operation requires the task to have an AI agent assignee but none is currently assigned (for example, POST /tasks/{id}/handoff/to-user issued against a task whose actor_agent_id is NULL).", UserAction: "Assign an agent to the task via POST /tasks/{id}/handoff/to-agent before invoking the agent-only operation."}
+	// WS.TASK_AGENT.NO_GRANTS — This agent has not been allowed to do anything yet
+	WsTaskAgentNoGrants = &Spec{Code: "WS.TASK_AGENT.NO_GRANTS", Status: 422, Message: "This agent has not been allowed to do anything yet", Description: "Returned when a run is requested for an agent whose allowed operations are empty.", UserAction: "Ask a workspace admin to choose what the agent can do in its settings."}
+	// WS.TASK_AGENT.TASK_NOT_WORKABLE — An agent cannot work on this task
+	WsTaskAgentTaskNotWorkable = &Spec{Code: "WS.TASK_AGENT.TASK_NOT_WORKABLE", Status: 422, Message: "An agent cannot work on this task", Description: "Returned when an agent run or proposal targets a task that is private, project-visible only, done, cancelled, or archived.", UserAction: "Reopen the task or make it visible to the workspace, then try again."}
 	// WS.TASK_CONSTRAINT.NOT_FOUND — Constraint not found
 	WsTaskConstraintNotFound = &Spec{Code: "WS.TASK_CONSTRAINT.NOT_FOUND", Status: 404, Message: "Constraint not found", Description: "Returned when a constraint with the given public_id does not exist on this task, or was already removed.", UserAction: "Refresh the task and try again."}
 	// WS.TASK_EVENT_LINK.NOT_FOUND — Linked event not found
