@@ -48,6 +48,8 @@ func AIFailure(err error) (*apierr.Spec, string) {
 		return apierrors.AiProposalInputsChanged, ""
 	case errors.Is(err, nlquery.ErrUnparseable):
 		return apierrors.AiNlQueryUnparseable, ""
+	case errors.Is(err, nlcommand.ErrNoMatch):
+		return apierrors.AiNlCommandNoMatch, ""
 	case errors.Is(err, ai.ErrParse),
 		errors.Is(err, nlconstraint.ErrUnparseable),
 		errors.Is(err, nlcommand.ErrUnresolvable),

@@ -35,6 +35,7 @@ func TestAIFailureMapsEachFailureOnce(t *testing.T) {
 		{ai.ErrAgentCostCapExceeded, apierrors.WsTaskAgentCostCapExceeded},
 		{ai.ErrAgentPaused, apierrors.AiAgentPaused},
 		{nlquery.ErrUnparseable, apierrors.AiNlQueryUnparseable},
+		{nlcommand.ErrNoMatch, apierrors.AiNlCommandNoMatch},
 		{ai.ErrParse, apierrors.AiResponseInvalidJson},
 		{nlconstraint.ErrUnparseable, apierrors.AiResponseInvalidJson},
 		{nlcommand.ErrUnresolvable, apierrors.AiResponseInvalidJson},

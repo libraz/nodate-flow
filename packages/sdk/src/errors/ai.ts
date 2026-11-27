@@ -36,6 +36,11 @@ export const AiErrors = {
     status: 404,
     message: "AI model not found",
   },
+  AI_NL_COMMAND_NO_MATCH: {
+    code: "AI.NL_COMMAND.NO_MATCH",
+    status: 422,
+    message: "Could not match that to a command",
+  },
   AI_NL_QUERY_UNPARSEABLE: {
     code: "AI.NL_QUERY.UNPARSEABLE",
     status: 422,

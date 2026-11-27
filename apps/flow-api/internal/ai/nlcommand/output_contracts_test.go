@@ -27,6 +27,28 @@ func (p *outputContractProvider) Complete(ctx context.Context, req providers.Req
 	return p.response, nil
 }
 
+func TestValidateCommandOutputNoMatch(t *testing.T) {
+	t.Parallel()
+	resp := func(text string) *providers.Response {
+		return &providers.Response{Text: text, Termination: providers.TerminationComplete}
+	}
+
+	payload, err := validateCommandOutput(resp(`{"tool":"","args":{},"confidence":0}`))
+	if err != nil || string(payload) != `{"tool":"","args":{},"confidence":0}` {
+		t.Fatalf("no-match payload = (%q, %v), want accepted", payload, err)
+	}
+
+	for _, bad := range []string{
+		`{"tool":"not_a_tool","args":{},"confidence":1}`,
+		`{"tool":"","args":{},"confidence":2}`,
+	} {
+		_, err := validateCommandOutput(resp(bad))
+		if !errors.Is(err, providers.ErrResponseSchemaMismatch) || !errors.Is(err, ErrUnresolvable) || errors.Is(err, ErrNoMatch) {
+			t.Errorf("validateCommandOutput(%s) err = %v, want unresolvable schema mismatch", bad, err)
+		}
+	}
+}
+
 func TestWorkspaceProviderOutputContract(t *testing.T) {
 	t.Parallel()
 

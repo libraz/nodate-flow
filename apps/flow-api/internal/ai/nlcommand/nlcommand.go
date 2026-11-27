@@ -19,6 +19,10 @@ import (
 // it to AI.RESPONSE.INVALID_JSON.
 var ErrUnresolvable = errors.New("nlcommand: unresolvable")
 
+// ErrNoMatch means the model ran correctly and reported that no tool
+// matches the input. It is distinct from ErrUnresolvable (invalid output).
+var ErrNoMatch = errors.New("nlcommand: no tool matches")
+
 // allowedTools is the closed set of MCP tools that may be invoked via
 // natural language commands. Tools that require complex multi-step
 // flows (e.g. apply_steps, propose_duplicates) are excluded.
@@ -159,6 +163,9 @@ func (r *Resolver) Resolve(ctx context.Context, prompt string) (*ToolCall, error
 		return nil, err
 	}
 	tc, verr := ValidateBytes(raw, allowedTools)
+	if errors.Is(verr, ErrNoMatch) {
+		return nil, ErrNoMatch
+	}
 	if verr != nil {
 		return nil, ErrUnresolvable
 	}
@@ -168,8 +175,8 @@ func (r *Resolver) Resolve(ctx context.Context, prompt string) (*ToolCall, error
 }
 
 // ValidateBytes parses and validates raw JSON against the allowed tools
-// set. Exported so tests and the mock provider can reuse the exact
-// validation path.
+// set; an empty tool name yields ErrNoMatch. Exported so tests and the
+// mock provider can reuse the exact validation path.
 func ValidateBytes(raw []byte, allowed map[string]struct{}) (*ToolCall, error) {
 	var candidate struct {
 		Tool       string         `json:"tool"`
@@ -179,14 +186,15 @@ func ValidateBytes(raw []byte, allowed map[string]struct{}) (*ToolCall, error) {
 	if err := json.Unmarshal(raw, &candidate); err != nil {
 		return nil, fmt.Errorf("decode: %w", err)
 	}
+	if candidate.Confidence < 0.0 || candidate.Confidence > 1.0 {
+		return nil, fmt.Errorf("confidence %f out of range [0.0, 1.0]", candidate.Confidence)
+	}
+	// An empty tool is the model's "no tool matches" answer; args are ignored.
 	if candidate.Tool == "" {
-		return nil, errors.New("empty tool name")
+		return nil, ErrNoMatch
 	}
 	if _, ok := allowed[candidate.Tool]; !ok {
 		return nil, fmt.Errorf("tool %q not in allowed set", candidate.Tool)
-	}
-	if candidate.Confidence < 0.0 || candidate.Confidence > 1.0 {
-		return nil, fmt.Errorf("confidence %f out of range [0.0, 1.0]", candidate.Confidence)
 	}
 	if candidate.Args == nil {
 		candidate.Args = map[string]any{}

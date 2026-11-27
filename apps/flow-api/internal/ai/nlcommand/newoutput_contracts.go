@@ -36,7 +36,8 @@ func validateCommandOutput(response *providers.Response) ([]byte, error) {
 	if err := outputcontract.Validate(commandOutputSpec, payload); err != nil {
 		return nil, commandContractError(err)
 	}
-	if _, err := ValidateBytes(payload, allowedTools); err != nil {
+	// A no-match answer is a valid model output, recorded as a success.
+	if _, err := ValidateBytes(payload, allowedTools); err != nil && !errors.Is(err, ErrNoMatch) {
 		return nil, errors.Join(ErrUnresolvable, providers.ErrResponseSchemaMismatch)
 	}
 	return payload, nil

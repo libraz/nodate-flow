@@ -60,6 +60,45 @@ func TestResolverCacheHitStillPassesGuard(t *testing.T) {
 	}
 }
 
+// fixedProvider returns a canned payload and counts upstream calls.
+type fixedProvider struct {
+	payload string
+	calls   int
+}
+
+func (p *fixedProvider) ResolveCommand(context.Context, string, []ToolSpec) ([]byte, error) {
+	p.calls++
+	return []byte(p.payload), nil
+}
+
+func TestResolverNoMatchIsNotCached(t *testing.T) {
+	t.Parallel()
+	p := &fixedProvider{payload: `{"tool":"","args":{},"confidence":0}`}
+	r := New(p, nil)
+	r.Cache = NewCache(time.Hour)
+
+	for i := 0; i < 2; i++ {
+		tc, err := r.Resolve(context.Background(), "このタスクを")
+		if !errors.Is(err, ErrNoMatch) || tc != nil {
+			t.Fatalf("Resolve = (%v, %v), want ErrNoMatch", tc, err)
+		}
+		if errors.Is(err, ErrUnresolvable) {
+			t.Fatal("ErrNoMatch must not match ErrUnresolvable")
+		}
+	}
+	if p.calls != 2 {
+		t.Fatalf("provider calls = %d, want 2 (no-match is not cached)", p.calls)
+	}
+}
+
+func TestResolverUnknownToolStaysUnresolvable(t *testing.T) {
+	t.Parallel()
+	r := New(&fixedProvider{payload: `{"tool":"not_a_tool","args":{},"confidence":1}`}, nil)
+	if _, err := r.Resolve(context.Background(), "do it"); !errors.Is(err, ErrUnresolvable) || errors.Is(err, ErrNoMatch) {
+		t.Fatalf("err = %v, want ErrUnresolvable only", err)
+	}
+}
+
 func TestResolverCachedToolCallIsNotShared(t *testing.T) {
 	t.Parallel()
 	p := &admittingProvider{}

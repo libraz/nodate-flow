@@ -6,6 +6,7 @@
   "AI.EMBEDDING.DISABLED": "このワークスペースでは埋め込みが無効です",
   "AI.EMBEDDING.NOT_CONFIGURED": "インスタンスの埋め込みプロバイダが設定されていません",
   "AI.MODEL.NOT_FOUND": "AI モデルが見つかりません",
+  "AI.NL_COMMAND.NO_MATCH": "コマンドとして解釈できませんでした",
   "AI.NL_QUERY.UNPARSEABLE": "入力をフィルタに変換できませんでした",
   "AI.OPERATION.KEY_CONFLICT": "操作キーが異なる内容の操作に使われています",
   "AI.PROPOSAL.INPUTS_CHANGED": "提案の生成中に入力内容が変更されました",

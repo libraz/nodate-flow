@@ -6,6 +6,7 @@
   "AI.EMBEDDING.DISABLED": "Embeddings are disabled for this workspace",
   "AI.EMBEDDING.NOT_CONFIGURED": "The instance embedding provider is not configured",
   "AI.MODEL.NOT_FOUND": "AI model not found",
+  "AI.NL_COMMAND.NO_MATCH": "Could not match that to a command",
   "AI.NL_QUERY.UNPARSEABLE": "Could not turn that into a filter",
   "AI.OPERATION.KEY_CONFLICT": "The operation key was used for different arguments",
   "AI.PROPOSAL.INPUTS_CHANGED": "The proposal inputs changed while it was being generated",

@@ -209,6 +209,18 @@ resources:
         description: "Returned when the NL query compiler could not produce a valid Lens JSON from the user's prose, either because the upstream LLM emitted malformed output or because the result failed schema validation against the closed Lens grammar."
         userAction: 'Rephrase the request — e.g. "blocked tasks due this week".'
 
+  nl_command:
+    breadcrumb: "AI > NL Command"
+    errors:
+      no_match:
+        code: AI.NL_COMMAND.NO_MATCH
+        status: 422
+        message: "Could not match that to a command"
+        message_ja: "コマンドとして解釈できませんでした"
+        message_zh: "无法将其识别为命令"
+        description: "Returned when the natural-language command resolver ran successfully but the model reported that no available tool matches the input (for example an incomplete sentence)."
+        userAction: 'Say what to do more specifically — e.g. "start this task" or "add a comment saying done".'
+
   agent:
     breadcrumb: "AI > Agent"
     errors:
