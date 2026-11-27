@@ -87,62 +87,8 @@
   color: var(--nf-color-fg-muted);
 }
 
-.trigger {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--nf-space-1);
-  min-block-size: var(--nf-space-6);
-  padding-inline: var(--nf-space-2);
-  border: var(--nf-space-px) dashed var(--nf-color-border-control);
-  border-radius: var(--nf-radius-pill);
-  background: transparent;
-  color: var(--nf-color-fg-muted);
-  font: inherit;
-  font-size: var(--nf-text-xs);
-  cursor: pointer;
-  transition:
-    color var(--nf-duration-fast) var(--nf-ease-standard),
-    border-color var(--nf-duration-fast) var(--nf-ease-standard),
-    background-color var(--nf-duration-fast) var(--nf-ease-standard);
-}
-
-.trigger:hover:not(:disabled) {
-  color: var(--nf-color-fg);
-  border-color: var(--nf-color-fg-subtle);
-  background: var(--nf-color-surface-hover);
-}
-
-.trigger:focus-visible {
-  outline: none;
-  box-shadow: var(--nf-shadow-focus);
-}
-
-.trigger:disabled {
-  opacity: var(--nf-opacity-disabled);
-  cursor: not-allowed;
-}
-
-.triggerIconOnly {
-  padding-inline: var(--nf-space-1-5);
-}
-
-/* Touch hit area: the same floor Chip and Button use. */
-/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
-@media (max-width: 767px) {
-  .trigger::after {
-    content: "";
-    position: absolute;
-    inset: 50%;
-    inline-size: var(--nf-space-8);
-    block-size: var(--nf-space-8);
-    transform: translate(-50%, -50%);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .row,
-  .trigger {
+  .row {
     transition: none;
   }
 }

@@ -43,10 +43,11 @@
   min-inline-size: 0;
 }
 
+/* One line where it fits; wraps in a narrow column. */
 .addRow {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--nf-space-2);
+  gap: var(--nf-space-1);
 }
 
 .muted,

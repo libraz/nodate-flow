@@ -17,7 +17,7 @@ import {
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-
+import TaskActionButton from '../tasks/task-action-button';
 import type { Label } from './api';
 import { pickLabelColor } from './label-color';
 import styles from './label-picker.module.css';
@@ -88,7 +88,6 @@ export default function LabelPicker({
     }
   };
 
-  const hasApplied = activeIds.length > 0;
   const emptyKey = labels.length === 0 && !query ? 'picker.no_labels' : 'picker.empty';
 
   const dotStyle = (color: string): CSSProperties => ({ '--dot-color': color }) as CSSProperties;
@@ -176,15 +175,9 @@ export default function LabelPicker({
         </div>
       }
     >
-      <button
-        type="button"
-        disabled={disabled}
-        aria-label={t('task.add')}
-        className={`${styles.trigger}${hasApplied ? ` ${styles.triggerIconOnly}` : ''}`}
-      >
-        <Plus size={12} aria-hidden />
-        {hasApplied ? null : t('task.add')}
-      </button>
+      <TaskActionButton icon={<Plus size={14} aria-hidden />} disabled={disabled}>
+        {t('task.add')}
+      </TaskActionButton>
     </Popover>
   );
 }

@@ -1,26 +1,16 @@
 /**
- * LinkedEventsEmpty smoke test.
- *
- * The wrapper composes the shared {@link EmptyState} primitive with a
- * decorative SVG icon and a "Link event" CTA. The smoke test asserts
- * the translated copy lands in the DOM and the CTA forwards clicks to
- * `onTriggerClick` so the picker can open from inside the empty state.
+ * LinkedEventsEmpty smoke test: the empty state is a single translated line.
  */
 
-import { fireEvent, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import { renderWithProviders } from '@tests/helpers/render';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import LinkedEventsEmpty from '../linked-events-empty';
 
 describe('<LinkedEventsEmpty>', () => {
-  it('renders the translated copy and invokes onTriggerClick', () => {
-    const onTriggerClick = vi.fn();
-    renderWithProviders(<LinkedEventsEmpty onTriggerClick={onTriggerClick} />);
-
+  it('renders the translated empty line', () => {
+    renderWithProviders(<LinkedEventsEmpty />);
     expect(screen.getByText('empty.title')).toBeDefined();
-    expect(screen.getByText('empty.body')).toBeDefined();
-
-    fireEvent.click(screen.getByRole('button', { name: 'empty.cta' }));
-    expect(onTriggerClick).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button')).toBeNull();
   });
 });

@@ -1,35 +1,16 @@
 /* AI step proposal panel. */
 
-.card {
+.root {
   display: flex;
   flex-direction: column;
   gap: var(--nf-space-3);
-  padding: var(--nf-space-4);
 }
 
-.head {
-  display: flex;
-  flex-direction: column;
-  gap: var(--nf-space-1);
-}
-
-/* Matches the other task-sidebar card headings. */
-.title {
-  margin: 0;
-  font-size: var(--nf-text-sm);
-  font-weight: var(--nf-weight-semibold);
-}
-
-.description,
-.fieldHint {
+.description {
   margin: 0;
   font-size: var(--nf-text-xs);
   line-height: var(--nf-leading-normal);
   color: var(--nf-color-fg-muted);
-}
-
-.fieldHint {
-  margin-block-start: var(--nf-space-1);
 }
 
 .stage {
@@ -49,7 +30,9 @@
 }
 
 .fieldLabel {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-1);
   margin-block-end: var(--nf-space-1);
   font-size: var(--nf-text-xs);
   color: var(--nf-color-fg-muted);
@@ -141,4 +124,8 @@
   display: flex;
   gap: var(--nf-space-2);
   justify-content: flex-end;
+}
+
+.proposeButton {
+  align-self: flex-start;
 }

@@ -1,0 +1,141 @@
+/* Contained strip: state, divider, transitions, then the overflow trigger at the end. */
+.root {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nf-space-2);
+  padding: var(--nf-space-2) var(--nf-space-3);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-lg);
+  background: var(--nf-color-bg-sunken);
+  /* Sticks below the top of the scroll container; one pixel above that offset lets the observer see it is stuck. */
+  position: sticky;
+  inset-block-start: calc(var(--nf-space-2) - 1px);
+  z-index: var(--nf-z-sticky);
+}
+
+/* While stuck, the strip's own background covers the gap above it so no content shows through. */
+.root[data-stuck]::before {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  inset-block-end: 100%;
+  block-size: var(--nf-space-2);
+  background: var(--nf-color-bg);
+}
+
+.title {
+  flex: 0 1 14rem;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-semibold);
+}
+
+.progress {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-1-5);
+  margin-inline-start: var(--nf-space-2);
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  white-space: nowrap;
+}
+
+.progressCount {
+  font-variant-numeric: tabular-nums;
+}
+
+/* A pie filled to the share of subtasks done. */
+.ring {
+  inline-size: var(--nf-space-3);
+  block-size: var(--nf-space-3);
+  border-radius: var(--nf-radius-pill);
+  background: conic-gradient(var(--nf-color-accent) var(--progress), var(--nf-color-border) 0);
+}
+
+.divider {
+  inline-size: var(--nf-space-px);
+  block-size: 1.25em;
+  background: var(--nf-color-border);
+}
+
+.actions {
+  display: flex;
+  flex: 1 1 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nf-space-2);
+  min-inline-size: 0;
+}
+
+/* Locked while a transition is in flight: dimmed, inert, except the control that is working. */
+.root [aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: var(--nf-opacity-disabled);
+}
+
+.root [data-pending] {
+  cursor: progress;
+  opacity: 1;
+}
+
+.moreTrigger {
+  padding-inline: var(--nf-space-2);
+}
+
+.menuList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-0-5);
+  margin: calc(-1 * var(--nf-space-4));
+  padding: var(--nf-space-2);
+}
+
+.menuItem {
+  all: unset;
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  padding: var(--nf-space-1-5) var(--nf-space-2);
+  border-radius: var(--nf-radius-sm);
+  cursor: pointer;
+  font-size: var(--nf-text-sm);
+  line-height: 1.4;
+  white-space: nowrap;
+  transition: background var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.menuItem:hover,
+.menuItem:focus-visible {
+  background: var(--nf-color-surface-hover);
+}
+
+.menuItem:focus-visible {
+  box-shadow: inset 0 0 0 var(--nf-space-px) var(--nf-color-border-strong);
+}
+
+.menuItemDanger {
+  color: var(--nf-color-danger-fg);
+}
+
+.menuDivider {
+  border: none;
+  border-block-start: var(--nf-space-px) solid var(--nf-color-border);
+  margin-block: var(--nf-space-1);
+}
+
+/* One row on a narrow screen: the lead action stays, the rest live in the menu. */
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
+@media (max-width: 639px) {
+  .root,
+  .actions {
+    flex-wrap: nowrap;
+  }
+
+  .divider {
+    display: none;
+  }
+}

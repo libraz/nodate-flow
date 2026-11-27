@@ -37,9 +37,7 @@
     "loading": "Searching…"
   },
   "empty": {
-    "title": "No events linked yet",
-    "body": "Connect this task to a meeting or deadline.",
-    "cta": "Link event"
+    "title": "No events linked yet"
   },
   "toast": {
     "linked": "Linked \"{title}\".",

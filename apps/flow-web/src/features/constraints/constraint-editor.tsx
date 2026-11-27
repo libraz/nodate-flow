@@ -7,19 +7,19 @@
  * detail drawer.
  */
 
+import { cx } from '@nodate-flow/ui/lib/cx';
 import Button from '@nodate-flow/ui/primitives/button';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
 import Select from '@nodate-flow/ui/primitives/select';
 import Textarea from '@nodate-flow/ui/primitives/textarea';
-import { AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
-import { type FormEvent, type ReactElement, useState } from 'react';
+import { AlertTriangle, CheckCircle2, Play, XCircle } from 'lucide-react';
+import { type FormEvent, type ReactElement, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import FormActions from '../../components/form-actions';
-import PageHelp from '../../components/page-help';
 import { confirmAction } from '../../lib/confirm-action';
 import { onSubmitShortcut } from '../../lib/submit-shortcut';
 import { AiSparkle } from '../ai-suggestions/ai-consequence';
+import TaskActionButton from '../tasks/task-action-button';
 
 import {
   type ConstraintKind,
@@ -52,6 +52,8 @@ function isKind(v: string): v is ConstraintKind {
 
 export default function ConstraintEditor({ taskId }: ConstraintEditorProps): ReactElement {
   const { t } = useTranslation('constraints');
+  const nlHintId = useId();
+  const formId = useId();
   const [kind, setKind] = useState<ConstraintKind>('custom');
   const [expression, setExpression] = useState('');
   const [nlPrompt, setNlPrompt] = useState('');
@@ -142,34 +144,36 @@ export default function ConstraintEditor({ taskId }: ConstraintEditorProps): Rea
 
   return (
     <section aria-label={t('editor.title')} className={styles.editor}>
-      <div className={styles.editorHead}>
-        <h3 className={styles.editorTitle}>{t('editor.title')}</h3>
-        <PageHelp topic="task-constraints" />
-      </div>
-      <div className={styles.nlRow}>
-        <FormField label={t('editor.nlPrompt')} description={t('editor.nlHint')}>
-          {(control) => (
-            <Input
-              {...control}
-              value={nlPrompt}
-              placeholder={t('editor.nlPrompt')}
-              onChange={(e) => setNlPrompt(e.currentTarget.value)}
-            />
-          )}
-        </FormField>
-        <Button
-          type="button"
+      <Input
+        value={nlPrompt}
+        placeholder={t('editor.nlPrompt')}
+        aria-label={t('editor.nlPrompt')}
+        aria-describedby={nlHintId}
+        onChange={(e) => setNlPrompt(e.currentTarget.value)}
+      />
+      <span id={nlHintId} className="sr-only">
+        {t('editor.nlHint')}
+      </span>
+      <div className={styles.actionRow}>
+        <TaskActionButton
+          icon={<AiSparkle kind="suggests" />}
           onClick={handleCompile}
           disabled={compileMut.isPending || !nlPrompt.trim()}
           aria-busy={compileMut.isPending || undefined}
-          className={styles.nlGenerate}
         >
-          <AiSparkle kind="suggests" />
           {t('editor.generate')}
+        </TaskActionButton>
+        <Button
+          type="submit"
+          form={formId}
+          size="sm"
+          disabled={addMut.isPending || !expression.trim()}
+        >
+          {t('editor.add')}
         </Button>
       </div>
 
-      <form onSubmit={onSubmit} onKeyDown={onSubmitShortcut}>
+      <form id={formId} onSubmit={onSubmit} onKeyDown={onSubmitShortcut}>
         <details className={styles.advanced} open={expression.length > 0}>
           <summary className={styles.advancedSummary}>{t('editor.advanced')}</summary>
           <FormField label={t('editor.kind')}>
@@ -203,29 +207,27 @@ export default function ConstraintEditor({ taskId }: ConstraintEditorProps): Rea
             )}
           </FormField>
         </details>
-        <FormActions hint={{ disabled: addMut.isPending || !expression.trim() }}>
-          <Button type="submit" disabled={addMut.isPending || !expression.trim()}>
-            {t('editor.add')}
-          </Button>
-          <Button
-            type="button"
-            onClick={onEvaluate}
-            disabled={evalMut.isPending}
-            aria-busy={evalMut.isPending || undefined}
-          >
-            {t('editor.evaluate')}
-          </Button>
-          <Button
-            type="button"
-            onClick={handleExplain}
-            disabled={explainMut.isPending || !expression.trim()}
-            aria-busy={explainMut.isPending || undefined}
-          >
-            <AiSparkle kind="suggests" />
-            {t('editor.explain')}
-          </Button>
-        </FormActions>
       </form>
+
+      <div className={cx(styles.actionRow, styles.toolRow)}>
+        <TaskActionButton
+          icon={<Play size={14} aria-hidden />}
+          title={t('editor.evaluateHint')}
+          onClick={onEvaluate}
+          disabled={evalMut.isPending}
+          aria-busy={evalMut.isPending || undefined}
+        >
+          {t('editor.evaluate')}
+        </TaskActionButton>
+        <TaskActionButton
+          icon={<AiSparkle kind="suggests" />}
+          onClick={handleExplain}
+          disabled={explainMut.isPending || !expression.trim()}
+          aria-busy={explainMut.isPending || undefined}
+        >
+          {t('editor.explain')}
+        </TaskActionButton>
+      </div>
 
       {explanation ? (
         <div>
@@ -279,9 +281,7 @@ export default function ConstraintEditor({ taskId }: ConstraintEditorProps): Rea
             ))}
           </ul>
         </div>
-      ) : (
-        <p className={styles.evaluateHint}>{t('editor.evaluateHint')}</p>
-      )}
+      ) : null}
     </section>
   );
 }

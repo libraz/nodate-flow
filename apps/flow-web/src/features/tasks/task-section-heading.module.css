@@ -2,9 +2,70 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--nf-space-2);
+  /* Keeps rows with and without a trailing button the same height. */
+  /* nf-token-override: matches the small button height */
+  min-block-size: 2rem;
+}
+
+.titleGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+  min-inline-size: 0;
 }
 
 .title {
   margin: 0;
-  font-size: var(--nf-text-lg);
+  font-size: var(--nf-text-base);
+  font-weight: var(--nf-weight-semibold);
+  color: var(--nf-color-fg);
+  white-space: nowrap;
+}
+
+.trailing {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  min-inline-size: 0;
+}
+
+.toggle {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* nf-token-override: component dimension, not a spacing step */
+  inline-size: 1.75rem;
+  /* nf-token-override: component dimension, not a spacing step */
+  block-size: 1.75rem;
+  border-radius: var(--nf-radius-sm);
+  color: var(--nf-color-fg-muted);
+  cursor: pointer;
+  transition:
+    background-color var(--nf-duration-instant) var(--nf-ease-standard),
+    color var(--nf-duration-instant) var(--nf-ease-standard);
+}
+
+.toggle:hover {
+  background: var(--nf-color-surface-hover);
+  color: var(--nf-color-fg);
+}
+
+.toggle:focus-visible {
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.chevron {
+  transition: rotate var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.toggle[aria-expanded="false"] .chevron {
+  rotate: -90deg;
+}
+
+.count {
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+  font-variant-numeric: tabular-nums;
 }

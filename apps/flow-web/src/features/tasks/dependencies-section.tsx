@@ -32,6 +32,7 @@ import {
 } from './api';
 import { STATE_KEY, STATE_TONE } from './constants';
 import styles from './dependencies-section.module.css';
+import TaskActionButton from './task-action-button';
 import TaskSearchPicker from './task-search-picker';
 import searchStyles from './task-search-picker.module.css';
 import TaskSectionHeading from './task-section-heading';
@@ -124,21 +125,25 @@ export default function DependenciesSection({
   };
 
   return (
-    <section aria-label={t('tasks.detail.dependencies.title')} className={styles.section}>
+    <section
+      aria-label={t('tasks.detail.dependencies.title')}
+      className={styles.section}
+      data-empty={isEmpty && !picking ? '' : undefined}
+    >
       <TaskSectionHeading
         title={t('tasks.detail.dependencies.title')}
+        hint={t('tasks.detail.dependencies.hint')}
+        {...(isEmpty ? { count: 0 } : {})}
         trailing={
           !picking ? (
-            <Button
-              type="button"
-              size="sm"
+            <TaskActionButton
+              icon={<Plus size={14} aria-hidden />}
               onClick={() => {
                 setPicking(true);
               }}
             >
-              <Plus size={14} aria-hidden />
               {t('tasks.detail.dependencies.add')}
-            </Button>
+            </TaskActionButton>
           ) : null
         }
       />
@@ -158,10 +163,6 @@ export default function DependenciesSection({
             setPicking(false);
           }}
         />
-      ) : null}
-
-      {isEmpty && !picking ? (
-        <p className={styles.empty}>{t('tasks.detail.dependencies.empty')}</p>
       ) : null}
 
       <DependencyGroup

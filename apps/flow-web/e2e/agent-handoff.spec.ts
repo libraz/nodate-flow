@@ -344,6 +344,9 @@ test.describe('task detail — agent handoff panel', () => {
     await injectAuth(page.context(), tenant);
     await openTaskDetail(page, task);
 
+    // The timeline lives in the Activity tab, which mounts on first click.
+    await page.getByRole('tab', { name: 'Activity', exact: true }).click();
+
     // The synthesized event renders inside TaskMiniTimeline as a
     // bot-glyph row. The rail dot wraps the Bot icon inside a span with
     // aria-label = t('actor.actor_agent', { name }) — because no agent

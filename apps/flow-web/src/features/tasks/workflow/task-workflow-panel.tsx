@@ -1,6 +1,5 @@
 import Badge, { type BadgeTone } from '@nodate-flow/ui/primitives/badge';
 import Button from '@nodate-flow/ui/primitives/button';
-import Card from '@nodate-flow/ui/primitives/card';
 import Checkbox from '@nodate-flow/ui/primitives/checkbox';
 import Combobox from '@nodate-flow/ui/primitives/combobox';
 import DatePicker from '@nodate-flow/ui/primitives/date-picker';
@@ -15,7 +14,6 @@ import { type FormEvent, type ReactElement, Suspense, useEffect, useRef, useStat
 import { ErrorBoundary } from 'react-error-boundary';
 import { useTranslation } from 'react-i18next';
 import FormActions from '../../../components/form-actions';
-import PageHelp from '../../../components/page-help';
 import { formatApiError } from '../../../lib/api-error';
 import { confirmAction } from '../../../lib/confirm-action';
 import { endOfDayUnix } from '../../../lib/date-utils';
@@ -28,6 +26,8 @@ import { KIND_LABEL_KEY } from '../../constraints/constraint-editor';
 import { safeSourceUrl } from '../../inbox/source-intake/safe-source-url';
 import { useWorkspaceMembersQuery } from '../../workspaces/api';
 import { type TaskActor, useListAttachments, useTaskActorsQuery, useTaskQuery } from '../api';
+import TaskActionButton from '../task-action-button';
+import TaskSectionHeading from '../task-section-heading';
 import {
   useCreateHandoff,
   useCreateSubmission,
@@ -104,10 +104,10 @@ function getRoleActors(actors: TaskActor[]): TaskActor[] {
 
 function LoadingCard(): ReactElement {
   return (
-    <Card className={css.card}>
+    <section className={css.card}>
       <Skeleton style={{ blockSize: 'var(--nf-space-5)', inlineSize: '65%' }} />
       <Skeleton style={{ blockSize: 'var(--nf-space-4)', inlineSize: '45%' }} />
-    </Card>
+    </section>
   );
 }
 
@@ -122,8 +122,8 @@ function ErrorCard({
 }): ReactElement {
   const { t } = useTranslation('common');
   return (
-    <Card className={css.card}>
-      <h2 className={css.heading}>{t('taskWorkflow.title')}</h2>
+    <section className={css.card}>
+      <TaskSectionHeading title={t('taskWorkflow.title')} />
       <p className={css.error} role="alert">
         {t('taskWorkflow.loadFailed')}
       </p>
@@ -138,7 +138,7 @@ function ErrorCard({
           {t('taskWorkflow.backToTasks')}
         </Link>
       </div>
-    </Card>
+    </section>
   );
 }
 
@@ -155,8 +155,8 @@ function TaskWorkflowPanelFallback({
 }): ReactElement {
   const { t } = useTranslation('common');
   return (
-    <Card className={css.card}>
-      <h2 className={css.heading}>{t('taskWorkflow.title')}</h2>
+    <section className={css.card}>
+      <TaskSectionHeading title={t('taskWorkflow.title')} />
       <p className={css.error} role="alert">
         {formatApiError(error, t, 'taskWorkflow.loadFailed')}
       </p>
@@ -171,7 +171,7 @@ function TaskWorkflowPanelFallback({
           {t('taskWorkflow.backToTasks')}
         </Link>
       </div>
-    </Card>
+    </section>
   );
 }
 
@@ -322,12 +322,12 @@ function TaskWorkflowPanelContent({
   }
   if (workflowQuery.isPending || !snapshot) {
     return (
-      <Card className={css.card}>
-        <h2 className={css.heading}>{t('taskWorkflow.title')}</h2>
+      <section className={css.card}>
+        <TaskSectionHeading title={t('taskWorkflow.title')} />
         <p role="status" className={css.muted}>
           {t('taskWorkflow.loading')}
         </p>
-      </Card>
+      </section>
     );
   }
 
@@ -501,43 +501,40 @@ function TaskWorkflowPanelContent({
   const isPolicyEditable = snapshot.capabilities.canSetPolicy;
 
   return (
-    <Card className={css.card}>
-      <div className={css.header}>
-        <div className={css.itemBody}>
-          <div className={css.titleRow}>
-            <h2 className={css.heading}>{t('taskWorkflow.title')}</h2>
-            <PageHelp topic="task-review-handoff" />
-          </div>
-          <p className={css.description}>{t('taskWorkflow.description')}</p>
-          <div className={css.summary}>
-            <span className={css.numeric}>
-              {t('taskWorkflow.revision', { revision: currentRevision })}
-            </span>
-            <Badge tone={hasActiveReview ? 'info' : 'neutral'}>
-              {t(
-                snapshot.completionPolicy === 'review_required'
-                  ? 'taskWorkflow.reviewRequired'
-                  : 'taskWorkflow.manual',
-              )}
-            </Badge>
-            {snapshot.requiredConstraintIds?.length ? (
-              <span className={css.numeric}>
-                {t('taskWorkflow.requiredChecksCount', {
-                  count: snapshot.requiredConstraintIds.length,
-                })}
-              </span>
-            ) : null}
-          </div>
-        </div>
-        <Button
-          type="button"
-          size="sm"
-          aria-expanded={expanded}
-          onClick={() => setExpanded((value) => !value)}
-        >
-          {expanded ? <ChevronUp size={14} aria-hidden /> : <ChevronDown size={14} aria-hidden />}
-          {expanded ? t('taskWorkflow.collapse') : t('taskWorkflow.expand')}
-        </Button>
+    <section className={css.card}>
+      <TaskSectionHeading
+        title={t('taskWorkflow.title')}
+        hint={t('taskWorkflow.description')}
+        trailing={
+          <TaskActionButton
+            icon={
+              expanded ? <ChevronUp size={14} aria-hidden /> : <ChevronDown size={14} aria-hidden />
+            }
+            aria-expanded={expanded}
+            onClick={() => setExpanded((value) => !value)}
+          >
+            {expanded ? t('taskWorkflow.collapse') : t('taskWorkflow.expand')}
+          </TaskActionButton>
+        }
+      />
+      <div className={css.summary}>
+        <span className={css.numeric}>
+          {t('taskWorkflow.revision', { revision: currentRevision })}
+        </span>
+        <Badge tone={hasActiveReview ? 'info' : 'neutral'}>
+          {t(
+            snapshot.completionPolicy === 'review_required'
+              ? 'taskWorkflow.reviewRequired'
+              : 'taskWorkflow.manual',
+          )}
+        </Badge>
+        {snapshot.requiredConstraintIds?.length ? (
+          <span className={css.numeric}>
+            {t('taskWorkflow.requiredChecksCount', {
+              count: snapshot.requiredConstraintIds.length,
+            })}
+          </span>
+        ) : null}
       </div>
 
       {!expanded ? null : (
@@ -1220,6 +1217,6 @@ function TaskWorkflowPanelContent({
           ) : null}
         </>
       )}
-    </Card>
+    </section>
   );
 }

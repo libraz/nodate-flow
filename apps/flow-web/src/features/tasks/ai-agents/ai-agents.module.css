@@ -16,72 +16,13 @@
 .section {
   display: flex;
   flex-direction: column;
-  gap: var(--nf-space-2);
-  background: var(--nf-color-bg);
-  border-radius: var(--nf-radius-md);
-}
-
-.sectionHeader {
-  display: flex;
-  align-items: center;
   gap: var(--nf-space-3);
-  padding: var(--nf-space-3) var(--nf-space-4);
-  border-radius: var(--nf-radius-md);
 }
 
-.disclosure {
-  appearance: none;
-  background: transparent;
-  border: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--nf-space-2);
-  padding: var(--nf-space-1) var(--nf-space-2);
-  margin-inline-start: calc(var(--nf-space-2) * -1);
-  border-radius: var(--nf-radius-sm);
-  color: var(--nf-color-fg);
-  font: inherit;
-  cursor: pointer;
-  flex: 1;
-  min-inline-size: 0;
-  transition: background-color var(--nf-duration-fast) var(--nf-ease-standard);
-}
-
-.disclosure:hover {
-  background: color-mix(in oklab, var(--nf-color-bg-elevated) 50%, transparent);
-}
-
-.disclosure:focus-visible {
-  outline: none;
-  box-shadow: var(--nf-shadow-focus);
-}
-
-.caret {
-  /* nf-token-override: component dimension, not a spacing step */
-  inline-size: 0.75rem;
-  /* nf-token-override: component dimension, not a spacing step */
-  block-size: 0.75rem;
-  transition: transform var(--nf-duration-fast) var(--nf-ease-standard);
-  color: var(--nf-color-fg-subtle);
-  flex-shrink: 0;
-}
-
-.caret[data-open="true"] {
-  transform: rotate(90deg);
-}
-
-.title {
+.empty {
   margin: 0;
-  font-size: var(--nf-text-base);
-  font-weight: var(--nf-weight-semibold);
-  color: var(--nf-color-fg);
-}
-
-.count {
-  font-size: var(--nf-text-xs);
-  color: var(--nf-color-fg-subtle);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.02em;
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
 }
 
 .body {
@@ -116,7 +57,7 @@
   align-items: center;
   column-gap: var(--nf-space-3);
   row-gap: var(--nf-space-1);
-  padding: var(--nf-space-3) var(--nf-space-4);
+  padding: var(--nf-space-3) var(--nf-space-1);
   border-block-end: 1px solid var(--nf-color-hairline);
   font-size: var(--nf-text-sm);
   transition: background-color var(--nf-duration-fast) var(--nf-ease-standard);

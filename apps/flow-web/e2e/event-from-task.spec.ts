@@ -2,8 +2,8 @@
  * Event-from-task quick action E2E.
  *
  * Covers apps/flow-web/src/features/tasks/event-from-task/event-from-task-dialog.tsx,
- * triggered from the TaskActionsCard ("Create calendar event" button) on
- * the task detail page (see apps/flow-web/src/routes/_authenticated.tasks.
+ * triggered from the "More actions" overflow menu in the task status bar
+ * ("Create calendar event" menu item) on the task detail page (see apps/flow-web/src/routes/_authenticated.tasks.
  * $taskId.lazy.tsx).
  *
  * The backend endpoint (POST /workspaces/{wsId}/calendars/{calId}/events/
@@ -33,6 +33,7 @@ import {
 
 const copy = {
   trigger: enCommon.tasks.actions.create_event.trigger,
+  moreActions: enCommon.tasks.detail.transitions.more,
   dialogTitle: enCommon.tasks.actions.create_event.title,
   workspaceLabel: enCommon.tasks.actions.create_event.workspace_label,
   calendarLabel: enCommon.tasks.actions.create_event.calendar_label,
@@ -77,14 +78,22 @@ async function seedTaskWithDueDate(tenant: TestTenant, title: string): Promise<S
 
 /**
  * Navigates to /tasks/{id} and waits until the task title h1 mounts.
- * The "Create calendar event" trigger lives in the actions card on the
- * sidebar; we wait for it explicitly so the test does not race the lazy
+ * The "Create calendar event" trigger lives in the status bar's overflow
+ * menu; we wait for the menu trigger so the test does not race the lazy
  * mount.
  */
 async function openTaskDetail(page: Page, taskId: string, title: string): Promise<void> {
   await page.goto(`/tasks/${taskId}`);
   await expect(page.getByText(title).first()).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByRole('button', { name: copy.trigger })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole('button', { name: copy.moreActions })).toBeVisible({
+    timeout: 10_000,
+  });
+}
+
+/** Opens the status-bar overflow menu and picks "Create calendar event". */
+async function openCreateEventDialog(page: Page): Promise<void> {
+  await page.getByRole('button', { name: copy.moreActions }).click();
+  await page.getByRole('menuitem', { name: copy.trigger }).click();
 }
 
 /**
@@ -138,7 +147,7 @@ test.describe('task detail — create event from task', () => {
     await injectAuth(page.context(), tenant);
     await openTaskDetail(page, task.id, task.title);
 
-    await page.getByRole('button', { name: copy.trigger }).click();
+    await openCreateEventDialog(page);
 
     const dialog = page.getByRole('dialog', { name: copy.dialogTitle });
     await expect(dialog).toBeVisible({ timeout: 5_000 });
@@ -160,7 +169,7 @@ test.describe('task detail — create event from task', () => {
     await injectAuth(page.context(), tenant);
     await openTaskDetail(page, task.id, task.title);
 
-    await page.getByRole('button', { name: copy.trigger }).click();
+    await openCreateEventDialog(page);
 
     const dialog = page.getByRole('dialog', { name: copy.dialogTitle });
     await expect(dialog).toBeVisible({ timeout: 5_000 });
@@ -200,7 +209,7 @@ test.describe('task detail — create event from task', () => {
     await injectAuth(page.context(), tenant);
     await openTaskDetail(page, task.id, task.title);
 
-    await page.getByRole('button', { name: copy.trigger }).click();
+    await openCreateEventDialog(page);
     const dialog = page.getByRole('dialog', { name: copy.dialogTitle });
     await expect(dialog).toBeVisible({ timeout: 5_000 });
 

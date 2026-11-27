@@ -216,7 +216,7 @@ test.describe('task detail edit affordances', () => {
     await expect(dueTriggerAfter).toContainText(String(targetYear));
   });
 
-  test('transitions state to In progress via the sidebar Start button', async ({ page }) => {
+  test('transitions state to In progress via the status bar Start button', async ({ page }) => {
     tenant = await createTestTenant();
     // Seed with a due date so the task matches real-world shape; not
     // required for the state transition itself.
@@ -226,25 +226,18 @@ test.describe('task detail edit affordances', () => {
     await injectAuth(page.context(), tenant);
     await openTaskDetail(page, taskId, title);
 
-    const sidebar = page.locator('aside');
-
-    // Scope the state-badge assertion to the row that contains the
-    // "State" / "状態" label. The wider <aside> also renders a
-    // StateGraph which shows every state name as an SVG label, so a
-    // global `aside.getByText(/Open/)` search would match the graph
-    // node even after the badge has flipped. The state badge row is
-    // the direct parent of the "State" label.
-    const stateLabel = sidebar.getByText(/^(State|状態)$/);
-    await expect(stateLabel).toBeVisible({ timeout: 10_000 });
-    const stateRow = stateLabel.locator('..');
+    // The state badge sits in the status bar under the title; the state
+    // graph is inside the collapsed analysis card, so only the badge text
+    // is visible.
+    const stateBadge = (name: RegExp) => page.getByText(name).filter({ visible: true });
 
     // Initial state badge reads "Open" / "オープン".
-    await expect(stateRow.getByText(/^(Open|オープン)$/)).toBeVisible({ timeout: 10_000 });
+    await expect(stateBadge(/^(Open|オープン)$/)).toBeVisible({ timeout: 10_000 });
 
-    // Click the "Start" transition inside the Transitions card. This
+    // Click the "Start" transition in the status bar. This
     // is a distinct verb from the "Complete" button covered by
     // task-complete.spec.ts and moves open → waiting.
-    const startBtn = sidebar.getByRole('button', { name: /^(Start|開始)$/ });
+    const startBtn = page.getByRole('button', { name: /^(Start|開始)$/ });
     await expect(startBtn).toBeVisible({ timeout: 10_000 });
     await startBtn.click();
 
@@ -252,15 +245,15 @@ test.describe('task detail edit affordances', () => {
     // (TRANSITIONS_BY_STATE.waiting = [submit, block, cancel]) and
     // the badge should flip to "In progress" / "進行中".
     await expect(startBtn).toHaveCount(0, { timeout: 10_000 });
-    await expect(stateRow.getByText(/^(In progress|進行中)$/)).toBeVisible({
-      timeout: 10_000,
-    });
-    await expect(stateRow.getByText(/^(Open|オープン)$/)).toHaveCount(0);
+    await expect(stateBadge(/^(In progress|進行中)$/)).toBeVisible({ timeout: 10_000 });
+    await expect(stateBadge(/^(Open|オープン)$/)).toHaveCount(0);
 
     // The new legal transitions should be visible (Submit / Block /
-    // Cancel) — assert one to prove the sidebar rehydrated, rather
+    // Cancel) — assert one to prove the bar rehydrated, rather
     // than relying solely on the badge text.
-    await expect(sidebar.getByRole('button', { name: /^(Submit|レビュー依頼)$/ })).toBeVisible({
+    await expect(
+      page.getByRole('button', { name: /^(Submit for review|レビュー依頼)$/ }),
+    ).toBeVisible({
       timeout: 5_000,
     });
   });

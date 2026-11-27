@@ -95,7 +95,7 @@ async function seedTask(tenant: TestTenant, title: string): Promise<{ id: string
 async function openTaskDetail(page: Page, taskId: string, title: string): Promise<void> {
   await page.goto(`/tasks/${taskId}`);
   await expect(page.getByText(title).first()).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByRole('heading', { name: copy.sectionTitle })).toBeVisible({
+  await expect(page.getByRole('heading', { name: copy.sectionTitle, exact: true })).toBeVisible({
     timeout: 10_000,
   });
 }
@@ -128,9 +128,16 @@ test.describe('task ↔ event manual links', () => {
     await injectAuth(page.context(), tenant);
     await openTaskDetail(page, task.id, task.title);
 
-    await expect(page.getByRole('heading', { name: copy.emptyTitle })).toBeVisible({
-      timeout: 5_000,
-    });
+    // An empty section renders only its heading row: title, bare count,
+    // the Link event action, and no body copy or disclosure chevron.
+    const section = page.getByRole('region', { name: copy.sectionTitle, exact: true });
+    await expect(
+      section.getByRole('heading', { name: copy.sectionTitle, exact: true }),
+    ).toBeVisible({ timeout: 5_000 });
+    await expect(section.getByText('0', { exact: true })).toBeVisible();
+    await expect(section.getByRole('button', { name: copy.trigger })).toBeVisible();
+    await expect(section.getByRole('button', { expanded: true })).toHaveCount(0);
+    await expect(page.getByText(copy.emptyTitle)).toHaveCount(0);
   });
 
   test('B: clicking Link event opens the picker and focuses the combobox', async ({ page }) => {
@@ -140,10 +147,7 @@ test.describe('task ↔ event manual links', () => {
     await injectAuth(page.context(), tenant);
     await openTaskDetail(page, task.id, task.title);
 
-    // The trigger lives in the section header. The empty-state CTA
-    // shares the same text, so scope the click to the header button
-    // (it's the first one with the trigger label).
-    await page.getByRole('button', { name: copy.trigger }).first().click();
+    await page.getByRole('button', { name: copy.trigger }).click();
 
     // Scope the combobox lookup to the picker dialog — the workspace
     // switcher selectors elsewhere on the page also match
@@ -169,10 +173,8 @@ test.describe('task ↔ event manual links', () => {
     await injectAuth(page.context(), tenant);
     await openTaskDetail(page, task.id, task.title);
 
-    // Open the picker. The empty state CTA also opens it, but we use
-    // the section header trigger so the test does not depend on the
-    // empty-state surface path.
-    await page.getByRole('button', { name: copy.trigger }).first().click();
+    // Open the picker from the section heading trigger.
+    await page.getByRole('button', { name: copy.trigger }).click();
 
     const picker = page.getByRole('dialog', { name: copy.trigger });
     const combobox = picker.getByRole('combobox');
@@ -214,7 +216,7 @@ test.describe('task ↔ event manual links', () => {
     await openTaskDetail(page, task.id, task.title);
 
     // Link the event first so we have something to unlink.
-    await page.getByRole('button', { name: copy.trigger }).first().click();
+    await page.getByRole('button', { name: copy.trigger }).click();
     const picker = page.getByRole('dialog', { name: copy.trigger });
     await picker.getByRole('combobox').fill(eventTitle.slice(0, 6));
     await picker.getByRole('option', { name: new RegExp(eventTitle) }).click();
@@ -242,7 +244,7 @@ test.describe('task ↔ event manual links', () => {
     await injectAuth(page.context(), tenant);
     await openTaskDetail(page, task.id, task.title);
 
-    await page.getByRole('button', { name: copy.trigger }).first().click();
+    await page.getByRole('button', { name: copy.trigger }).click();
     const picker = page.getByRole('dialog', { name: copy.trigger });
     await expect(picker.getByRole('combobox')).toBeVisible({ timeout: 5_000 });
 
@@ -273,7 +275,7 @@ test.describe('task ↔ event manual links', () => {
     await injectAuth(page.context(), tenant);
     await openTaskDetail(page, task.id, task.title);
 
-    await page.getByRole('button', { name: copy.trigger }).first().click();
+    await page.getByRole('button', { name: copy.trigger }).click();
     const picker = page.getByRole('dialog', { name: copy.trigger });
     const combobox = picker.getByRole('combobox');
     await expect(combobox).toBeVisible({ timeout: 5_000 });
@@ -326,7 +328,7 @@ test.describe('task ↔ event manual links', () => {
     await injectAuth(page.context(), tenant);
     await openTaskDetail(page, task.id, task.title);
 
-    const trigger = page.getByRole('button', { name: copy.trigger }).first();
+    const trigger = page.getByRole('button', { name: copy.trigger });
     await trigger.click();
 
     const picker = page.getByRole('dialog', { name: copy.trigger });
@@ -392,7 +394,9 @@ test.describe('task ↔ event manual links', () => {
       await expect(page.getByText(task.title).first()).toBeVisible({ timeout: 15_000 });
 
       // The Japanese section.title is "関連イベント".
-      await expect(page.getByRole('heading', { name: copy.jaSectionTitle })).toBeVisible({
+      await expect(
+        page.getByRole('heading', { name: copy.jaSectionTitle, exact: true }),
+      ).toBeVisible({
         timeout: 10_000,
       });
     } finally {
@@ -415,14 +419,14 @@ test.describe('task ↔ event manual links', () => {
 
       // The disclosure heading must stay visible at iPhone-class widths
       // (no clipping into a hidden overflow column).
-      await expect(page.getByRole('heading', { name: copy.sectionTitle })).toBeVisible({
-        timeout: 5_000,
-      });
+      await expect(page.getByRole('heading', { name: copy.sectionTitle, exact: true })).toBeVisible(
+        {
+          timeout: 5_000,
+        },
+      );
 
       // The header "Link event" trigger button must also remain reachable.
-      // `.first()` because the empty state CTA shares the same accessible
-      // name and matches twice on a freshly-seeded task.
-      await expect(page.getByRole('button', { name: copy.trigger }).first()).toBeVisible({
+      await expect(page.getByRole('button', { name: copy.trigger })).toBeVisible({
         timeout: 5_000,
       });
     });

@@ -3,8 +3,8 @@
  * sub-section on the task detail page.
  *
  * Composition:
- * - header: a disclosure caret + title + count + a ghost "Link event"
- *   button that opens the popover picker.
+ * - header: the shared section heading with count, a "Link event"
+ *   button that opens the popover picker, and a disclosure chevron.
  * - body (when expanded): empty state, list of `LinkedEventRow`s, and
  *   the picker popover anchored to the trigger button.
  *
@@ -25,16 +25,18 @@
  */
 
 import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
-import Button from '@nodate-flow/ui/primitives/button';
 import Collapse from '@nodate-flow/ui/primitives/collapse';
 import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { useQueryClient } from '@tanstack/react-query';
+import { Plus } from 'lucide-react';
 import { type ReactElement, useState } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { useTranslation } from 'react-i18next';
 import { ApiError, formatApiError } from '../../../lib/api-error';
+import TaskActionButton from '../task-action-button';
+import TaskSectionHeading from '../task-section-heading';
 import EventPicker from './event-picker';
 import { useCollapsibleState } from './hooks/use-collapsible-state';
 import { useLinkEvent } from './hooks/use-link-event';
@@ -42,7 +44,6 @@ import { linkedEventsKeys, useLinkedEventsQuery } from './hooks/use-linked-event
 import { useUnlinkEvent } from './hooks/use-unlink-event';
 import LinkedEventRow from './linked-event-row';
 import styles from './linked-events.module.css';
-import LinkedEventsEmpty from './linked-events-empty';
 import LinkedEventsError from './linked-events-error';
 import type { CalendarEventListItem, LinkKind, TaskEventLink } from './types';
 
@@ -205,35 +206,16 @@ function LinkedEventsSectionImpl({
   const isEmpty = entries.length === 0;
 
   return (
-    <section className={styles.section} aria-labelledby={titleId}>
-      <div className={styles.sectionHeader}>
-        <button
-          type="button"
-          className={styles.disclosure}
-          aria-expanded={!collapsed}
-          aria-controls={bodyId}
-          onClick={toggle}
-        >
-          <svg
-            className={styles.caret}
-            data-open={collapsed ? undefined : 'true'}
-            viewBox="0 0 16 16"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={1.5}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-            focusable="false"
-          >
-            <path d="M6 4l4 4-4 4" />
-          </svg>
-          <h3 id={titleId} className={styles.title}>
-            {t('section.title')}
-          </h3>
-          <span className={styles.count}>{t('section.count', { count: total })}</span>
-        </button>
-        <div className={styles.headerActions}>
+    <section
+      className={styles.section}
+      aria-labelledby={titleId}
+      data-empty={isEmpty ? '' : undefined}
+    >
+      <TaskSectionHeading
+        id={titleId}
+        title={t('section.title')}
+        count={total}
+        trailing={
           <EventPicker
             workspaceId={workspaceId}
             taskId={taskId}
@@ -243,21 +225,25 @@ function LinkedEventsSectionImpl({
             onOpenChange={setPickerOpen}
             onLink={handleLink}
           >
-            <Button type="button" variant="ghost" size="sm" aria-haspopup="dialog">
+            <TaskActionButton icon={<Plus size={14} aria-hidden />} aria-haspopup="dialog">
               {t('trigger.linkEvent')}
-            </Button>
+            </TaskActionButton>
           </EventPicker>
-        </div>
-      </div>
+        }
+        {...(isEmpty
+          ? {}
+          : {
+              toggle: {
+                collapsed,
+                onToggle: toggle,
+                controlsId: bodyId,
+                label: t(collapsed ? 'section.expand' : 'section.collapse'),
+              },
+            })}
+      />
 
-      <Collapse open={!collapsed} id={bodyId}>
-        {isEmpty ? (
-          <LinkedEventsEmpty
-            onTriggerClick={() => {
-              setPickerOpen(true);
-            }}
-          />
-        ) : (
+      <Collapse open={!collapsed && !isEmpty} id={bodyId}>
+        {isEmpty ? null : (
           <ul className={styles.list}>
             {entries.map(({ key, item: entry, present }) => (
               <PresenceItem

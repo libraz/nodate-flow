@@ -1,0 +1,9 @@
+.action {
+  color: var(--nf-color-accent-fg);
+}
+
+.action:hover:not(:disabled),
+.action:focus-visible:not(:disabled) {
+  background: var(--nf-color-accent-subtle);
+  color: var(--nf-color-accent-fg);
+}

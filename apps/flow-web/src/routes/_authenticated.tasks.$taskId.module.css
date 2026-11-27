@@ -1,7 +1,141 @@
 /* Task detail page — states and motion the inline styles cannot express. */
 
 .panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(16rem, 22rem);
+  gap: var(--nf-space-6);
   animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
+}
+
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
+@media (max-width: 639px) {
+  .panel {
+    grid-template-columns: 1fr;
+  }
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-6);
+  min-inline-size: 0;
+}
+
+.mainHead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-4);
+  min-inline-size: 0;
+}
+
+.mainHead:empty {
+  display: none;
+}
+
+/* One section system: equal spacing, one hairline between neighbours that rendered something. */
+.sections {
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 0;
+}
+
+.section {
+  padding-block: var(--nf-space-6);
+  min-inline-size: 0;
+}
+
+.section:first-child {
+  padding-block-start: 0;
+}
+
+.section:last-child {
+  padding-block-end: 0;
+}
+
+/* A related section with nothing in it is only its heading row: half the padding. */
+.relatedSection:has([data-empty]) {
+  padding-block: var(--nf-space-3);
+}
+
+.tabCount {
+  margin-inline-start: var(--nf-space-1-5);
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.section:empty {
+  display: none;
+}
+
+.section:not(:empty) ~ .section:not(:empty) {
+  border-block-start: var(--nf-space-px) solid var(--nf-color-hairline);
+}
+
+/* One muted line, the empty state of every section. */
+.empty {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+}
+
+.count {
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.descriptionSection,
+.commentsSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+}
+
+.descriptionCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+}
+
+.descriptionBody {
+  /* nf-token-override: component dimension, not a spacing step */
+  min-block-size: 3rem;
+  inline-size: 100%;
+  font-size: var(--nf-text-sm);
+  line-height: 1.7;
+}
+
+/* Markdown headings stay at or below the section heading size. */
+.descriptionBody :global(h1) {
+  font-size: 1.15em;
+}
+
+.descriptionBody :global(h2) {
+  font-size: 1.08em;
+}
+
+.descriptionBody :global(h3),
+.descriptionBody :global(h4) {
+  font-size: 1em;
+}
+
+.descriptionForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+}
+
+/* Edit mode matches the rendered body size. */
+.descriptionForm :global(textarea) {
+  font-size: var(--nf-text-sm);
+  line-height: 1.7;
+}
+
+/* Reactions close the card, set off by a hairline. */
+.reactions {
+  padding-block-start: var(--nf-space-3);
+  border-block-start: var(--nf-space-px) solid var(--nf-color-hairline);
 }
 
 /* The loading shell mirrors the two-column page so arrival does not reflow it. */
@@ -89,6 +223,11 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--nf-space-2);
+}
+
+.assigneeRemove {
+  flex-shrink: 0;
+  color: var(--nf-color-fg-muted);
 }
 
 .assigneeName {
@@ -197,14 +336,42 @@
 
 .titleRow {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--nf-space-2);
 }
 
+/* Clicking the text edits the title; keyboard users use the pencil button. */
 .titleHeading {
   flex: 1;
   min-inline-size: 0;
+  margin-inline: calc(var(--nf-space-1-5) * -1);
+  padding-inline: var(--nf-space-1-5);
+  border-radius: var(--nf-radius-sm);
+  cursor: text;
+  transition: background-color var(--nf-duration-instant) var(--nf-ease-standard);
+}
+
+.titleHeading:hover {
+  background: var(--nf-color-surface-hover);
+}
+
+/* Help, favourite and edit sit together, centred on the first line of the title. */
+.titleActions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--nf-space-1);
+  min-block-size: calc(var(--nf-text-page-title) * var(--nf-leading-tight));
+}
+
+.iconButton {
+  padding-inline: var(--nf-space-2);
+}
+
+.titleError {
+  margin: 0;
+  color: var(--nf-color-danger-fg);
+  font-size: var(--nf-text-sm);
 }
 
 .titleEditing {
@@ -251,46 +418,79 @@
   flex-direction: column;
   gap: var(--nf-space-4);
   position: sticky;
-  inset-block-start: var(--nf-space-4);
+  inset-block-start: var(--nf-space-2);
   align-self: start;
   max-block-size: calc(
     100dvh -
     var(--nf-topbar-height, 3.5rem) -
     var(--nf-dock-clearance, 0px) -
-    var(--nf-space-4)
+    var(--nf-space-page) -
+    3 *
+    var(--nf-space-2)
   );
   overflow-y: auto;
+  scrollbar-width: thin;
 }
 
-.stateRow {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
+@media (max-width: 639px) {
+  /* One column: the sidebar follows the main column instead of floating beside it. */
+  .aside {
+    position: static;
+    max-block-size: none;
+    overflow-y: visible;
+  }
 }
 
-.mutedLabel {
-  color: var(--nf-color-fg-muted);
+.propRow {
+  display: grid;
+  grid-template-columns: 7rem minmax(0, 1fr);
+  align-items: start;
+  column-gap: var(--nf-space-2);
 }
 
-.fieldStack {
-  display: flex;
-  flex-direction: column;
-  gap: var(--nf-space-1);
-}
-
-.fieldLabel {
+/* Aligns the label with the first line of a one-line value field. */
+.propLabel {
   display: inline-flex;
   align-items: center;
-  gap: var(--nf-space-1-5);
+  gap: var(--nf-space-1);
+  min-block-size: var(--nf-space-8);
   font-size: var(--nf-text-sm);
-  font-weight: var(--nf-weight-medium);
-  color: var(--nf-color-fg);
+  color: var(--nf-color-fg-muted);
+  white-space: nowrap;
 }
 
-.descriptionToolbar {
+.propValue {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--nf-space-2);
+  min-inline-size: 0;
+}
+
+.analysisBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-4);
+}
+
+.inferBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1-5);
+}
+
+.inferHead {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
   gap: var(--nf-space-2);
-  margin-block-end: var(--nf-space-2);
+}
+
+.inferReason {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nf-space-1-5);
+  margin: 0;
+  font-size: var(--nf-text-supporting);
+  color: var(--nf-color-fg);
 }

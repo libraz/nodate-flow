@@ -7,6 +7,7 @@ import Button from '@nodate-flow/ui/primitives/button';
 import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import motion from '@nodate-flow/ui/styles/list-motion.module.css';
+import { Upload } from 'lucide-react';
 import { type ChangeEvent, type ReactElement, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatApiError } from '../../lib/api-error';
@@ -19,6 +20,7 @@ import {
   useListAttachments,
   usePresignUpload,
 } from './api';
+import TaskActionButton from './task-action-button';
 import css from './task-attachments.module.css';
 import TaskSectionHeading from './task-section-heading';
 
@@ -138,9 +140,10 @@ export default function TaskAttachments({ taskId }: TaskAttachmentsProps): React
   };
 
   return (
-    <section className={css.section}>
+    <section className={css.section} data-empty={entries.length === 0 ? '' : undefined}>
       <TaskSectionHeading
         title={t('tasks.attachments.title')}
+        {...(entries.length === 0 ? { count: 0 } : {})}
         trailing={
           <div>
             <input
@@ -151,23 +154,19 @@ export default function TaskAttachments({ taskId }: TaskAttachmentsProps): React
                 void handleFileChange(e);
               }}
             />
-            <Button
-              type="button"
-              variant="default"
-              size="sm"
+            <TaskActionButton
+              icon={<Upload size={14} aria-hidden />}
               onClick={() => fileInputRef.current?.click()}
               disabled={presignUpload.isPending}
             >
               {presignUpload.isPending
                 ? t('tasks.attachments.uploading')
                 : t('tasks.attachments.upload')}
-            </Button>
+            </TaskActionButton>
           </div>
         }
       />
-      {entries.length === 0 ? (
-        <p className={css.empty}>{t('tasks.attachments.empty')}</p>
-      ) : (
+      {entries.length === 0 ? null : (
         <ul className={css.list}>
           {entries.map(({ key, item: a, present }) => (
             <PresenceItem

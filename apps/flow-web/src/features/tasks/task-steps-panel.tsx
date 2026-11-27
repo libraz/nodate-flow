@@ -1,5 +1,5 @@
 /**
- * TaskStepsPanel — collapsible panel for AI-powered task decomposition.
+ * TaskStepsPanel — AI-powered task decomposition; the capability tile around it owns the title and the expansion.
  *
  * Lets the user propose subtask steps via AI, review / edit / toggle them,
  * then apply selected steps as real subtasks.
@@ -8,7 +8,6 @@
 import { cx } from '@nodate-flow/ui/lib/cx';
 import Badge from '@nodate-flow/ui/primitives/badge';
 import Button from '@nodate-flow/ui/primitives/button';
-import Card from '@nodate-flow/ui/primitives/card';
 import Checkbox from '@nodate-flow/ui/primitives/checkbox';
 import Collapse from '@nodate-flow/ui/primitives/collapse';
 import Input from '@nodate-flow/ui/primitives/input';
@@ -26,6 +25,7 @@ import {
   useApplySteps,
   useProposeSteps,
 } from './steps-api';
+import { HintTip } from './task-side-card';
 import css from './task-steps-panel.module.css';
 
 const GRANULARITY_KEY: Record<StepGranularity, string> = {
@@ -183,16 +183,17 @@ export default function TaskStepsPanel({ taskId }: TaskStepsPanelProps): ReactEl
   const selectedCount = checked.filter(Boolean).length;
 
   return (
-    <Card className={css.card}>
-      <div className={css.head}>
-        <h2 className={css.title}>{t('tasks.steps.title')}</h2>
-        <p className={css.description}>{t('tasks.steps.description')}</p>
-      </div>
-
+    <div className={css.root}>
       {!hasProposed ? (
         <div key="form" className={cx(css.form, css.stage)}>
           <div>
-            <span className={css.fieldLabel}>{t('tasks.steps.granularity_label')}</span>
+            <span className={css.fieldLabel}>
+              {t('tasks.steps.granularity_label')}
+              <HintTip
+                title={t('tasks.steps.granularity_label')}
+                hint={t('tasks.steps.granularity_hint')}
+              />
+            </span>
             <SegmentedControl<StepGranularity>
               ariaLabel={t('tasks.steps.granularity_label')}
               size="sm"
@@ -204,11 +205,12 @@ export default function TaskStepsPanel({ taskId }: TaskStepsPanelProps): ReactEl
                 label: t(GRANULARITY_KEY[g]),
               }))}
             />
-            <p className={css.fieldHint}>{t('tasks.steps.granularity_hint')}</p>
           </div>
           {/* The button stays in place while the proposal runs, so the panel does not jump. */}
           <Button
             type="button"
+            size="sm"
+            className={css.proposeButton}
             disabled={propose.isPending}
             aria-busy={propose.isPending}
             onClick={() => {
@@ -265,6 +267,6 @@ export default function TaskStepsPanel({ taskId }: TaskStepsPanelProps): ReactEl
           </div>
         </div>
       )}
-    </Card>
+    </div>
   );
 }

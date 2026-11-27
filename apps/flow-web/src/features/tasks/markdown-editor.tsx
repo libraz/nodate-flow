@@ -51,6 +51,8 @@ interface MarkdownEditorProps {
   placeholder?: string | undefined;
   /** Runs for every key the mention picker did not consume. */
   onKeyDown?: ((event: KeyboardEvent<HTMLTextAreaElement>) => void) | undefined;
+  /** Lets the parent move focus into the textarea. */
+  textareaRef?: RefObject<HTMLTextAreaElement | null> | undefined;
 }
 
 /** Wrap the selected text (or insert at cursor) with `before` / `after`. */
@@ -116,10 +118,12 @@ export default function MarkdownEditor({
   id,
   placeholder,
   onKeyDown,
+  textareaRef: externalRef,
 }: MarkdownEditorProps): ReactElement {
   const { t } = useTranslation('common');
   const [previewing, setPreviewing] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const ownRef = useRef<HTMLTextAreaElement>(null);
+  const textareaRef = externalRef ?? ownRef;
 
   const handleBold = (): void => {
     wrapSelection(textareaRef, value, '**', '**', onChange);

@@ -998,7 +998,6 @@
       "cancel": "キャンセル",
       "priority_label": "優先度",
       "due_label": "期日",
-      "state_label": "状態",
       "assignees_label": "担当者",
       "assignees": {
         "title": "担当者",
@@ -1024,7 +1023,8 @@
         "relates": "関連",
         "duplicateOf": "重複元",
         "duplicatedBy": "重複として参照",
-        "empty": "依存関係はまだありません。追加すると、このタスクをブロックするもの、ブロックされるもの、重複するタスクを示せます。",
+        "empty": "依存関係はまだありません。",
+        "hint": "このタスクをブロックするもの、ブロックされるもの、重複するタスクを示せます。",
         "add": "依存を追加",
         "addCancel": "キャンセル",
         "remove": "削除",
@@ -1075,8 +1075,6 @@
         "empty": "このタスクにはまだ AI の記録がありません。"
       },
       "transitions": {
-        "title": "状態を変更",
-        "current": "現在の状態",
         "pending": "状態を変更中…",
         "start": "開始",
         "block": "ブロック",
@@ -1085,8 +1083,37 @@
         "complete": "完了",
         "reopen": "再オープン",
         "cancel": "キャンセル",
-        "hint": "現在の状態から行える操作だけが表示されます。完了とキャンセルのタスクは再オープンのみ可能です。"
-      }
+        "more": "その他の操作"
+      },
+      "sections": {
+        "description": "説明"
+      },
+      "properties": {
+        "title": "詳細"
+      },
+      "automation": {
+        "title": "AI と自動化",
+        "agent": {
+          "summary": "このタスクの作業を AI エージェントに任せます。"
+        },
+        "next_action": {
+          "summary": "次にどの状態へ進めるかを AI が提案します。"
+        },
+        "steps": {
+          "summary": "AI がこのタスクをサブタスク案に分けます。確認してから作成されます。",
+          "open": "サブタスク案を作る"
+        },
+        "constraints": {
+          "summary": "完了条件などのルールを決めて、満たしているかを自動で確認します。",
+          "count": "{count, plural, =0 {ルールはまだありません} other {ルール #件}}",
+          "open": "ルールを編集",
+          "close": "閉じる"
+        }
+      },
+      "diagnostics": {
+        "title": "分析"
+      },
+      "hint_label": "{title}について"
     },
     "history": {
       "title": "説明文の履歴",
@@ -1108,7 +1135,6 @@
       }
     },
     "actions": {
-      "title": "アクション",
       "create_event": {
         "trigger": "カレンダーイベントを作成",
         "title": "タスクからイベントを作成",

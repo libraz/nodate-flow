@@ -1,10 +1,11 @@
 /**
  * /tasks/$taskId — task detail panel (lazy).
  *
- * Two-column layout: main content (title, description, comments) on the
- * left, sidebar (state, priority, due, assignees, transitions) on the
- * right. State transitions go through `useTransitionTask`; description /
- * title / priority / due edits go through `useUpdateTask`.
+ * Two-column layout: main content (title, status bar, description and the
+ * other sections, comments last) on the left, sidebar (details, AI and
+ * automation, analysis, activity) on the right. State transitions go
+ * through `TaskStatusBar`; description / title / priority / due edits go
+ * through `useUpdateTask`.
  */
 
 import { useFirstLoadStagger } from '@nodate-flow/ui/hooks/use-first-load-stagger';
@@ -18,20 +19,30 @@ import {
 } from '@nodate-flow/ui/primitives/breadcrumb';
 import Button from '@nodate-flow/ui/primitives/button';
 import Card from '@nodate-flow/ui/primitives/card';
+import Collapse from '@nodate-flow/ui/primitives/collapse';
 import Combobox from '@nodate-flow/ui/primitives/combobox';
 import DatePicker from '@nodate-flow/ui/primitives/date-picker';
-import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
 import Markdown from '@nodate-flow/ui/primitives/markdown';
 import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
-import Separator from '@nodate-flow/ui/primitives/separator';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
+import Tooltip from '@nodate-flow/ui/primitives/tooltip';
 import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { BP } from '@nodate-flow/ui/tokens/breakpoints';
 import { createLazyFileRoute, getRouteApi, Link } from '@tanstack/react-router';
-import { History, Pencil, Plus, X } from 'lucide-react';
-import { type ReactElement, Suspense, useEffect, useId, useState } from 'react';
+import {
+  Bot,
+  CalendarDays,
+  History,
+  Lightbulb,
+  ListTree,
+  Pencil,
+  Plus,
+  ShieldCheck,
+  X,
+} from 'lucide-react';
+import { type ReactElement, type ReactNode, Suspense, useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import FormActions from '../components/form-actions';
 import PageFrame from '../components/page-frame';
@@ -49,6 +60,7 @@ import TaskLabelsField, { TaskLabelsFieldSkeleton } from '../features/labels/tas
 import { useProjectQuery } from '../features/projects/api';
 import { useTaskReactionsQuery } from '../features/reactions/api';
 import ReactionBar from '../features/reactions/reaction-bar';
+import ActivityTabs from '../features/tasks/activity-tabs';
 import AgentAssignSection from '../features/tasks/agent-panel/agent-assign-section';
 import AgentPanel from '../features/tasks/agent-panel/agent-panel';
 import AIAgentsSection from '../features/tasks/ai-agents/section';
@@ -66,24 +78,32 @@ import {
   useTaskQuery,
   useUpdateTask,
 } from '../features/tasks/api';
+import AutomationTile from '../features/tasks/automation-tile';
 import CommentForm from '../features/tasks/comment-form';
 import CommentRow from '../features/tasks/comment-row';
 import { PRIORITY_KEY, TRANSITION_KEY } from '../features/tasks/constants';
 import DependenciesSection from '../features/tasks/dependencies-section';
 import DescriptionHistoryDrawer from '../features/tasks/description-history/description-history-drawer';
-import EventFromTaskDialog from '../features/tasks/event-from-task/event-from-task-dialog';
+import { useCollapsibleState } from '../features/tasks/links/hooks/use-collapsible-state';
 import LinkedEventsSection from '../features/tasks/links/linked-events-section';
 import MarkdownEditor from '../features/tasks/markdown-editor';
-import PriorityControl from '../features/tasks/priority-control';
 import PriorityMark from '../features/tasks/priority-mark';
+import PriorityPicker from '../features/tasks/priority-picker';
+import fieldStyles from '../features/tasks/property-field.module.css';
 import SubtasksSection from '../features/tasks/subtasks-section';
+import TaskActionButton from '../features/tasks/task-action-button';
 import TaskAttachments from '../features/tasks/task-attachments';
 import TaskParentLink from '../features/tasks/task-parent-link';
-import { TaskSideCard, TaskSideCardHeading } from '../features/tasks/task-side-card';
+import TaskSectionHeading, { TaskDisclosureToggle } from '../features/tasks/task-section-heading';
+import {
+  HintTip,
+  TaskSideCard,
+  TaskSideCardHeading,
+  TaskSideGroup,
+} from '../features/tasks/task-side-card';
 import TaskSourceLinks from '../features/tasks/task-source-links';
-import TaskStateBadge from '../features/tasks/task-state-badge';
+import TaskStatusBar from '../features/tasks/task-status-bar';
 import TaskStepsPanel from '../features/tasks/task-steps-panel';
-import TaskTransitionCard from '../features/tasks/task-transition-card';
 import TaskRoleAssignments from '../features/tasks/workflow/task-role-assignments';
 import TaskWorkflowPanel from '../features/tasks/workflow/task-workflow-panel';
 import { useTaskTimelineQuery } from '../features/timeline/api';
@@ -167,6 +187,8 @@ function TitleEditor({
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(initial);
   const [showEmptyError, setShowEmptyError] = useState(false);
+  // Set once an edit ends, so the pencil that remounts takes focus back.
+  const [returnFocus, setReturnFocus] = useState(false);
   const update = useUpdateTask();
   const errorId = useId();
 
@@ -174,24 +196,35 @@ function TitleEditor({
     const enterEdit = (): void => {
       setValue(initial);
       setShowEmptyError(false);
+      setReturnFocus(false);
       setEditing(true);
     };
+    const title = t('tasks.detail.title_edit_named', { title: initial });
     return (
       <div className={css.titleRow}>
-        <h1 className={cx(frameStyles.title, css.titleHeading)}>{initial}</h1>
-        <PageHelp topic="task-detail" />
-        <Suspense fallback={<Skeleton className={css.starSkeleton} />}>
-          <TaskFavoriteStar taskId={id} workspaceId={workspaceId} />
-        </Suspense>
-        <Button
-          type="button"
-          size="sm"
-          onClick={enterEdit}
-          aria-label={t('tasks.detail.title_edit_named', { title: initial })}
-        >
-          <Pencil size={14} aria-hidden />
-          {t('tasks.detail.title_edit')}
-        </Button>
+        {/* biome-ignore lint/a11y/useKeyWithClickEvents: see above, the pencil button is the keyboard path. */}
+        <h1 className={cx(frameStyles.title, css.titleHeading)} onClick={enterEdit}>
+          {initial}
+        </h1>
+        <div className={css.titleActions}>
+          <PageHelp topic="task-detail" />
+          <Suspense fallback={<Skeleton className={css.starSkeleton} />}>
+            <TaskFavoriteStar taskId={id} workspaceId={workspaceId} />
+          </Suspense>
+          <Tooltip content={t('tasks.detail.title_edit')}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className={css.iconButton}
+              autoFocus={returnFocus}
+              onClick={enterEdit}
+              aria-label={title}
+            >
+              <Pencil size={14} aria-hidden />
+            </Button>
+          </Tooltip>
+        </div>
       </div>
     );
   }
@@ -201,20 +234,24 @@ function TitleEditor({
   const isUnchanged = trimmed === initial;
   const saveDisabled = update.isPending || isEmpty || isUnchanged;
 
+  const closeEditor = (): void => {
+    setReturnFocus(true);
+    setEditing(false);
+    setShowEmptyError(false);
+  };
+
   const handleSave = async (): Promise<void> => {
     if (isEmpty) {
       setShowEmptyError(true);
       return;
     }
     if (isUnchanged) {
-      setEditing(false);
-      setShowEmptyError(false);
+      closeEditor();
       return;
     }
     try {
       await update.mutateAsync({ id, patch: { title: trimmed } });
-      setEditing(false);
-      setShowEmptyError(false);
+      closeEditor();
     } catch (err) {
       toaster.show({
         tone: 'danger',
@@ -242,8 +279,7 @@ function TitleEditor({
               void handleSave();
             } else if (e.key === 'Escape') {
               e.preventDefault();
-              setEditing(false);
-              setShowEmptyError(false);
+              closeEditor();
             }
           }}
           autoFocus
@@ -265,19 +301,14 @@ function TitleEditor({
           type="button"
           variant="ghost"
           onClick={() => {
-            setEditing(false);
-            setShowEmptyError(false);
+            closeEditor();
           }}
         >
           {t('tasks.detail.cancel')}
         </Button>
       </div>
       {showEmptyError ? (
-        <p
-          id={errorId}
-          role="alert"
-          style={{ margin: 0, color: 'var(--nf-color-danger-fg)', fontSize: 'var(--nf-text-sm)' }}
-        >
+        <p id={errorId} role="alert" className={css.titleError}>
           {t('tasks.validation.title_required')}
         </p>
       ) : null}
@@ -285,65 +316,25 @@ function TitleEditor({
   );
 }
 
-function DescriptionEditor({
+function DescriptionForm({
   id,
   initial,
   workspaceId,
+  onClose,
 }: {
   id: string;
   initial: string;
   workspaceId: string;
+  onClose: () => void;
 }): ReactElement {
   const { t } = useTranslation('common');
-  const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(initial);
   const update = useUpdateTask();
-
-  if (!editing) {
-    const enterEdit = (): void => {
-      setValue(initial);
-      setEditing(true);
-    };
-    const isEmpty = initial.length === 0;
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}>
-        {/* biome-ignore lint/a11y/noStaticElementInteractions: interactive only in the empty state, where it carries role="button" + tabIndex + a keyboard handler; otherwise an inert description renderer. */}
-        <div
-          role={isEmpty ? 'button' : undefined}
-          tabIndex={isEmpty ? 0 : undefined}
-          onClick={isEmpty ? enterEdit : undefined}
-          onKeyDown={
-            isEmpty
-              ? (e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    enterEdit();
-                  }
-                }
-              : undefined
-          }
-          className={isEmpty ? css.descriptionEmpty : undefined}
-          // nf-token-override: component dimension, not a spacing step
-          style={isEmpty ? undefined : { minBlockSize: '3rem', inlineSize: '100%' }}
-        >
-          {isEmpty ? t('tasks.detail.description_empty') : <Markdown>{initial}</Markdown>}
-        </div>
-        {!isEmpty && (
-          <div>
-            <Button type="button" size="sm" onClick={enterEdit}>
-              <Pencil size={14} aria-hidden />
-              {t('tasks.detail.description_edit')}
-            </Button>
-          </div>
-        )}
-      </div>
-    );
-  }
 
   const handleSave = async (): Promise<void> => {
     try {
       await update.mutateAsync({ id, patch: { description: value } });
-      setEditing(false);
+      onClose();
     } catch (err) {
       toaster.show({
         tone: 'danger',
@@ -354,8 +345,7 @@ function DescriptionEditor({
 
   return (
     <form
-      className={css.editorEnter}
-      style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}
+      className={cx(css.editorEnter, css.descriptionForm)}
       onSubmit={(e) => {
         e.preventDefault();
         void handleSave();
@@ -371,13 +361,7 @@ function DescriptionEditor({
         aria-label={t('tasks.detail.description_edit')}
       />
       <FormActions hint>
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={() => {
-            setEditing(false);
-          }}
-        >
+        <Button type="button" variant="ghost" onClick={onClose}>
           {t('tasks.detail.cancel')}
         </Button>
         <Button type="submit">{t('tasks.detail.save')}</Button>
@@ -386,12 +370,67 @@ function DescriptionEditor({
   );
 }
 
+function DescriptionEditor({
+  id,
+  initial,
+  workspaceId,
+  editing,
+  onEditingChange,
+}: {
+  id: string;
+  initial: string;
+  workspaceId: string;
+  editing: boolean;
+  onEditingChange: (next: boolean) => void;
+}): ReactElement {
+  const { t } = useTranslation('common');
+
+  if (editing) {
+    return (
+      <DescriptionForm
+        id={id}
+        initial={initial}
+        workspaceId={workspaceId}
+        onClose={() => {
+          onEditingChange(false);
+        }}
+      />
+    );
+  }
+
+  const isEmpty = initial.length === 0;
+  const enterEdit = (): void => {
+    onEditingChange(true);
+  };
+  return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: interactive only in the empty state, where it carries role="button" + tabIndex + a keyboard handler; otherwise an inert description renderer.
+    <div
+      role={isEmpty ? 'button' : undefined}
+      tabIndex={isEmpty ? 0 : undefined}
+      onClick={isEmpty ? enterEdit : undefined}
+      onKeyDown={
+        isEmpty
+          ? (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                enterEdit();
+              }
+            }
+          : undefined
+      }
+      className={isEmpty ? css.descriptionEmpty : css.descriptionBody}
+    >
+      {isEmpty ? t('tasks.detail.description_empty') : <Markdown>{initial}</Markdown>}
+    </div>
+  );
+}
+
 /**
- * DescriptionSection wraps the description card so we can compose the
- * editor with a History trigger that opens the
- * {@link DescriptionHistoryDrawer}. The drawer is mounted lazily — it
- * stays unmounted until the user opens it for the first time, after
- * which the standard react-query cache governs revisits.
+ * DescriptionSection is the column's one card: the heading row carries
+ * History and Edit, the card holds the body and, in its footer, the
+ * reactions. The history drawer mounts lazily — it stays unmounted until the
+ * user opens it for the first time, after which the standard react-query
+ * cache governs revisits.
  */
 function DescriptionSection({
   id,
@@ -403,21 +442,58 @@ function DescriptionSection({
   workspaceId: string;
 }): ReactElement {
   const { t } = useTranslation('common');
+  const headingId = useId();
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  // Set once an edit ends, so the edit button that remounts takes focus back.
+  const [returnFocus, setReturnFocus] = useState(false);
+  const canEdit = !editing && initial.length > 0;
   return (
-    <Card>
-      <div className={css.descriptionToolbar}>
-        <Button
-          type="button"
-          size="sm"
-          onClick={() => setHistoryOpen(true)}
-          aria-label={t('tasks.history.title')}
-        >
-          <History size={14} aria-hidden />
-          {t('tasks.history.open')}
-        </Button>
-      </div>
-      <DescriptionEditor id={id} initial={initial} workspaceId={workspaceId} />
+    <section className={css.descriptionSection} aria-labelledby={headingId}>
+      <TaskSectionHeading
+        id={headingId}
+        title={t('tasks.detail.sections.description')}
+        trailing={
+          <>
+            <TaskActionButton
+              icon={<History size={14} aria-hidden />}
+              onClick={() => setHistoryOpen(true)}
+              aria-label={t('tasks.history.title')}
+            >
+              {t('tasks.history.open')}
+            </TaskActionButton>
+            {canEdit ? (
+              <TaskActionButton
+                icon={<Pencil size={14} aria-hidden />}
+                autoFocus={returnFocus}
+                onClick={() => {
+                  setEditing(true);
+                }}
+              >
+                {t('tasks.detail.description_edit')}
+              </TaskActionButton>
+            ) : null}
+          </>
+        }
+      />
+      <Card className={css.descriptionCard}>
+        <DescriptionEditor
+          id={id}
+          initial={initial}
+          workspaceId={workspaceId}
+          editing={editing}
+          onEditingChange={(next) => {
+            setReturnFocus(!next);
+            setEditing(next);
+          }}
+        />
+        <div className={css.reactions}>
+          {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
+          <Suspense fallback={<Skeleton style={{ blockSize: '1.5rem', inlineSize: '8rem' }} />}>
+            <ReactionsSection taskId={id} />
+          </Suspense>
+        </div>
+      </Card>
       {historyOpen ? (
         <DescriptionHistoryDrawer
           taskId={id}
@@ -426,7 +502,7 @@ function DescriptionSection({
           onClose={() => setHistoryOpen(false)}
         />
       ) : null}
-    </Card>
+    </section>
   );
 }
 
@@ -435,41 +511,6 @@ function ReactionsSection({ taskId }: { taskId: string }): ReactElement {
   const { data: reactions } = useTaskReactionsQuery(taskId);
   return (
     <ReactionBar taskId={taskId} reactions={reactions} currentUserId={currentUser?.id ?? ''} />
-  );
-}
-
-/**
- * TaskActionsCard hosts secondary task actions that don't belong to the
- * state transition cluster. Currently surfaces the
- * "Create calendar event" affordance — the dialog mounts lazily once
- * the actor opens it.
- */
-function TaskActionsCard({
-  taskId,
-  workspaceId,
-}: {
-  taskId: string;
-  workspaceId: string;
-}): ReactElement {
-  const { t } = useTranslation('common');
-  const [eventDialogOpen, setEventDialogOpen] = useState(false);
-  return (
-    <TaskSideCard>
-      <TaskSideCardHeading title={t('tasks.actions.title')} />
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--nf-space-2)' }}>
-        <Button type="button" variant="default" onClick={() => setEventDialogOpen(true)}>
-          {t('tasks.actions.create_event.trigger')}
-        </Button>
-      </div>
-      {eventDialogOpen ? (
-        <EventFromTaskDialog
-          taskId={taskId}
-          defaultWorkspaceId={workspaceId}
-          open={eventDialogOpen}
-          onClose={() => setEventDialogOpen(false)}
-        />
-      ) : null}
-    </TaskSideCard>
   );
 }
 
@@ -488,12 +529,9 @@ function CommentsFeed({
   const staggerFor = useFirstLoadStagger();
 
   return (
-    <section style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-4)' }}>
-      <h2 style={{ margin: 0, fontSize: 'var(--nf-text-lg)' }}>{t('tasks.comments.title')}</h2>
+    <section className={css.commentsSection} aria-label={t('tasks.comments.title')}>
       {entries.length === 0 ? (
-        <p className={css.editorEnter} style={{ color: 'var(--nf-color-fg-muted)', margin: 0 }}>
-          {t('tasks.comments.empty')}
-        </p>
+        <p className={cx(css.editorEnter, css.empty)}>{t('tasks.comments.empty')}</p>
       ) : (
         <ul className={css.commentList}>
           {entries.map(({ key, item: c, present }, index) => {
@@ -521,6 +559,74 @@ function CommentsFeed({
       )}
       <CommentForm taskId={taskId} workspaceId={workspaceId} />
     </section>
+  );
+}
+
+/** Tab label of the comments tab: the title and how many comments there are. */
+function CommentsTabLabel({ taskId }: { taskId: string }): ReactElement {
+  const { t } = useTranslation('common');
+  const { data: comments } = useTaskCommentsQuery(taskId);
+  return (
+    <>
+      {t('tasks.comments.title')}
+      <span className={css.tabCount}>{comments.length}</span>
+    </>
+  );
+}
+
+/**
+ * Comments, the timeline and AI activity share one tabbed block at the end
+ * of the main column. The comments panel is open from the start; the other
+ * two mount on first use, so their queries wait until their tab is opened.
+ */
+function TaskActivity({
+  taskId,
+  workspaceId,
+  locale,
+}: {
+  taskId: string;
+  workspaceId: string;
+  locale: string;
+}): ReactElement {
+  const { t } = useTranslation('common');
+  const { t: tAgents } = useTranslation('aiAgents');
+  return (
+    <ActivityTabs
+      ariaLabel={t('tasks.detail.activity.title')}
+      tabs={[
+        {
+          value: 'comments',
+          label: (
+            <Suspense fallback={t('tasks.comments.title')}>
+              <CommentsTabLabel taskId={taskId} />
+            </Suspense>
+          ),
+          content: (
+            <Suspense fallback={<SectionSkeleton />}>
+              <CommentsFeed taskId={taskId} workspaceId={workspaceId} />
+            </Suspense>
+          ),
+        },
+        {
+          value: 'activity',
+          label: t('tasks.detail.activity.title'),
+          content: (
+            <Suspense fallback={<SectionSkeleton />}>
+              <TaskMiniTimeline taskId={taskId} />
+            </Suspense>
+          ),
+        },
+        {
+          value: 'ai',
+          label: tAgents('section.title'),
+          content: (
+            <Suspense fallback={<AIAgentsSkeleton />}>
+              <AIAgentsSection taskId={taskId} locale={locale} />
+            </Suspense>
+          ),
+        },
+      ]}
+    />
   );
 }
 
@@ -570,9 +676,7 @@ function AssigneesSection({
   return (
     <>
       {entries.length === 0 ? (
-        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>
-          {t('tasks.detail.assignees.empty')}
-        </p>
+        <p className={css.empty}>{t('tasks.detail.assignees.empty')}</p>
       ) : (
         <ul className={css.plainList}>
           {entries.map(({ key, item: a, present }) => (
@@ -591,6 +695,7 @@ function AssigneesSection({
                   type="button"
                   variant="ghost"
                   size="sm"
+                  className={css.assigneeRemove}
                   aria-label={t('tasks.detail.assignees.remove', { name: a.displayName })}
                   onClick={() => {
                     void handleRemove(a.id);
@@ -605,9 +710,7 @@ function AssigneesSection({
       )}
       {picking ? (
         available.length === 0 ? (
-          <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>
-            {t('tasks.detail.assignees.none')}
-          </p>
+          <p className={css.empty}>{t('tasks.detail.assignees.none')}</p>
         ) : (
           <Combobox
             aria-label={t('tasks.detail.assignees.add')}
@@ -619,25 +722,45 @@ function AssigneesSection({
           />
         )
       ) : (
-        <Button
-          type="button"
-          size="sm"
+        <TaskActionButton
+          icon={<Plus size={14} aria-hidden />}
           className={css.startAligned}
           onClick={() => {
             setPicking(true);
           }}
         >
-          <Plus size={14} aria-hidden />
           {t('tasks.detail.assignees.add')}
-        </Button>
+        </TaskActionButton>
       )}
     </>
   );
 }
 
+/** One property of the details card: a fixed label column and a value column. */
+function PropertyRow({
+  label,
+  labelId,
+  hint,
+  children,
+}: {
+  label: string;
+  labelId?: string;
+  hint?: ReactElement;
+  children: ReactNode;
+}): ReactElement {
+  return (
+    <div className={css.propRow}>
+      <span id={labelId} className={css.propLabel}>
+        {label}
+        {hint}
+      </span>
+      <div className={css.propValue}>{children}</div>
+    </div>
+  );
+}
+
 interface SidebarProps {
   id: string;
-  projectId: string;
   workspaceId: string;
   state: TaskDerivedState;
   priority: TaskPriority;
@@ -645,19 +768,12 @@ interface SidebarProps {
   dueOn: string | undefined;
 }
 
-function Sidebar({
-  id,
-  projectId,
-  workspaceId,
-  state,
-  priority,
-  startOn,
-  dueOn,
-}: SidebarProps): ReactElement {
+function Sidebar({ id, workspaceId, state, priority, startOn, dueOn }: SidebarProps): ReactElement {
   const { t, i18n } = useTranslation('common');
   const weekStart = useWeekStart();
   const { t: tAgents } = useTranslation('aiAgents');
   const { t: tLabels } = useTranslation('labels');
+  const { t: tConstraints } = useTranslation('constraints');
   const labelsLabelId = useId();
   const locale = i18n.resolvedLanguage ?? 'en';
   const weekdayLabels = t('common.date.weekdays', { returnObjects: true }) as string[];
@@ -713,154 +829,204 @@ function Sidebar({
   return (
     <aside className={css.aside}>
       <TaskSideCard>
-        <div className={css.stateRow}>
-          <span className={css.mutedLabel}>{t('tasks.detail.state_label')}</span>
-          <TaskStateBadge state={state} />
-        </div>
-        <Separator />
-        {/*
-         * Priority picker — rendered as a segmented control (radiogroup) so
-         * the five ordinal ranks are visible at once and the active rank is
-         * one click away. We do not use `FormField` here because
-         * `radiogroup` uses `aria-label` for its accessible name rather than
-         * `<label htmlFor>`, so we compose the visible label + colour dot
-         * manually to match the surrounding sidebar rhythm.
-         */}
-        <div className={css.fieldStack}>
-          <span className={css.fieldLabel}>
-            {t('tasks.detail.priority_label')}
-            <PriorityMark priority={priority} />
-          </span>
-          <PriorityControl
-            value={priority}
-            onChange={(next) => {
-              void handlePriorityChange(next);
-            }}
-          />
-        </div>
-        <FormField label={t('tasks.form.start')}>
-          {() => (
-            <DatePicker
-              value={startOn ?? ''}
+        <TaskSideCardHeading title={t('tasks.detail.properties.title')} />
+        <TaskSideGroup>
+          <PropertyRow label={t('tasks.detail.priority_label')}>
+            <PriorityPicker
+              value={priority}
               onChange={(next) => {
-                void handleStartChange(next);
+                void handlePriorityChange(next);
               }}
-              weekdayLabels={weekdayLabels}
-              weekStart={weekStart}
-              formatMonthYear={formatMonthYear}
-              prevLabel={t('calendar.prev')}
-              nextLabel={t('calendar.next')}
-              triggerLabel={startOn ? formatDate(startOn, locale) : t('common.date.placeholder')}
             />
-          )}
-        </FormField>
-        <FormField label={t('tasks.detail.due_label')}>
-          {() => (
-            <DatePicker
-              value={dueOn ?? ''}
-              onChange={(next) => {
-                void handleDueChange(next);
-              }}
-              weekdayLabels={weekdayLabels}
-              weekStart={weekStart}
-              formatMonthYear={formatMonthYear}
-              prevLabel={t('calendar.prev')}
-              nextLabel={t('calendar.next')}
-              triggerLabel={dueOn ? formatDueDate(dueOn, locale) : t('common.date.placeholder')}
-            />
-          )}
-        </FormField>
-        <div className={css.fieldStack}>
-          <span id={labelsLabelId} className={css.fieldLabel}>
-            {tLabels('title')}
-          </span>
-          <Suspense fallback={<TaskLabelsFieldSkeleton />}>
-            <TaskLabelsField taskId={id} workspaceId={workspaceId} labelledBy={labelsLabelId} />
-          </Suspense>
-        </div>
+          </PropertyRow>
+          <PropertyRow label={t('tasks.form.start')}>
+            <div className={fieldStyles.dateField}>
+              <DatePicker
+                className={cx(fieldStyles.dateTrigger, !startOn && fieldStyles.dateEmpty)}
+                value={startOn ?? ''}
+                onChange={(next) => {
+                  void handleStartChange(next);
+                }}
+                weekdayLabels={weekdayLabels}
+                weekStart={weekStart}
+                formatMonthYear={formatMonthYear}
+                prevLabel={t('calendar.prev')}
+                nextLabel={t('calendar.next')}
+                triggerLabel={startOn ? formatDate(startOn, locale) : t('common.date.placeholder')}
+              />
+              <CalendarDays size={14} aria-hidden className={fieldStyles.dateIcon} />
+            </div>
+          </PropertyRow>
+          <PropertyRow label={t('tasks.detail.due_label')}>
+            <div className={fieldStyles.dateField}>
+              <DatePicker
+                className={cx(fieldStyles.dateTrigger, !dueOn && fieldStyles.dateEmpty)}
+                value={dueOn ?? ''}
+                onChange={(next) => {
+                  void handleDueChange(next);
+                }}
+                weekdayLabels={weekdayLabels}
+                weekStart={weekStart}
+                formatMonthYear={formatMonthYear}
+                prevLabel={t('calendar.prev')}
+                nextLabel={t('calendar.next')}
+                triggerLabel={dueOn ? formatDueDate(dueOn, locale) : t('common.date.placeholder')}
+              />
+              <CalendarDays size={14} aria-hidden className={fieldStyles.dateIcon} />
+            </div>
+          </PropertyRow>
+          <PropertyRow label={tLabels('title')} labelId={labelsLabelId}>
+            <Suspense fallback={<TaskLabelsFieldSkeleton />}>
+              <TaskLabelsField taskId={id} workspaceId={workspaceId} labelledBy={labelsLabelId} />
+            </Suspense>
+          </PropertyRow>
+        </TaskSideGroup>
+
+        <TaskSideGroup>
+          <PropertyRow label={t('tasks.detail.assignees.title')}>
+            <Suspense fallback={<SectionSkeleton />}>
+              <AssigneesSection taskId={id} workspaceId={workspaceId} />
+            </Suspense>
+          </PropertyRow>
+          <PropertyRow
+            label={t('taskWorkflow.rolesHeading')}
+            hint={
+              <HintTip
+                title={t('taskWorkflow.rolesHeading')}
+                hint={t('taskWorkflow.rolesDescription')}
+              />
+            }
+          >
+            <Suspense fallback={<SectionSkeleton />}>
+              <TaskRoleAssignments key={id} taskId={id} workspaceId={workspaceId} />
+            </Suspense>
+          </PropertyRow>
+        </TaskSideGroup>
       </TaskSideCard>
 
-      <TaskTransitionCard taskId={id} projectId={projectId} state={state} />
-
-      <TaskActionsCard taskId={id} workspaceId={workspaceId} />
-
       <TaskSideCard>
-        <TaskSideCardHeading title={t('tasks.detail.assignees.title')} />
-        <Suspense fallback={<SectionSkeleton />}>
-          <AssigneesSection taskId={id} workspaceId={workspaceId} />
-        </Suspense>
-      </TaskSideCard>
-
-      <TaskSideCard>
-        <TaskSideCardHeading
-          title={t('taskWorkflow.rolesHeading')}
-          hint={t('taskWorkflow.rolesDescription')}
-        />
-        <Suspense fallback={<SectionSkeleton />}>
-          <TaskRoleAssignments key={id} taskId={id} workspaceId={workspaceId} />
-        </Suspense>
-      </TaskSideCard>
-
-      <TaskSideCard>
-        <TaskSideCardHeading
+        <TaskSideCardHeading title={t('tasks.detail.automation.title')} />
+        <AutomationTile
+          icon={Bot}
           title={tAgents('task_detail.agent.assign.title')}
           hint={tAgents('task_detail.agent.assign.description')}
+          summary={t('tasks.detail.automation.agent.summary')}
+          body={
+            <Suspense fallback={<SectionSkeleton />}>
+              <AgentAssignSection taskId={id} workspaceId={workspaceId} />
+            </Suspense>
+          }
         />
-        <Suspense fallback={<SectionSkeleton />}>
-          <AgentAssignSection taskId={id} workspaceId={workspaceId} />
-        </Suspense>
-      </TaskSideCard>
-
-      <TaskSideCard>
-        <Suspense fallback={<SectionSkeleton />}>
-          <StateGraphSection taskId={id} current={state} />
-        </Suspense>
-      </TaskSideCard>
-
-      <TaskSideCard>
-        <Suspense fallback={<SectionSkeleton />}>
-          <ConstraintEditor taskId={id} />
-        </Suspense>
-      </TaskSideCard>
-
-      <TaskSideCard>
-        <Suspense fallback={<SectionSkeleton />}>
-          <ReplayPanel taskId={id} />
-        </Suspense>
-      </TaskSideCard>
-
-      <TaskSideCard>
-        <TaskSideCardHeading
+        <AutomationTile
+          icon={Lightbulb}
           title={t('tasks.detail.infer_state.title')}
           hint={t('tasks.detail.infer_state.hint')}
           marker={<AiConsequence kind="suggests" />}
+          summary={t('tasks.detail.automation.next_action.summary')}
+          body={
+            <Suspense fallback={<SectionSkeleton />}>
+              <InferStateSection taskId={id} />
+            </Suspense>
+          }
         />
-        <Suspense fallback={<SectionSkeleton />}>
-          <InferStateSection taskId={id} />
-        </Suspense>
-      </TaskSideCard>
-
-      <Suspense fallback={<SectionSkeleton />}>
-        <TaskStepsPanel taskId={id} workspaceId={workspaceId} />
-      </Suspense>
-
-      <TaskSideCard>
-        <TaskSideCardHeading
-          title={t('tasks.detail.duplicates.title')}
-          hint={t('tasks.detail.duplicates.hint')}
+        <AutomationTile
+          icon={ListTree}
+          title={t('tasks.steps.title')}
+          hint={t('tasks.steps.description')}
+          summary={t('tasks.detail.automation.steps.summary')}
+          disclosure={{
+            openLabel: t('tasks.detail.automation.steps.open'),
+            tier: 'secondary',
+            children: (
+              <Suspense fallback={<SectionSkeleton />}>
+                <TaskStepsPanel taskId={id} workspaceId={workspaceId} />
+              </Suspense>
+            ),
+          }}
         />
-        <Suspense fallback={<SectionSkeleton />}>
-          <RelatedTasksSection taskId={id} />
-        </Suspense>
+        <AutomationTile
+          icon={ShieldCheck}
+          title={tConstraints('editor.title')}
+          hint={tConstraints('editor.nlHint')}
+          summary={t('tasks.detail.automation.constraints.summary')}
+          status={
+            <Suspense fallback={null}>
+              <ConstraintCount taskId={id} />
+            </Suspense>
+          }
+          disclosure={{
+            openLabel: t('tasks.detail.automation.constraints.open'),
+            closeLabel: t('tasks.detail.automation.constraints.close'),
+            tier: 'tertiary',
+            icon: <Pencil size={14} aria-hidden />,
+            children: (
+              <Suspense fallback={<SectionSkeleton />}>
+                <ConstraintEditor taskId={id} />
+              </Suspense>
+            ),
+          }}
+        />
       </TaskSideCard>
 
-      <TaskSideCard>
-        <TaskSideCardHeading title={t('tasks.detail.activity.title')} />
-        <Suspense fallback={<SectionSkeleton />}>
-          <TaskMiniTimeline taskId={id} />
-        </Suspense>
-      </TaskSideCard>
+      <AnalysisCard taskId={id} state={state} />
     </aside>
+  );
+}
+
+/**
+ * AnalysisCard holds the diagnostic views (state graph, replay, related
+ * tasks). It starts collapsed and remembers the choice; its body mounts only
+ * while open, so the queries behind it wait until it is asked for.
+ */
+function AnalysisCard({
+  taskId,
+  state,
+}: {
+  taskId: string;
+  state: TaskDerivedState;
+}): ReactElement {
+  const { t } = useTranslation('common');
+  const { collapsed, toggle } = useCollapsibleState('task-diagnostics', true);
+  const bodyId = useId();
+  const title = t('tasks.detail.diagnostics.title');
+  return (
+    <TaskSideCard>
+      <TaskSideCardHeading
+        title={title}
+        marker={
+          <TaskDisclosureToggle
+            collapsed={collapsed}
+            onToggle={toggle}
+            controlsId={bodyId}
+            label={title}
+          />
+        }
+      />
+      <Collapse open={!collapsed} id={bodyId}>
+        <div className={css.analysisBody}>
+          <TaskSideGroup>
+            <Suspense fallback={<SectionSkeleton />}>
+              <StateGraphSection taskId={taskId} current={state} />
+            </Suspense>
+          </TaskSideGroup>
+          <TaskSideGroup>
+            <Suspense fallback={<SectionSkeleton />}>
+              <ReplayPanel taskId={taskId} />
+            </Suspense>
+          </TaskSideGroup>
+          <TaskSideGroup>
+            <TaskSideCardHeading
+              level="sub"
+              title={t('tasks.detail.duplicates.title')}
+              hint={t('tasks.detail.duplicates.hint')}
+            />
+            <Suspense fallback={<SectionSkeleton />}>
+              <RelatedTasksSection taskId={taskId} />
+            </Suspense>
+          </TaskSideGroup>
+        </div>
+      </Collapse>
+    </TaskSideCard>
   );
 }
 
@@ -870,13 +1036,11 @@ function Sidebar({
  */
 function TaskMetaStrip({
   taskId,
-  state,
   priority,
   dueOn,
   locale,
 }: {
   taskId: string;
-  state: TaskDerivedState;
   priority: TaskPriority;
   dueOn: string | undefined;
   locale: string;
@@ -884,12 +1048,6 @@ function TaskMetaStrip({
   const { t } = useTranslation('common');
   return (
     <dl className={css.metaStrip}>
-      <div className={css.metaItem}>
-        <dt className={css.metaLabel}>{t('tasks.detail.state_label')}</dt>
-        <dd className={css.metaValue}>
-          <TaskStateBadge state={state} />
-        </dd>
-      </div>
       <div className={css.metaItem}>
         <dt className={css.metaLabel}>{t('tasks.detail.priority_label')}</dt>
         <dd className={css.metaValue}>
@@ -931,11 +1089,7 @@ function RelatedTasksSection({ taskId }: { taskId: string }): ReactElement {
   const { t } = useTranslation('common');
   const { data } = useTaskDuplicatesQuery(taskId);
   if (data.candidates.length === 0) {
-    return (
-      <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: 'var(--nf-text-sm)' }}>
-        {t('tasks.detail.duplicates.empty')}
-      </p>
-    );
+    return <p className={css.empty}>{t('tasks.detail.duplicates.empty')}</p>;
   }
   return (
     <ul className={css.plainList}>
@@ -987,43 +1141,31 @@ function StateGraphSection({
   return <StateGraph current={current} activeSources={active} />;
 }
 
+/** Status line of the constraints tile: how many rules the task has. */
+function ConstraintCount({ taskId }: { taskId: string }): ReactElement {
+  const { t } = useTranslation('common');
+  const { data: task } = useTaskQuery(taskId);
+  return (
+    <span>{t('tasks.detail.automation.constraints.count', { count: task.constraintCount })}</span>
+  );
+}
+
 function InferStateSection({ taskId }: { taskId: string }): ReactElement {
   const { t } = useTranslation('common');
   const { data } = useTaskInferStateQuery(taskId);
   if (!data.proposal) {
-    return (
-      <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: 'var(--nf-text-sm)' }}>
-        {t('tasks.detail.infer_state.empty')}
-      </p>
-    );
+    return <p className={css.empty}>{t('tasks.detail.infer_state.empty')}</p>;
   }
   const { transition, confidence, reason } = data.proposal;
   const transitionKey = TRANSITION_KEY[transition as TransitionName];
   const transitionLabel = transitionKey ? t(transitionKey) : transition;
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1-5)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--nf-space-2)' }}>
+    <div className={css.inferBody}>
+      <div className={css.inferHead}>
         <Badge tone="accent">{transitionLabel}</Badge>
-        <span
-          style={{
-            fontFamily: 'var(--nf-font-mono)',
-            fontSize: 'var(--nf-text-xs)',
-            color: 'var(--nf-color-fg-muted)',
-          }}
-        >
-          {confidence.toFixed(2)}
-        </span>
+        <span className={css.score}>{confidence.toFixed(2)}</span>
       </div>
-      <p
-        style={{
-          margin: 0,
-          fontSize: 'var(--nf-text-supporting)',
-          color: 'var(--nf-color-fg)',
-          display: 'flex',
-          gap: 'var(--nf-space-1-5)',
-          flexWrap: 'wrap',
-        }}
-      >
+      <p className={css.inferReason}>
         <strong>{t('tasks.detail.infer_state.reason_label')}</strong>
         <span>{reason}</span>
       </p>
@@ -1073,12 +1215,8 @@ function TaskBreadcrumb({
 }
 
 /**
- * Tracks whether the viewport is narrower than the `sm` breakpoint.
- *
- * Mirrors the `useIsMobile` pattern from
- * `apps/flow-web/src/components/layout/sidebar.tsx` so the detail panel can
- * flip an inline grid-template from two columns to one. An inline style cannot
- * be targeted with `@media`, so the decision is made in JS.
+ * Tracks whether the viewport is narrower than the `sm` breakpoint, for the
+ * read-only metadata strip that only the one-column layout shows.
  */
 function useIsNarrow(): boolean {
   const [narrow, setNarrow] = useState(
@@ -1102,95 +1240,88 @@ function TaskDetailPanel({ id }: TaskDetailPanelProps): ReactElement {
   const locale = i18n.resolvedLanguage ?? i18n.language ?? 'en';
 
   return (
-    <section
-      className={css.panel}
-      style={{
-        display: 'grid',
-        gridTemplateColumns: isNarrow ? '1fr' : 'minmax(0, 1fr) minmax(16rem, 22rem)',
-        gap: 'var(--nf-space-6)',
-      }}
-    >
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 'var(--nf-space-6)',
-          minInlineSize: 0,
-        }}
-      >
-        <Suspense fallback={<Skeleton className={css.breadcrumbSkeleton} />}>
-          <TaskBreadcrumb workspaceId={task.workspaceId} projectId={task.projectId} />
-        </Suspense>
-        {task.parentTaskId ? <TaskParentLink parentId={task.parentTaskId} /> : null}
-        <TitleEditor id={id} initial={task.title} workspaceId={task.workspaceId} />
-        {isNarrow ? (
-          <TaskMetaStrip
-            taskId={id}
-            state={state}
-            priority={priority}
-            dueOn={task.dueOn}
-            locale={locale}
-          />
-        ) : null}
-        {task.agentContext?.agent ? (
-          <AgentPanel taskId={id} agentContext={task.agentContext} locale={locale} />
-        ) : null}
-        <DescriptionSection
-          id={id}
-          initial={task.description ?? ''}
-          workspaceId={task.workspaceId}
-        />
-        {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
-        <Suspense fallback={<Skeleton style={{ blockSize: '2rem', inlineSize: '12rem' }} />}>
-          <ReactionsSection taskId={id} />
-        </Suspense>
-        <Separator />
-        {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
-        <Suspense fallback={<Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />}>
-          <TaskAttachments taskId={id} />
-        </Suspense>
-        <Separator />
-        {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
-        <Suspense fallback={<Skeleton style={{ blockSize: '8rem', inlineSize: '100%' }} />}>
-          <CommentsFeed taskId={id} workspaceId={task.workspaceId} />
-        </Suspense>
-        <Suspense fallback={<SectionSkeleton />}>
-          <TaskSourceLinks taskId={id} />
-        </Suspense>
-        <TaskWorkflowPanel
-          key={id}
+    <section className={css.panel}>
+      <div className={css.main}>
+        <div className={css.mainHead}>
+          <Suspense fallback={<Skeleton className={css.breadcrumbSkeleton} />}>
+            <TaskBreadcrumb workspaceId={task.workspaceId} projectId={task.projectId} />
+          </Suspense>
+          {task.parentTaskId ? <TaskParentLink parentId={task.parentTaskId} /> : null}
+          <TitleEditor id={id} initial={task.title} workspaceId={task.workspaceId} />
+        </div>
+        <TaskStatusBar
           taskId={id}
-          workspaceId={task.workspaceId}
           projectId={task.projectId}
+          workspaceId={task.workspaceId}
+          state={state}
+          title={task.title}
         />
-        {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
-        <Suspense fallback={<Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />}>
-          <SubtasksSection
-            taskId={id}
-            projectId={task.projectId}
-            workspaceId={task.workspaceId}
-            visibility={task.visibility}
-            parentTaskId={task.parentTaskId}
-          />
-        </Suspense>
-        <Separator />
-        {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
-        <Suspense fallback={<Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />}>
-          <DependenciesSection taskId={id} workspaceId={task.workspaceId} />
-        </Suspense>
-        <Separator />
-        {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
-        <Suspense fallback={<Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />}>
-          <LinkedEventsSection taskId={id} workspaceId={task.workspaceId} locale={locale} />
-        </Suspense>
-        <Separator />
-        <Suspense fallback={<AIAgentsSkeleton />}>
-          <AIAgentsSection taskId={id} locale={locale} />
-        </Suspense>
+        <div className={css.mainHead}>
+          {isNarrow ? (
+            <TaskMetaStrip taskId={id} priority={priority} dueOn={task.dueOn} locale={locale} />
+          ) : null}
+          {task.agentContext?.agent ? (
+            <AgentPanel taskId={id} agentContext={task.agentContext} locale={locale} />
+          ) : null}
+        </div>
+        <div className={css.sections}>
+          <div className={css.section}>
+            <DescriptionSection
+              id={id}
+              initial={task.description ?? ''}
+              workspaceId={task.workspaceId}
+            />
+          </div>
+          <div className={css.section}>
+            {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
+            <Suspense fallback={<Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />}>
+              <SubtasksSection
+                taskId={id}
+                projectId={task.projectId}
+                workspaceId={task.workspaceId}
+                visibility={task.visibility}
+                parentTaskId={task.parentTaskId}
+              />
+            </Suspense>
+          </div>
+          <div className={cx(css.section, css.relatedSection)}>
+            {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
+            <Suspense fallback={<Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />}>
+              <DependenciesSection taskId={id} workspaceId={task.workspaceId} />
+            </Suspense>
+          </div>
+          <div className={cx(css.section, css.relatedSection)}>
+            {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
+            <Suspense fallback={<Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />}>
+              <TaskAttachments taskId={id} />
+            </Suspense>
+          </div>
+          <div className={cx(css.section, css.relatedSection)}>
+            {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
+            <Suspense fallback={<Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />}>
+              <LinkedEventsSection taskId={id} workspaceId={task.workspaceId} locale={locale} />
+            </Suspense>
+          </div>
+          <div className={cx(css.section, css.relatedSection)}>
+            <TaskWorkflowPanel
+              key={id}
+              taskId={id}
+              workspaceId={task.workspaceId}
+              projectId={task.projectId}
+            />
+          </div>
+          <div className={cx(css.section, css.relatedSection)}>
+            <Suspense fallback={<SectionSkeleton />}>
+              <TaskSourceLinks taskId={id} />
+            </Suspense>
+          </div>
+          <div className={css.section}>
+            <TaskActivity taskId={id} workspaceId={task.workspaceId} locale={locale} />
+          </div>
+        </div>
       </div>
       <Sidebar
         id={id}
-        projectId={task.projectId}
         workspaceId={task.workspaceId}
         state={state}
         priority={priority}

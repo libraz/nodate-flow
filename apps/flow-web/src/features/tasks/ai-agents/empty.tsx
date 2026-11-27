@@ -1,16 +1,13 @@
 /**
- * AIAgentsEmpty — placeholder shown when the task has no recorded AI
- * invocations yet. Kept intentionally quiet so the section recedes
- * until an agent actually does something against the task.
- *
- * Thin wrapper around the shared {@link EmptyState} primitive.
+ * AIAgentsEmpty — the one muted line shown when the task has no recorded
+ * AI invocations yet, so the section recedes until an agent acts.
  */
 
-import EmptyState from '@nodate-flow/ui/primitives/empty-state';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
+import styles from './ai-agents.module.css';
 
 export default function AIAgentsEmpty(): ReactElement {
   const { t } = useTranslation('aiAgents');
-  return <EmptyState title={t('empty.title')} description={t('empty.body')} />;
+  return <p className={styles.empty}>{t('empty.title')}</p>;
 }

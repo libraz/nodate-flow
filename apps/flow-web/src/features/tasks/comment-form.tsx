@@ -7,14 +7,14 @@
  */
 
 import Button from '@nodate-flow/ui/primitives/button';
-import FormField from '@nodate-flow/ui/primitives/form-field';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
-import { type FormEvent, type ReactElement, useState } from 'react';
+import { type FormEvent, type ReactElement, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import FormActions from '../../components/form-actions';
 import { formatApiError } from '../../lib/api-error';
 import { onSubmitShortcut } from '../../lib/submit-shortcut';
 import { useAddTaskComment } from './api';
+import css from './comment-form.module.css';
 import MarkdownEditor from './markdown-editor';
 
 export interface CommentFormProps {
@@ -27,6 +27,7 @@ export default function CommentForm({ taskId, workspaceId }: CommentFormProps): 
   const { t } = useTranslation('common');
   const add = useAddTaskComment();
   const [body, setBody] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const submit = async (): Promise<void> => {
     const trimmed = body.trim();
@@ -34,6 +35,8 @@ export default function CommentForm({ taskId, workspaceId }: CommentFormProps): 
     try {
       await add.mutateAsync({ taskId, body: trimmed });
       setBody('');
+      // The submit button disables with the cleared draft, so focus would otherwise fall to the page.
+      textareaRef.current?.focus();
     } catch (err) {
       toaster.show({
         tone: 'danger',
@@ -48,24 +51,16 @@ export default function CommentForm({ taskId, workspaceId }: CommentFormProps): 
   };
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      onKeyDown={onSubmitShortcut}
-      style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}
-    >
-      <FormField label={t('tasks.comments.title')}>
-        {(control) => (
-          <MarkdownEditor
-            id={control.id}
-            value={body}
-            onChange={setBody}
-            workspaceId={workspaceId}
-            placeholder={t('tasks.comments.add_placeholder')}
-            aria-label={t('tasks.comments.title')}
-            rows={3}
-          />
-        )}
-      </FormField>
+    <form className={css.form} onSubmit={handleSubmit} onKeyDown={onSubmitShortcut}>
+      <MarkdownEditor
+        value={body}
+        onChange={setBody}
+        workspaceId={workspaceId}
+        textareaRef={textareaRef}
+        placeholder={t('tasks.comments.add_placeholder')}
+        aria-label={t('tasks.comments.title')}
+        rows={3}
+      />
       <FormActions hint={{ disabled: body.trim().length === 0 || add.isPending }}>
         <Button type="submit" disabled={body.trim().length === 0 || add.isPending}>
           {t('tasks.comments.add')}

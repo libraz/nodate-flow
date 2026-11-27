@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { formatApiError } from '../../../lib/api-error';
 import { useWorkspaceMembersQuery } from '../../workspaces/api';
 import { useAddTaskActor, useRemoveTaskActor, useTaskActorsQuery } from '../api';
+import TaskActionButton from '../task-action-button';
 import { useWorkflowQuery } from './api';
 import css from './task-role-assignments.module.css';
 
@@ -145,24 +146,20 @@ export default function TaskRoleAssignments({
         </div>
       ) : (
         <div className={css.addRow}>
-          <Button
-            type="button"
-            size="sm"
+          <TaskActionButton
+            icon={<Plus size={14} aria-hidden />}
             disabled={addActor.isPending}
             onClick={() => startPicking('reviewer')}
           >
-            <Plus size={14} aria-hidden />
             {t('taskWorkflow.addReviewer')}
-          </Button>
-          <Button
-            type="button"
-            size="sm"
+          </TaskActionButton>
+          <TaskActionButton
+            icon={<Plus size={14} aria-hidden />}
             disabled={addActor.isPending}
             onClick={() => startPicking('approver')}
           >
-            <Plus size={14} aria-hidden />
             {t('taskWorkflow.addApprover')}
-          </Button>
+          </TaskActionButton>
         </div>
       )}
 

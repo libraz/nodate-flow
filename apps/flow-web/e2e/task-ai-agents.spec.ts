@@ -1,32 +1,30 @@
 /**
  * Task detail AI Agents section E2E (G6).
  *
- * Smoke-level coverage for the AI activity collapsible section that
- * sits next to LinkedEventsSection on the task detail page. The
- * section lists every AI invocation against the task (priority
+ * Smoke-level coverage for the AI activity tab at the end of the task
+ * detail main column (activity-tabs: Comments / Activity / AI activity).
+ * The panel mounts on first click of its tab and lists every AI invocation against the task (priority
  * suggestions, state inferences, agent ticks, …) — we only assert on
  * the section chrome and the empty-state copy because invocation
  * rows depend on the backend AI engine running against the task,
  * which is not deterministic from the test runner.
  *
  * Cases:
- *   A. empty state — section renders the "No AI activity yet"
- *      placeholder when the task has zero recorded invocations
- *      (i.e. on a freshly seeded task).
- *   B. collapse / expand — clicking the disclosure toggle flips
- *      `aria-expanded` on the button and `hidden` on the body,
- *      and the localStorage persistence keeps the state across
- *      a reload.
+ *   A. empty state — after opening the tab the "No AI activity yet"
+ *      placeholder renders when the task has zero recorded
+ *      invocations (i.e. on a freshly seeded task).
+ *   B. tab switching — the panel stays hidden until its tab is
+ *      selected, and selecting it hides the comments panel.
  *   C. error state — when GET /tasks/{id}/ai/invocations 500s the
  *      section's local ErrorBoundary catches the throw and renders
  *      `AIAgentsError` (`role="alert"` + `aiAgents.error.fetchFailed`
- *      copy + Retry button) inline, scoped to this section. The root
+ *      copy + Retry button) inline, scoped to this panel. The root
  *      FatalFallback is reserved for genuinely fatal failures
  *      elsewhere on the page.
- *   D. ja locale — on a freshly seeded task the section title
- *      resolves through the aiAgents namespace in Japanese.
- *   E. mobile viewport — the section header + empty placeholder
- *      both stay visible at 375x812.
+ *   D. ja locale — the tab label and empty copy resolve through the
+ *      aiAgents namespace in Japanese.
+ *   E. mobile viewport — the tab and empty placeholder stay usable
+ *      at 375x812.
  *
  * Note: per the task brief, we verify the empty / collapse / error /
  * locale / mobile cases only — seeding an invocation requires running
@@ -55,10 +53,8 @@ const copy = {
   sectionTitle: enAiAgents.section.title,
   sectionTitleJa: jaAiAgents.section.title,
   emptyTitleJa: jaAiAgents.empty.title,
-  expand: enAiAgents.section.expand,
-  collapse: enAiAgents.section.collapse,
   emptyTitle: enAiAgents.empty.title,
-  emptyBody: enAiAgents.empty.body,
+  commentsTab: enCommon.tasks.comments.title,
   fatalTitle: enCommon.fatal.title,
   errorFetchFailed: enAiAgents.error.fetchFailed,
   errorRetry: enAiAgents.error.retry,
@@ -82,20 +78,20 @@ async function seedTask(tenant: TestTenant, title: string): Promise<{ id: string
 }
 
 /**
- * Navigates to /tasks/{id} and waits until the AI activity section
- * header mounts. The disclosure caret + title pair is the most
- * stable readiness signal that the suspense boundary resolved.
+ * Navigates to /tasks/{id}, waits for the title, then selects the AI
+ * activity tab (the panel only mounts on first click).
  */
 async function openTaskDetail(page: Page, taskId: string, title: string): Promise<void> {
   await page.goto(`/tasks/${taskId}`);
   await expect(page.getByText(title).first()).toBeVisible({ timeout: 15_000 });
-  // Exact match: the empty-state heading "No AI activity yet" contains
-  // the substring "AI activity" and would otherwise widen this locator
-  // into a strict-mode violation now that EmptyState renders a real
-  // heading.
-  await expect(page.getByRole('heading', { name: copy.sectionTitle, exact: true })).toBeVisible({
-    timeout: 10_000,
-  });
+  await openAiTab(page);
+}
+
+async function openAiTab(page: Page, name: string = copy.sectionTitle): Promise<void> {
+  const tab = page.getByRole('tab', { name, exact: true });
+  await expect(tab).toBeVisible({ timeout: 10_000 });
+  await tab.click();
+  await expect(tab).toHaveAttribute('aria-selected', 'true');
 }
 
 test.describe('task detail — AI agents section', () => {
@@ -117,40 +113,37 @@ test.describe('task detail — AI agents section', () => {
     await injectAuth(page.context(), tenant);
     await openTaskDetail(page, task.id, task.title);
 
-    // The empty placeholder is a `<p>` with the title copy + body
-    // copy. Use the title — it is short enough that the substring
-    // match is safe even with extra whitespace.
-    await expect(page.getByText(copy.emptyTitle)).toBeVisible({ timeout: 5_000 });
-    await expect(page.getByText(copy.emptyBody)).toBeVisible();
+    // The empty placeholder is a single muted `<p>` carrying the title
+    // copy (no heading, no body, no CTA).
+    const panel = page.getByRole('tabpanel', { name: copy.sectionTitle });
+    await expect(panel.getByText(copy.emptyTitle)).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByRole('heading', { name: copy.emptyTitle })).toHaveCount(0);
   });
 
-  test('B: collapse / expand toggles aria-expanded and hidden on the body', async ({ page }) => {
+  test('B: the AI activity panel is hidden until its tab is selected', async ({ page }) => {
     tenant = await createTestTenant();
     const task = await seedTask(tenant, `AI agents B ${Date.now().toString(36)}`);
 
     await injectAuth(page.context(), tenant);
-    await openTaskDetail(page, task.id, task.title);
+    await page.goto(`/tasks/${task.id}`);
+    await expect(page.getByText(task.title).first()).toBeVisible({ timeout: 15_000 });
 
-    // The disclosure is a `<button aria-expanded ...>` whose
-    // accessible name is the section title (it wraps an h3 with the
-    // title text). Default is expanded for short lists.
-    const disclosure = page
-      .getByRole('button', { expanded: true })
-      .filter({ hasText: copy.sectionTitle });
-    await expect(disclosure).toBeVisible({ timeout: 5_000 });
+    const aiTab = page.getByRole('tab', { name: copy.sectionTitle, exact: true });
+    const commentsTab = page.getByRole('tab', { name: copy.commentsTab });
 
-    // Click to collapse → aria-expanded flips to false. The body
-    // gets `hidden` so the empty state copy disappears.
-    await disclosure.click();
-    const collapsedDisclosure = page
-      .getByRole('button', { expanded: false })
-      .filter({ hasText: copy.sectionTitle });
-    await expect(collapsedDisclosure).toBeVisible({ timeout: 5_000 });
-    await expect(page.getByText(copy.emptyTitle)).toBeHidden();
+    // Comments is the initial tab; the AI panel has not mounted yet.
+    await expect(commentsTab).toHaveAttribute('aria-selected', 'true', { timeout: 10_000 });
+    await expect(aiTab).toHaveAttribute('aria-selected', 'false');
+    await expect(page.getByText(copy.emptyTitle)).toHaveCount(0);
 
-    // Click again to expand → empty body is visible again.
-    await collapsedDisclosure.click();
+    await aiTab.click();
+    await expect(aiTab).toHaveAttribute('aria-selected', 'true');
+    await expect(commentsTab).toHaveAttribute('aria-selected', 'false');
     await expect(page.getByText(copy.emptyTitle)).toBeVisible({ timeout: 5_000 });
+
+    // Switching back keeps the AI panel mounted but hidden.
+    await commentsTab.click();
+    await expect(page.getByText(copy.emptyTitle)).toBeHidden();
   });
 
   /**
@@ -181,6 +174,7 @@ test.describe('task detail — AI agents section', () => {
     // The task detail page itself still mounts — only the AI section
     // unwinds to its local fallback, so the task title remains visible.
     await expect(page.getByText(task.title).first()).toBeVisible({ timeout: 15_000 });
+    await openAiTab(page);
 
     // The per-section AIAgentsError fallback renders inside `role="alert"`
     // with the localised fetchFailed copy and a Retry button.
@@ -212,11 +206,7 @@ test.describe('task detail — AI agents section', () => {
 
     await page.goto(`/tasks/${task.id}`);
     await expect(page.getByText(task.title).first()).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByRole('heading', { name: copy.sectionTitleJa, exact: true })).toBeVisible(
-      {
-        timeout: 10_000,
-      },
-    );
+    await openAiTab(page, copy.sectionTitleJa);
     // The empty placeholder copy also resolves in ja, confirming the
     // namespace is fully wired (not just `section.title`).
     await expect(page.getByText(copy.emptyTitleJa)).toBeVisible({ timeout: 5_000 });
@@ -240,7 +230,7 @@ test.describe('task detail — AI agents section — mobile viewport', () => {
   });
 
   /**
-   * E: at 375x812 the AI activity section header and the empty
+   * E: at 375x812 the AI activity tab and the empty
    * placeholder are both visible. Visibility-only — no pixel-perfect
    * layout assertions; we are confirming the section does not get
    * clipped off-screen / hidden on a phone-class viewport.
@@ -255,9 +245,7 @@ test.describe('task detail — AI agents section — mobile viewport', () => {
     await page.goto(`/tasks/${task.id}`);
     await expect(page.getByText(task.title).first()).toBeVisible({ timeout: 15_000 });
 
-    await expect(page.getByRole('heading', { name: copy.sectionTitle, exact: true })).toBeVisible({
-      timeout: 10_000,
-    });
+    await openAiTab(page);
     await expect(page.getByText(copy.emptyTitle)).toBeVisible({ timeout: 5_000 });
   });
 });

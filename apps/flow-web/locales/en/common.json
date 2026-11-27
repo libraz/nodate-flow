@@ -998,7 +998,6 @@
       "cancel": "Cancel",
       "priority_label": "Priority",
       "due_label": "Due date",
-      "state_label": "State",
       "assignees_label": "Assignees",
       "assignees": {
         "title": "Assignees",
@@ -1024,7 +1023,8 @@
         "relates": "Relates to",
         "duplicateOf": "Duplicate of",
         "duplicatedBy": "Duplicated by",
-        "empty": "No dependencies yet. Add one to show what blocks this task, what it blocks, or which tasks are its duplicates.",
+        "empty": "No dependencies yet.",
+        "hint": "Add one to show what blocks this task, what it blocks, or which tasks are its duplicates.",
         "add": "Add dependency",
         "addCancel": "Cancel",
         "remove": "Remove",
@@ -1075,8 +1075,6 @@
         "empty": "No AI activity recorded for this task yet."
       },
       "transitions": {
-        "title": "Change state",
-        "current": "Current state",
         "pending": "Changing state…",
         "start": "Start",
         "block": "Block",
@@ -1085,8 +1083,37 @@
         "complete": "Complete",
         "reopen": "Reopen",
         "cancel": "Cancel",
-        "hint": "Only moves allowed from the current state are shown. Done and Cancelled tasks can only be reopened."
-      }
+        "more": "More actions"
+      },
+      "sections": {
+        "description": "Description"
+      },
+      "properties": {
+        "title": "Details"
+      },
+      "automation": {
+        "title": "AI & automation",
+        "agent": {
+          "summary": "Hand this task to an AI agent to work on."
+        },
+        "next_action": {
+          "summary": "AI suggests which state to move this task to next."
+        },
+        "steps": {
+          "summary": "AI splits this task into subtasks you can review first.",
+          "open": "Create subtask ideas"
+        },
+        "constraints": {
+          "summary": "Set rules such as completion criteria and check them automatically.",
+          "count": "{count, plural, =0 {No rules yet} one {# rule} other {# rules}}",
+          "open": "Edit rules",
+          "close": "Close"
+        }
+      },
+      "diagnostics": {
+        "title": "Analysis"
+      },
+      "hint_label": "About {title}"
     },
     "history": {
       "title": "Description history",
@@ -1108,7 +1135,6 @@
       }
     },
     "actions": {
-      "title": "Actions",
       "create_event": {
         "trigger": "Create calendar event",
         "title": "Create event from task",

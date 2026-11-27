@@ -23,6 +23,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { TaskDerivedState } from '../tasks/api';
 import { STATE_KEY } from '../tasks/constants';
+import { TaskSideCardHeading } from '../tasks/task-side-card';
 import { useTaskReplayQuery } from './replay-api';
 import styles from './replay-panel.module.css';
 
@@ -54,20 +55,23 @@ export default function ReplayPanel({ taskId }: ReplayPanelProps): ReactElement 
 
   return (
     <section aria-label={t('replay.title')} className={styles.panel}>
-      <header className={styles.header}>
-        <h3 className={styles.title}>{t('replay.title')}</h3>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={() => void q.refetch()}
-          disabled={q.isFetching}
-          aria-busy={q.isFetching || undefined}
-        >
-          {t('replay.refresh')}
-        </Button>
-      </header>
-      <p className={styles.description}>{t('replay.description')}</p>
+      <TaskSideCardHeading
+        level="sub"
+        title={t('replay.title')}
+        hint={t('replay.description')}
+        marker={
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => void q.refetch()}
+            disabled={q.isFetching}
+            aria-busy={q.isFetching || undefined}
+          >
+            {t('replay.refresh')}
+          </Button>
+        }
+      />
       <div key={bodyState} className={styles.body}>
         {q.isLoading ? (
           <div aria-busy="true">

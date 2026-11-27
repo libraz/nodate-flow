@@ -20,3 +20,7 @@
   align-items: center;
   justify-content: space-between;
 }
+
+.startAligned {
+  align-self: flex-start;
+}

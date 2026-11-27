@@ -1,0 +1,88 @@
+/* An editable value that looks editable at rest: quiet box, trailing icon, hover and focus states. */
+
+.field {
+  box-sizing: border-box;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  max-inline-size: 100%;
+  min-block-size: var(--nf-space-8);
+  /* Takes back the box padding so the value text lines up with plain values in the column. */
+  margin-inline-start: calc(var(--nf-space-2) * -1);
+  padding-inline: var(--nf-space-2);
+  border: var(--nf-space-px) solid transparent;
+  border-radius: var(--nf-radius-sm);
+  background: transparent;
+  color: var(--nf-color-fg);
+  font: inherit;
+  font-size: var(--nf-text-sm);
+  cursor: pointer;
+  transition:
+    background-color var(--nf-duration-fast) var(--nf-ease-standard),
+    border-color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.field:hover,
+.field[aria-expanded="true"] {
+  background: var(--nf-color-surface-hover);
+  border-color: var(--nf-color-border);
+}
+
+.field:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.empty {
+  color: var(--nf-color-fg-muted);
+}
+
+.icon {
+  flex-shrink: 0;
+  color: var(--nf-color-fg-muted);
+  pointer-events: none;
+}
+
+/* Wraps a ui DatePicker: its trigger is restyled as `.field`, the icon sits over its end edge. */
+.dateField {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  max-inline-size: 100%;
+  margin-inline-start: calc(var(--nf-space-2) * -1);
+}
+
+.dateField .dateTrigger {
+  box-sizing: border-box;
+  min-block-size: var(--nf-space-8);
+  padding-block: 0;
+  padding-inline: var(--nf-space-2) var(--nf-space-8);
+  border: var(--nf-space-px) solid transparent;
+  border-radius: var(--nf-radius-sm);
+  background: transparent;
+  color: var(--nf-color-fg);
+  font-weight: var(--nf-weight-regular);
+}
+
+.dateField .dateTrigger:hover {
+  background: var(--nf-color-surface-hover);
+  border-color: var(--nf-color-border);
+  color: var(--nf-color-fg);
+}
+
+.dateField .dateEmpty {
+  color: var(--nf-color-fg-muted);
+}
+
+.dateField .dateTrigger:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.dateField .dateIcon {
+  position: absolute;
+  inset-inline-end: var(--nf-space-2);
+  color: var(--nf-color-fg-muted);
+  pointer-events: none;
+}

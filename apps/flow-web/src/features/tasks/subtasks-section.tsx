@@ -35,6 +35,7 @@ import {
 import CompleteTaskButton from './complete-task-button';
 import { STATE_COLOR } from './constants';
 import css from './subtasks-section.module.css';
+import TaskActionButton from './task-action-button';
 import TaskSearchPicker from './task-search-picker';
 import TaskSectionHeading from './task-section-heading';
 
@@ -303,11 +304,8 @@ export default function SubtasksSection({
         </div>
       ) : attaching ? null : (
         <div className={css.actions}>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className={css.addButton}
+          <TaskActionButton
+            icon={<Plus size={14} aria-hidden />}
             ref={(node: HTMLElement | null) => {
               if (node && restoreFocus.current) {
                 restoreFocus.current = false;
@@ -318,21 +316,16 @@ export default function SubtasksSection({
               setAdding(true);
             }}
           >
-            <Plus aria-hidden="true" />
             {t('tasks.detail.subtasks.add')}
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className={css.addButton}
+          </TaskActionButton>
+          <TaskActionButton
+            icon={<Search size={14} aria-hidden />}
             onClick={() => {
               setAttaching(true);
             }}
           >
-            <Search aria-hidden="true" />
             {t('tasks.detail.subtasks.add_existing')}
-          </Button>
+          </TaskActionButton>
         </div>
       )}
       {attaching ? (

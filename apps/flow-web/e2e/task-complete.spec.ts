@@ -3,7 +3,7 @@
  *
  * Exercises the state-transition path that existing task-crud.spec.ts and
  * task-detail.spec.ts leave uncovered: clicking the "Complete" button on
- * the task detail sidebar's Transitions panel, posting to
+ * the task detail status bar, posting to
  * POST /tasks/{id}/transitions, and observing the state badge flip to
  * "Done".
  *
@@ -37,10 +37,10 @@ test.describe('task complete transition', () => {
     await injectAuth(page.context(), tenant);
     await page.goto(`/tasks/${taskId}`);
 
-    // Wait for the detail page to render and the transitions panel to arrive.
+    // Wait for the detail page to render and the status bar to arrive.
     await expect(page.getByRole('heading', { name: title })).toBeVisible({ timeout: 10_000 });
 
-    // The Complete button only exists in the Transitions card while the task
+    // The Complete button only exists in the status bar while the task
     // is in a state that permits it (open / review). Wait for it to land so
     // we know the detail page has fully hydrated.
     const completeButton = page.getByRole('button', { name: /^Complete$/ });
@@ -50,19 +50,15 @@ test.describe('task complete transition', () => {
     await completeButton.click();
 
     // After a successful POST the React Query cache invalidates and the
-    // sidebar state badge re-renders with "Done". This is the primary
-    // signal that the transition landed end-to-end. Scope to the
-    // sidebar's <aside> and to the row that contains the "State" label
-    // so we don't match unrelated "Done" strings (toasts, static copy,
-    // or other state-graph labels).
-    const sidebar = page.locator('aside');
-    const stateLabel = sidebar.getByText(/^State$/);
-    await expect(stateLabel).toBeVisible({ timeout: 10_000 });
-    const stateRow = stateLabel.locator('..');
-    await expect(stateRow.getByText(/^Done$/).first()).toBeVisible({ timeout: 10_000 });
+    // status bar's state badge re-renders with "Done". This is the primary
+    // signal that the transition landed end-to-end. The state graph lives
+    // in the collapsed analysis card, so only the badge is visible.
+    await expect(page.getByText(/^Done$/).filter({ visible: true })).toHaveCount(1, {
+      timeout: 10_000,
+    });
 
     // Complete is no longer a legal transition from the Done state, so
-    // the Transitions card should hide the button as well — assert via
+    // the status bar should hide the button as well — assert via
     // toBeHidden so the assertion semantics match the user-visible state.
     await expect(completeButton).toBeHidden();
   });

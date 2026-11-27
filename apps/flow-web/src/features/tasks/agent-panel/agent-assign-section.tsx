@@ -19,6 +19,7 @@ import Combobox from '@nodate-flow/ui/primitives/combobox';
 import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import motion from '@nodate-flow/ui/styles/list-motion.module.css';
+import { Plus } from 'lucide-react';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -30,6 +31,7 @@ import {
   useRemoveTaskActor,
   useTaskAgentActorsQuery,
 } from '../api';
+import TaskActionButton from '../task-action-button';
 import css from './agent-assign-section.module.css';
 
 export interface AgentAssignSectionProps {
@@ -153,10 +155,9 @@ export default function AgentAssignSection({
           />
         )
       ) : (
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
+        <TaskActionButton
+          icon={<Plus size={14} aria-hidden />}
+          className={css.startAligned}
           disabled={addAgent.isPending}
           aria-busy={addAgent.isPending}
           onClick={() => {
@@ -164,7 +165,7 @@ export default function AgentAssignSection({
           }}
         >
           {t('task_detail.agent.assign.add')}
-        </Button>
+        </TaskActionButton>
       )}
     </>
   );

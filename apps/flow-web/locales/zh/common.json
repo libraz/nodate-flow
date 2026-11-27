@@ -998,7 +998,6 @@
       "cancel": "取消",
       "priority_label": "优先级",
       "due_label": "截止日期",
-      "state_label": "状态",
       "assignees_label": "负责人",
       "assignees": {
         "title": "负责人",
@@ -1024,7 +1023,8 @@
         "relates": "相关",
         "duplicateOf": "重复于",
         "duplicatedBy": "被…重复",
-        "empty": "还没有依赖关系。添加后可表示阻塞此任务的任务、被此任务阻塞的任务，以及重复任务。",
+        "empty": "还没有依赖关系。",
+        "hint": "添加后可表示阻塞此任务的任务、被此任务阻塞的任务，以及重复任务。",
         "add": "添加依赖",
         "addCancel": "取消",
         "remove": "移除",
@@ -1075,8 +1075,6 @@
         "empty": "此任务暂无 AI 活动记录。"
       },
       "transitions": {
-        "title": "更改状态",
-        "current": "当前状态",
         "pending": "正在更改状态…",
         "start": "开始",
         "block": "阻塞",
@@ -1085,8 +1083,37 @@
         "complete": "完成",
         "reopen": "重新打开",
         "cancel": "取消",
-        "hint": "只显示当前状态下允许的操作。已完成和已取消的任务只能重新打开。"
-      }
+        "more": "更多操作"
+      },
+      "sections": {
+        "description": "说明"
+      },
+      "properties": {
+        "title": "详情"
+      },
+      "automation": {
+        "title": "AI 与自动化",
+        "agent": {
+          "summary": "将此任务交给 AI 智能体来处理。"
+        },
+        "next_action": {
+          "summary": "由 AI 建议此任务接下来应转到哪个状态。"
+        },
+        "steps": {
+          "summary": "AI 会把此任务拆分为子任务方案，确认后才会创建。",
+          "open": "生成子任务方案"
+        },
+        "constraints": {
+          "summary": "设定完成条件等规则，并自动检查是否满足。",
+          "count": "{count, plural, =0 {还没有规则} other {# 条规则}}",
+          "open": "编辑规则",
+          "close": "关闭"
+        }
+      },
+      "diagnostics": {
+        "title": "分析"
+      },
+      "hint_label": "关于 {title}"
     },
     "history": {
       "title": "描述历史",
@@ -1108,7 +1135,6 @@
       }
     },
     "actions": {
-      "title": "操作",
       "create_event": {
         "trigger": "创建日历事件",
         "title": "从任务创建事件",

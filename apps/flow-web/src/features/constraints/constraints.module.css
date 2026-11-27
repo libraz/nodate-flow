@@ -86,31 +86,17 @@
   gap: var(--nf-space-3);
 }
 
-.editorHead {
+/* Two buttons per row: the first at the start, the second at the end. */
+.actionRow {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--nf-space-1-5);
-}
-
-.editorTitle {
-  margin: 0;
-  font-size: var(--nf-text-base);
-  font-weight: var(--nf-weight-semibold);
-}
-
-.nlRow {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  justify-content: space-between;
   gap: var(--nf-space-2);
 }
 
-.nlRow > :first-child {
-  align-self: stretch;
-}
-
-.nlGenerate {
-  white-space: nowrap;
+.toolRow {
+  justify-content: flex-start;
 }
 
 .subheading {
@@ -122,12 +108,6 @@
 .explanation {
   margin: 0;
   font-size: var(--nf-text-sm);
-}
-
-.evaluateHint {
-  margin: 0;
-  font-size: var(--nf-text-supporting);
-  color: var(--nf-color-fg-muted);
 }
 
 .outcomes {
@@ -197,17 +177,5 @@
 }
 
 .stateCaption {
-  display: flex;
-  flex-direction: column;
-  gap: var(--nf-space-1);
   margin-block-end: var(--nf-space-2);
-}
-
-.stateCaptionTitle {
-  font-weight: var(--nf-weight-semibold);
-}
-
-.stateCaptionNote {
-  font-size: var(--nf-text-supporting);
-  color: var(--nf-color-fg-muted);
 }

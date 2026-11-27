@@ -1,0 +1,54 @@
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  min-inline-size: 0;
+}
+
+/* One size and radius for every capability icon. */
+.icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--nf-space-8);
+  block-size: var(--nf-space-8);
+  border-radius: var(--nf-radius-sm);
+  background: var(--nf-color-accent-subtle);
+  color: var(--nf-color-accent-fg);
+}
+
+.heading {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+
+.summary {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  line-height: var(--nf-leading-normal);
+  color: var(--nf-color-fg-muted);
+}
+
+.footer {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--nf-space-2);
+}
+
+.status {
+  min-inline-size: 0;
+  font-size: var(--nf-text-sm);
+}
+
+.expanded {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+  padding-block-start: var(--nf-space-1);
+}
+
+.close {
+  align-self: flex-start;
+}

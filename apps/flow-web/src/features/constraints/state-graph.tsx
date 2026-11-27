@@ -9,6 +9,7 @@ import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { CONSTRAINT_STATE_COLORS } from '../../lib/source-colors';
+import { TaskSideCardHeading } from '../tasks/task-side-card';
 import styles from './constraints.module.css';
 
 const STATES = ['open', 'waiting', 'review', 'done', 'cancelled'] as const;
@@ -67,8 +68,11 @@ export default function StateGraph({ current, activeSources }: StateGraphProps):
   return (
     <figure aria-label={t('stateGraph.title')} className={styles.stateFigure}>
       <figcaption className={styles.stateCaption}>
-        <span className={styles.stateCaptionTitle}>{t('stateGraph.title')}</span>
-        <span className={styles.stateCaptionNote}>{t('stateGraph.description')}</span>
+        <TaskSideCardHeading
+          level="sub"
+          title={t('stateGraph.title')}
+          hint={t('stateGraph.description')}
+        />
       </figcaption>
       <svg role="img" aria-label={t('stateGraph.legend')} viewBox="-90 0 600 240" width="100%">
         <defs>
