@@ -18,7 +18,7 @@
 //     attached so the /share/cal/{token} render path has something to
 //     display;
 //   - a placeholder Anthropic ai_providers row + matching ai_models row
-//     so the /settings/ai-agents create flow has something to bind to
+//     so the /settings/ai/agents create flow has something to bind to
 //     on a fresh DB. The api_key_ciphertext is a seed placeholder;
 //     rotate via PATCH /ai/providers before any real LLM dispatch.
 //

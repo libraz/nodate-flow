@@ -1,6 +1,71 @@
 {
   "components": {
     "schemas": {
+      "AIStatusAutoActions": {
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "intervalMinutes": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": ["enabled", "intervalMinutes"],
+        "type": "object"
+      },
+      "AIStatusBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/AIStatusBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "autoActions": {
+            "$ref": "#/components/schemas/AIStatusAutoActions"
+          },
+          "embedding": {
+            "$ref": "#/components/schemas/AIStatusEmbedding"
+          },
+          "provider": {
+            "$ref": "#/components/schemas/AIStatusProvider"
+          }
+        },
+        "required": ["provider", "embedding", "autoActions"],
+        "type": "object"
+      },
+      "AIStatusEmbedding": {
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "enum": ["enabled", "disabled", "unconfigured"],
+            "type": "string"
+          }
+        },
+        "required": ["status"],
+        "type": "object"
+      },
+      "AIStatusProvider": {
+        "additionalProperties": false,
+        "properties": {
+          "model": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "state": {
+            "enum": ["ready", "no_default_model", "none", "unavailable"],
+            "type": "string"
+          }
+        },
+        "required": ["state"],
+        "type": "object"
+      },
       "AcceptEventInviteInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -24718,6 +24783,51 @@
           }
         ],
         "summary": "Workspace-wide deterministic state inference proposals",
+        "tags": ["Public"]
+      }
+    },
+    "/workspaces/{wsId}/ai/status": {
+      "get": {
+        "description": "Reports which AI capabilities work for the workspace: the provider AI features resolve to, the embedding policy, and the auto-action executor. Never exposes credentials.",
+        "operationId": "ai-status-get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIStatusBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Get workspace AI status",
         "tags": ["Public"]
       }
     },

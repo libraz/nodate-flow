@@ -717,6 +717,14 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Tags:        []string{"Public"},
 		}, aihandlers.ListModels(shared.aiDeps))
 		huma.Register(subAPI, huma.Operation{
+			OperationID: "ai-status-get",
+			Method:      http.MethodGet,
+			Path:        "/workspaces/{wsId}/ai/status",
+			Summary:     "Get workspace AI status",
+			Description: "Reports which AI capabilities work for the workspace: the provider AI features resolve to, the embedding policy, and the auto-action executor. Never exposes credentials.",
+			Tags:        []string{"Public"},
+		}, aihandlers.GetAIStatus(shared.aiDeps))
+		huma.Register(subAPI, huma.Operation{
 			OperationID: "ai-priority-suggestions-list",
 			Method:      http.MethodGet,
 			Path:        "/workspaces/{wsId}/ai/priority-suggestions",

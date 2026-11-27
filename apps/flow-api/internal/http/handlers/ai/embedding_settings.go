@@ -80,25 +80,48 @@ func PatchEmbeddingSettings(deps Deps) func(context.Context, *PatchEmbeddingSett
 	}
 }
 
-func embeddingSettingsOutput(ctx context.Context, deps Deps, workspaceID uint32) (*EmbeddingSettingsOutput, error) {
+// embeddingMode reads the workspace embedding mode, defaulting to inherit.
+func embeddingMode(ctx context.Context, deps Deps, workspaceID uint32) (generated.WorkspaceEmbeddingSettingsMode, error) {
 	mode := generated.WorkspaceEmbeddingSettingsModeInherit
 	storedMode, err := deps.Queries.GetWorkspaceEmbeddingSettings(ctx, workspaceID)
 	if err != nil && err != sql.ErrNoRows {
-		return nil, httpErr(apierrors.InternalUnexpected)
+		return "", httpErr(apierrors.InternalUnexpected)
 	}
 	if err == nil {
 		mode = storedMode
 	}
 	if mode != generated.WorkspaceEmbeddingSettingsModeInherit && mode != generated.WorkspaceEmbeddingSettingsModeDisabled {
-		return nil, httpErr(apierrors.InternalUnexpected)
+		return "", httpErr(apierrors.InternalUnexpected)
 	}
+	return mode, nil
+}
 
-	status := "unconfigured"
+func embeddingStatusFor(deps Deps, mode generated.WorkspaceEmbeddingSettingsMode) string {
 	if mode == generated.WorkspaceEmbeddingSettingsModeDisabled {
-		status = "disabled"
-	} else if deps.EmbedConfigured {
-		status = "enabled"
+		return "disabled"
 	}
+	if deps.EmbedConfigured {
+		return "enabled"
+	}
+	return "unconfigured"
+}
+
+// embeddingStatus is the effective embedding status: the workspace mode wins,
+// then the instance configuration.
+func embeddingStatus(ctx context.Context, deps Deps, workspaceID uint32) (string, error) {
+	mode, err := embeddingMode(ctx, deps, workspaceID)
+	if err != nil {
+		return "", err
+	}
+	return embeddingStatusFor(deps, mode), nil
+}
+
+func embeddingSettingsOutput(ctx context.Context, deps Deps, workspaceID uint32) (*EmbeddingSettingsOutput, error) {
+	mode, err := embeddingMode(ctx, deps, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	status := embeddingStatusFor(deps, mode)
 
 	body := EmbeddingSettingsBody{
 		Mode:   string(mode),

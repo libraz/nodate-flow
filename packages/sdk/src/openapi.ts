@@ -3126,6 +3126,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspaces/{wsId}/ai/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get workspace AI status
+         * @description Reports which AI capabilities work for the workspace: the provider AI features resolve to, the embedding policy, and the auto-action executor. Never exposes credentials.
+         */
+        get: operations["ai-status-get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspaces/{wsId}/ai/suggestions": {
         parameters: {
             query?: never;
@@ -5346,6 +5366,32 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AIStatusAutoActions: {
+            enabled: boolean;
+            /** Format: int32 */
+            intervalMinutes: number;
+        };
+        AIStatusBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AIStatusBody.json
+             */
+            readonly $schema?: string;
+            autoActions: components["schemas"]["AIStatusAutoActions"];
+            embedding: components["schemas"]["AIStatusEmbedding"];
+            provider: components["schemas"]["AIStatusProvider"];
+        };
+        AIStatusEmbedding: {
+            /** @enum {string} */
+            status: "enabled" | "disabled" | "unconfigured";
+        };
+        AIStatusProvider: {
+            model?: string;
+            name?: string;
+            /** @enum {string} */
+            state: "ready" | "no_default_model" | "none" | "unavailable";
+        };
         AcceptEventInviteInputBody: {
             /**
              * Format: uri
@@ -18179,6 +18225,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ListStateSuggestionsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "ai-status-get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AIStatusBody"];
                 };
             };
             /** @description Error */
