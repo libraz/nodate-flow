@@ -42,8 +42,12 @@
   "action": {
     "ai_agent_create": "AI エージェントを作成しました",
     "ai_agent_pause": "AI エージェントを一時停止しました",
+    "ai_agent_proposal_approve": "エージェントの提案を承認しました",
+    "ai_agent_proposal_reject": "エージェントの提案を却下しました",
+    "ai_agent_run_request": "エージェントに実行を依頼しました",
     "ai_agent_update_model": "エージェントのモデルを変更しました",
     "ai_agent_update_schedule": "エージェントのスケジュールを更新しました",
+    "ai_agent_update_tools": "エージェントができる操作を変更しました",
     "ai_agent_update_triggers": "エージェントのトリガーを更新しました",
     "ai_command_resolve": "AI コマンドを解決しました",
     "ai_invocation": "AI を実行しました",

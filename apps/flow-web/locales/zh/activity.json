@@ -42,8 +42,12 @@
   "action": {
     "ai_agent_create": "创建了 AI 代理",
     "ai_agent_pause": "暂停了 AI 代理",
+    "ai_agent_proposal_approve": "批准了代理的提案",
+    "ai_agent_proposal_reject": "拒绝了代理的提案",
+    "ai_agent_run_request": "请求代理运行",
     "ai_agent_update_model": "更改了代理的模型",
     "ai_agent_update_schedule": "更新了代理计划",
+    "ai_agent_update_tools": "更改了代理可执行的操作",
     "ai_agent_update_triggers": "更新了代理触发器",
     "ai_command_resolve": "解决了 AI 命令",
     "ai_invocation": "执行了 AI 调用",

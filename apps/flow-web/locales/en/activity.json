@@ -42,8 +42,12 @@
   "action": {
     "ai_agent_create": "created an AI agent",
     "ai_agent_pause": "paused an AI agent",
+    "ai_agent_proposal_approve": "approved an agent's proposal",
+    "ai_agent_proposal_reject": "rejected an agent's proposal",
+    "ai_agent_run_request": "asked an agent to run",
     "ai_agent_update_model": "changed an agent's model",
     "ai_agent_update_schedule": "updated an agent schedule",
+    "ai_agent_update_tools": "changed what an agent can do",
     "ai_agent_update_triggers": "updated agent triggers",
     "ai_command_resolve": "resolved an AI command",
     "ai_invocation": "ran an AI invocation",

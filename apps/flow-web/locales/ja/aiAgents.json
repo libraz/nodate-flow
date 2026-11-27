@@ -75,7 +75,83 @@
         "removed": "{name} をこのタスクから外しました。",
         "description": "割り当てたエージェントは、トリガー設定に従ってこのタスクに取り組みます。確信が持てない、コスト上限に達した、エラーが出た、制約が衝突した場合は、タスクを自分に戻します。"
       },
-      "hand_back_hint": "エージェントからこのタスクを引き取ります。"
+      "hand_back_hint": "エージェントからこのタスクを引き取ります。",
+      "private_task": "非公開タスクではエージェントは動きません",
+      "run_now": {
+        "label": "今すぐ実行",
+        "requested": "実行を依頼しました",
+        "failed": "実行を依頼できませんでした",
+        "paused_badge": "停止中",
+        "reasons": {
+          "no_permission": "このタスクでエージェントの実行を依頼する権限がありません",
+          "paused": "このエージェントは停止中です",
+          "no_grants": "このエージェントには何も許可されていないため、動きません",
+          "not_workable": "完了済み・アーカイブ済みのタスクではエージェントは動きません",
+          "private": "非公開タスクではエージェントは動きません"
+        }
+      },
+      "proposals": {
+        "title": "承認待ち",
+        "expires": "期限: {time}",
+        "expired": "期限切れ",
+        "changes_to": "変更後",
+        "empty_value": "なし",
+        "show_more": "もっと見る",
+        "show_less": "閉じる",
+        "approve": "承認",
+        "reject": "却下",
+        "approved": "承認しました",
+        "rejected": "却下しました",
+        "decide_failed": "提案を更新できませんでした",
+        "cannot_decide": "この操作を行える人が承認できます",
+        "reject_title": "この提案を却下",
+        "reject_reason": "理由（任意）",
+        "reject_reason_help": "エージェントは次回の実行時にこれを読みます。",
+        "reject_confirm": "却下する",
+        "reject_cancel": "キャンセル",
+        "ops": {
+          "add_comment": "コメントを追加",
+          "set_priority": "優先度を変更",
+          "set_due_on": "期限を変更",
+          "transition_task": "状態を変更",
+          "create_subtask": "サブタスクを追加"
+        }
+      },
+      "history": {
+        "status": {
+          "running": "実行中",
+          "completed": "完了",
+          "failed": "失敗"
+        },
+        "ended": {
+          "done": "完了",
+          "max_steps": "ステップ上限で停止",
+          "write_cap": "書き込み上限で停止",
+          "repeat": "同じ手の繰り返しで停止",
+          "timeout": "タイムアウト",
+          "budget": "予算上限で停止",
+          "invalid_output": "応答を読み取れず停止",
+          "tool_error": "ツールエラーで停止",
+          "stopped": "停止（タスクまたはエージェントが変更されました）",
+          "coalesced": "スキップ（先の実行で対応済み）",
+          "rate_limited": "スキップ（直近の実行が多すぎます）"
+        },
+        "outcome": {
+          "applied": "適用",
+          "proposed": "提案",
+          "noop": "変更なし",
+          "skipped": "スキップ",
+          "not_permitted": "権限なし",
+          "invalid": "無効",
+          "failed": "失敗",
+          "stopped": "停止"
+        },
+        "tool_finish": "終了",
+        "view_proposal": "提案を見る",
+        "no_steps": "記録されたステップはありません。",
+        "steps_failed": "ステップを読み込めませんでした。",
+        "confidence": "確信度 {value}"
+      }
     }
   },
   "handoff_reason": {

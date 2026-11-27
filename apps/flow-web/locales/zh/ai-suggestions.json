@@ -73,7 +73,44 @@
       "unavailable": "{modelName}（不可用）",
       "update_failed": "更改模型失败"
     },
-    "pause_help": "暂停后，该代理不会因任何触发方式运行（包括「立即运行」）。点「恢复」重新启用。"
+    "pause_help": "暂停后，该代理不会因任何触发方式运行（包括「立即运行」）。点「恢复」重新启用。",
+    "tools": {
+      "title": "可执行的操作",
+      "summary": "{approval} 项需批准，{auto} 项自动",
+      "inactive": "未启用",
+      "legend": "批准：经人批准后执行。自动：分配代理的人和提出请求的人都能执行的操作，将立即执行。",
+      "emptyWarning": "未允许任何操作，因此此代理不会运行",
+      "modes": {
+        "off": "禁止",
+        "approval": "批准",
+        "auto": "自动"
+      },
+      "save": "保存",
+      "saveFailed": "无法保存",
+      "readOnly": "只有管理员可以更改。",
+      "operations": {
+        "add_comment": {
+          "label": "添加评论",
+          "description": "在任务上发表评论。"
+        },
+        "set_priority": {
+          "label": "更改优先级",
+          "description": "设置任务的优先级。"
+        },
+        "set_due_on": {
+          "label": "更改截止日期",
+          "description": "设置或清除截止日期。"
+        },
+        "transition_task": {
+          "label": "更改状态",
+          "description": "开始、搁置、恢复、提交审核或完成任务。"
+        },
+        "create_subtask": {
+          "label": "创建子任务",
+          "description": "在任务下添加子任务。"
+        }
+      }
+    }
   },
   "empty": "暂无建议",
   "loading": "思考中...",

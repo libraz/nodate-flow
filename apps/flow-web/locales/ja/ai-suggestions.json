@@ -73,7 +73,44 @@
       "unavailable": "{modelName}（利用不可）",
       "update_failed": "モデルを変更できませんでした"
     },
-    "pause_help": "一時停止すると、このエージェントはどのトリガーでも動かなくなります（「今すぐ実行」も含む）。「再開」で元に戻ります。"
+    "pause_help": "一時停止すると、このエージェントはどのトリガーでも動かなくなります（「今すぐ実行」も含む）。「再開」で元に戻ります。",
+    "tools": {
+      "title": "できること",
+      "summary": "承認 {approval} 件、自動 {auto} 件",
+      "inactive": "無効",
+      "legend": "承認: 人が承認したら実行。自動: 割り当てた人と頼んだ人の両方ができる操作なら、すぐ実行。",
+      "emptyWarning": "何も許可されていないため、このエージェントは動きません",
+      "modes": {
+        "off": "不可",
+        "approval": "承認",
+        "auto": "自動"
+      },
+      "save": "保存",
+      "saveFailed": "保存できませんでした",
+      "readOnly": "変更できるのは管理者のみです。",
+      "operations": {
+        "add_comment": {
+          "label": "コメントの追加",
+          "description": "タスクにコメントを投稿します。"
+        },
+        "set_priority": {
+          "label": "優先度の変更",
+          "description": "タスクの優先度を設定します。"
+        },
+        "set_due_on": {
+          "label": "期限の変更",
+          "description": "期限を設定、または解除します。"
+        },
+        "transition_task": {
+          "label": "状態の変更",
+          "description": "タスクの開始・保留・再開・提出・完了を行います。"
+        },
+        "create_subtask": {
+          "label": "サブタスクの作成",
+          "description": "タスクの下にサブタスクを追加します。"
+        }
+      }
+    }
   },
   "empty": "提案はまだありません",
   "loading": "考え中...",

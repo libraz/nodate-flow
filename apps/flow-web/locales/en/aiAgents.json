@@ -75,7 +75,83 @@
         "removed": "Removed {name} from this task.",
         "description": "An assigned agent works on this task according to its trigger setting, and hands it back to you when it is unsure, hits its cost cap, hits an error or finds conflicting constraints."
       },
-      "hand_back_hint": "Take this task over from the agent."
+      "hand_back_hint": "Take this task over from the agent.",
+      "private_task": "Agents don't work on private tasks.",
+      "run_now": {
+        "label": "Run now",
+        "requested": "Run requested",
+        "failed": "Could not request a run",
+        "paused_badge": "Paused",
+        "reasons": {
+          "no_permission": "You can't ask agents to run on this task.",
+          "paused": "This agent is paused.",
+          "no_grants": "Nothing is allowed for this agent, so it can't run.",
+          "not_workable": "Agents don't work on finished or archived tasks.",
+          "private": "Agents don't work on private tasks."
+        }
+      },
+      "proposals": {
+        "title": "Waiting for approval",
+        "expires": "Expires {time}",
+        "expired": "Expired",
+        "changes_to": "changes to",
+        "empty_value": "none",
+        "show_more": "Show more",
+        "show_less": "Show less",
+        "approve": "Approve",
+        "reject": "Reject",
+        "approved": "Approved",
+        "rejected": "Rejected",
+        "decide_failed": "Could not update the proposal",
+        "cannot_decide": "Anyone who can do this operation can approve it.",
+        "reject_title": "Reject this proposal",
+        "reject_reason": "Reason (optional)",
+        "reject_reason_help": "The agent reads this the next time it runs.",
+        "reject_confirm": "Reject",
+        "reject_cancel": "Cancel",
+        "ops": {
+          "add_comment": "Add comment",
+          "set_priority": "Change priority",
+          "set_due_on": "Change due date",
+          "transition_task": "Change state",
+          "create_subtask": "Add subtask"
+        }
+      },
+      "history": {
+        "status": {
+          "running": "Running",
+          "completed": "Completed",
+          "failed": "Failed"
+        },
+        "ended": {
+          "done": "Finished",
+          "max_steps": "Stopped at the step limit",
+          "write_cap": "Stopped at the write limit",
+          "repeat": "Stopped after repeating itself",
+          "timeout": "Timed out",
+          "budget": "Stopped at the budget limit",
+          "invalid_output": "Stopped on an unreadable reply",
+          "tool_error": "Stopped on a tool error",
+          "stopped": "Stopped (task or agent changed)",
+          "coalesced": "Skipped (already covered by an earlier run)",
+          "rate_limited": "Skipped (too many recent runs)"
+        },
+        "outcome": {
+          "applied": "Applied",
+          "proposed": "Proposed",
+          "noop": "No change",
+          "skipped": "Skipped",
+          "not_permitted": "Not permitted",
+          "invalid": "Invalid",
+          "failed": "Failed",
+          "stopped": "Stopped"
+        },
+        "tool_finish": "Finish",
+        "view_proposal": "View proposal",
+        "no_steps": "No steps recorded.",
+        "steps_failed": "Could not load the steps.",
+        "confidence": "conf {value}"
+      }
     }
   },
   "handoff_reason": {

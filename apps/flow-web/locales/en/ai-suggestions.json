@@ -73,7 +73,44 @@
       "unavailable": "{modelName} (unavailable)",
       "update_failed": "Failed to change the model"
     },
-    "pause_help": "Pause stops this agent from running on any trigger, including Run now. Resume turns it back on."
+    "pause_help": "Pause stops this agent from running on any trigger, including Run now. Resume turns it back on.",
+    "tools": {
+      "title": "What it can do",
+      "summary": "{approval} need approval, {auto} automatic",
+      "inactive": "Inactive",
+      "legend": "Approval: runs once a person approves. Auto: runs immediately when both the person who assigned the agent and the person who asked can do it.",
+      "emptyWarning": "Nothing is allowed, so this agent won't run.",
+      "modes": {
+        "off": "Off",
+        "approval": "Approval",
+        "auto": "Auto"
+      },
+      "save": "Save",
+      "saveFailed": "Could not save",
+      "readOnly": "Only admins can change this.",
+      "operations": {
+        "add_comment": {
+          "label": "Add comments",
+          "description": "Post a comment on the task."
+        },
+        "set_priority": {
+          "label": "Change priority",
+          "description": "Set the task's priority."
+        },
+        "set_due_on": {
+          "label": "Change due date",
+          "description": "Set or clear the due date."
+        },
+        "transition_task": {
+          "label": "Change state",
+          "description": "Start, block, unblock, submit for review or complete the task."
+        },
+        "create_subtask": {
+          "label": "Create subtasks",
+          "description": "Add a subtask under the task."
+        }
+      }
+    }
   },
   "empty": "No suggestions yet",
   "loading": "Thinking...",
