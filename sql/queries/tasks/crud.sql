@@ -78,6 +78,7 @@ SELECT
   v.project_public_id,
   v.project_name,
   v.parent_task_public_id,
+  v.parent_task_title,
   v.title,
   v.visibility,
   v.derived_state,
@@ -89,6 +90,8 @@ SELECT
   v.task_number,
   v.archived_at,
   v.label_ids,
+  v.subtask_count,
+  v.comment_count,
   v.sort_weight,
   v.updated_at,
   v.created_at,
@@ -168,6 +171,7 @@ SELECT
   v.project_public_id,
   v.project_name,
   v.parent_task_public_id,
+  v.parent_task_title,
   v.title,
   v.visibility,
   v.derived_state,
@@ -179,6 +183,8 @@ SELECT
   v.task_number,
   v.archived_at,
   v.label_ids,
+  v.subtask_count,
+  v.comment_count,
   v.sort_weight,
   v.updated_at,
   v.created_at,
@@ -222,6 +228,7 @@ SELECT
   v.project_public_id,
   v.project_name,
   v.parent_task_public_id,
+  v.parent_task_title,
   v.title,
   v.visibility,
   v.derived_state,
@@ -233,6 +240,8 @@ SELECT
   v.task_number,
   v.archived_at,
   v.label_ids,
+  v.subtask_count,
+  v.comment_count,
   v.sort_weight,
   v.updated_at,
   v.created_at,
@@ -318,6 +327,7 @@ SELECT
   v.project_public_id,
   v.project_name,
   v.parent_task_public_id,
+  v.parent_task_title,
   v.title,
   v.visibility,
   v.derived_state,
@@ -329,6 +339,8 @@ SELECT
   v.task_number,
   v.archived_at,
   v.label_ids,
+  v.subtask_count,
+  v.comment_count,
   v.sort_weight,
   v.updated_at,
   v.created_at,
@@ -619,19 +631,38 @@ ORDER BY v.created_at DESC, v.public_id DESC
 LIMIT ?;
 
 -- name: ListChildTasksByParentID :many
--- List existing child tasks for a given parent task. Used by step
--- decomposition to avoid suggesting duplicates of already-created steps.
+-- List enabled, non-archived child tasks of a parent. Backs the subtasks
+-- endpoint and step decomposition (duplicate avoidance). The primary
+-- assignee follows the v_task_list_all rule: first assignee in display
+-- order, no name when that actor is an agent or a disabled user.
 SELECT
   t.id,
   t.public_id,
   t.title,
   t.description,
   t.priority,
-  t.derived_state
+  t.derived_state,
+  t.due_on,
+  t.sort_weight,
+  t.created_at,
+  u.public_id AS primary_assignee_public_id,
+  u.display_name AS primary_assignee_name
 FROM tasks t
+LEFT JOIN task_actors pa
+  ON pa.id = (
+    SELECT ta.id
+    FROM task_actors ta
+    WHERE ta.task_id = t.id
+      AND ta.enabled = TRUE
+      AND ta.role = 'assignee'
+    ORDER BY ta.sort_weight ASC, ta.id ASC
+    LIMIT 1
+  )
+LEFT JOIN users u ON u.id = pa.user_id AND u.enabled = TRUE
 WHERE t.workspace_id = ?
   AND t.parent_task_id = ?
   AND t.enabled = TRUE
+  AND t.archived_at IS NULL
   -- Reaching this statement means the actor may see the parent; a child
   -- carries its own visibility and its title and description are on the
   -- wire. Elevated roles skip the check.
@@ -655,7 +686,7 @@ WHERE t.workspace_id = ?
       )
     ))
   )
-ORDER BY t.created_at ASC
+ORDER BY t.sort_weight ASC, t.created_at ASC, t.id ASC
 LIMIT 100;
 
 -- name: ListChildTasksByParentIDKeyset :many
@@ -674,11 +705,27 @@ SELECT
   t.description,
   t.priority,
   t.derived_state,
-  t.created_at
+  t.due_on,
+  t.sort_weight,
+  t.created_at,
+  u.public_id AS primary_assignee_public_id,
+  u.display_name AS primary_assignee_name
 FROM tasks t
+LEFT JOIN task_actors pa
+  ON pa.id = (
+    SELECT ta.id
+    FROM task_actors ta
+    WHERE ta.task_id = t.id
+      AND ta.enabled = TRUE
+      AND ta.role = 'assignee'
+    ORDER BY ta.sort_weight ASC, ta.id ASC
+    LIMIT 1
+  )
+LEFT JOIN users u ON u.id = pa.user_id AND u.enabled = TRUE
 WHERE t.workspace_id = ?
   AND t.parent_task_id = ?
   AND t.enabled = TRUE
+  AND t.archived_at IS NULL
   -- Same Layer-4 filter as ListChildTasksByParentID: the parent being
   -- visible says nothing about the children.
   AND (
@@ -742,6 +789,7 @@ SELECT
   v.project_identifier,
   v.task_number,
   v.parent_task_public_id,
+  v.parent_task_title,
   v.title,
   v.visibility,
   v.derived_state,
@@ -755,7 +803,9 @@ SELECT
   v.created_at,
   v.primary_assignee_public_id,
   v.assignee_count,
-  v.label_ids
+  v.label_ids,
+  v.subtask_count,
+  v.comment_count
 FROM v_task_list_archived v
 WHERE v.workspace_id = ?
   -- Archiving does not widen who may read a task. The route is mounted
@@ -828,6 +878,7 @@ SELECT
   v.project_identifier,
   v.task_number,
   v.parent_task_public_id,
+  v.parent_task_title,
   v.title,
   v.visibility,
   v.derived_state,
@@ -841,7 +892,9 @@ SELECT
   v.created_at,
   v.primary_assignee_public_id,
   v.assignee_count,
-  v.label_ids
+  v.label_ids,
+  v.subtask_count,
+  v.comment_count
 FROM v_task_list_archived v
 WHERE v.workspace_id = ?
   -- Same Layer-4 filter as ListArchivedTasksForWorkspace.

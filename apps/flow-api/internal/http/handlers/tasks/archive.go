@@ -230,6 +230,9 @@ func mapArchivedTaskListItem(r generated.ListArchivedTasksForWorkspaceRow) TaskL
 		ProjectIdentifier: r.ProjectIdentifier.String,
 		TaskNumber:        int32(r.TaskNumber), //#nosec G115 -- task_number is per-project sequence (uint32), fits int32 within realistic deployments
 		ParentTaskID:      nullBytesToUUIDString(r.ParentTaskPublicID),
+		ParentTaskTitle:   r.ParentTaskTitle.String,
+		SubtaskCount:      r.SubtaskCount,
+		CommentCount:      r.CommentCount,
 		Title:             r.Title,
 		Visibility:        string(r.Visibility),
 		DerivedState:      string(r.DerivedState),
@@ -258,6 +261,9 @@ func mapArchivedTaskListItemKeyset(r generated.ListArchivedTasksForWorkspaceKeys
 		ProjectIdentifier: r.ProjectIdentifier.String,
 		TaskNumber:        int32(r.TaskNumber), //#nosec G115 -- task_number is per-project sequence (uint32), fits int32 within realistic deployments
 		ParentTaskID:      nullBytesToUUIDString(r.ParentTaskPublicID),
+		ParentTaskTitle:   r.ParentTaskTitle.String,
+		SubtaskCount:      r.SubtaskCount,
+		CommentCount:      r.CommentCount,
 		Title:             r.Title,
 		Visibility:        string(r.Visibility),
 		DerivedState:      string(r.DerivedState),

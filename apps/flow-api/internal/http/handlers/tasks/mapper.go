@@ -158,6 +158,9 @@ type taskListRow struct {
 	ProjectPublicID         []byte
 	ProjectName             string
 	ParentTaskPublicID      sql.NullString
+	ParentTaskTitle         sql.NullString
+	SubtaskCount            int64
+	CommentCount            int64
 	Title                   string
 	Visibility              generated.TasksVisibility
 	DerivedState            generated.TasksDerivedState
@@ -221,6 +224,9 @@ func taskListRowToDTO(r taskListRow) TaskListItem {
 		ProjectIdentifier: r.ProjectIdentifier.String,
 		TaskNumber:        int32(r.TaskNumber), //#nosec G115 -- task_number is per-project sequence (uint32), fits int32 within realistic deployments
 		ParentTaskID:      nullBytesToUUIDString(r.ParentTaskPublicID),
+		ParentTaskTitle:   r.ParentTaskTitle.String,
+		SubtaskCount:      r.SubtaskCount,
+		CommentCount:      r.CommentCount,
 		Title:             r.Title,
 		Visibility:        string(r.Visibility),
 		DerivedState:      string(r.DerivedState),
@@ -248,6 +254,9 @@ func taskListRowFromProject(r generated.ListTasksForProjectRow) taskListRow {
 		ProjectPublicID:         r.ProjectPublicID,
 		ProjectName:             r.ProjectName,
 		ParentTaskPublicID:      r.ParentTaskPublicID,
+		ParentTaskTitle:         r.ParentTaskTitle,
+		SubtaskCount:            r.SubtaskCount,
+		CommentCount:            r.CommentCount,
 		Title:                   r.Title,
 		Visibility:              r.Visibility,
 		DerivedState:            r.DerivedState,
@@ -278,6 +287,9 @@ func taskListRowFromProjectKeyset(r generated.ListTasksForProjectKeysetRow) task
 		ProjectPublicID:         r.ProjectPublicID,
 		ProjectName:             r.ProjectName,
 		ParentTaskPublicID:      r.ParentTaskPublicID,
+		ParentTaskTitle:         r.ParentTaskTitle,
+		SubtaskCount:            r.SubtaskCount,
+		CommentCount:            r.CommentCount,
 		Title:                   r.Title,
 		Visibility:              r.Visibility,
 		DerivedState:            r.DerivedState,
@@ -304,6 +316,9 @@ func taskListRowFromWorkspace(r generated.ListTasksForWorkspaceRow) taskListRow 
 		ProjectPublicID:         r.ProjectPublicID,
 		ProjectName:             r.ProjectName,
 		ParentTaskPublicID:      r.ParentTaskPublicID,
+		ParentTaskTitle:         r.ParentTaskTitle,
+		SubtaskCount:            r.SubtaskCount,
+		CommentCount:            r.CommentCount,
 		Title:                   r.Title,
 		Visibility:              r.Visibility,
 		DerivedState:            r.DerivedState,
@@ -330,6 +345,9 @@ func taskListRowFromWorkspaceKeyset(r generated.ListTasksForWorkspaceKeysetRow) 
 		ProjectPublicID:         r.ProjectPublicID,
 		ProjectName:             r.ProjectName,
 		ParentTaskPublicID:      r.ParentTaskPublicID,
+		ParentTaskTitle:         r.ParentTaskTitle,
+		SubtaskCount:            r.SubtaskCount,
+		CommentCount:            r.CommentCount,
 		Title:                   r.Title,
 		Visibility:              r.Visibility,
 		DerivedState:            r.DerivedState,

@@ -134,6 +134,9 @@ type TaskListItem struct {
 	ProjectID         string            `json:"projectId"`
 	ProjectName       string            `json:"projectName,omitempty"`
 	ParentTaskID      string            `json:"parentTaskId,omitempty"`
+	ParentTaskTitle   string            `json:"parentTaskTitle,omitempty" doc:"Title of the parent task; omitted for a top-level task"`
+	SubtaskCount      int64             `json:"subtaskCount" doc:"Number of direct subtasks; 0 when the task has none"`
+	CommentCount      int64             `json:"commentCount" doc:"Number of comments on the task; 0 when it has none"`
 	Title             string            `json:"title"`
 	Visibility        string            `json:"visibility"`
 	DerivedState      string            `json:"derivedState"`

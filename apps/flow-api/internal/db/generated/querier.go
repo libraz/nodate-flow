@@ -1489,8 +1489,10 @@ type Querier interface {
 	// transitively hides the entire subtree even when the row itself is
 	// still enabled = TRUE.
 	ListChildPages(ctx context.Context, arg ListChildPagesParams) ([]ListChildPagesRow, error)
-	// List existing child tasks for a given parent task. Used by step
-	// decomposition to avoid suggesting duplicates of already-created steps.
+	// List enabled, non-archived child tasks of a parent. Backs the subtasks
+	// endpoint and step decomposition (duplicate avoidance). The primary
+	// assignee follows the v_task_list_all rule: first assignee in display
+	// order, no name when that actor is an agent or a disabled user.
 	ListChildTasksByParentID(ctx context.Context, arg ListChildTasksByParentIDParams) ([]ListChildTasksByParentIDRow, error)
 	// Keyset-paginated variant of ListChildTasksByParentID.
 	//

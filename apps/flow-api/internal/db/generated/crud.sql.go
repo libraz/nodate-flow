@@ -622,6 +622,7 @@ SELECT
   v.project_identifier,
   v.task_number,
   v.parent_task_public_id,
+  v.parent_task_title,
   v.title,
   v.visibility,
   v.derived_state,
@@ -635,7 +636,9 @@ SELECT
   v.created_at,
   v.primary_assignee_public_id,
   v.assignee_count,
-  v.label_ids
+  v.label_ids,
+  v.subtask_count,
+  v.comment_count
 FROM v_task_list_archived v
 WHERE v.workspace_id = ?
   -- Archiving does not widen who may read a task. The route is mounted
@@ -680,6 +683,7 @@ type ListArchivedTasksForWorkspaceRow struct {
 	ProjectIdentifier       sql.NullString    `json:"projectIdentifier"`
 	TaskNumber              uint32            `json:"taskNumber"`
 	ParentTaskPublicID      sql.NullString    `json:"parentTaskPublicId"`
+	ParentTaskTitle         sql.NullString    `json:"parentTaskTitle"`
 	Title                   string            `json:"title"`
 	Visibility              TasksVisibility   `json:"visibility"`
 	DerivedState            TasksDerivedState `json:"derivedState"`
@@ -694,6 +698,8 @@ type ListArchivedTasksForWorkspaceRow struct {
 	PrimaryAssigneePublicID sql.NullString    `json:"primaryAssigneePublicId"`
 	AssigneeCount           int64             `json:"assigneeCount"`
 	LabelIds                string            `json:"labelIds"`
+	SubtaskCount            int64             `json:"subtaskCount"`
+	CommentCount            int64             `json:"commentCount"`
 }
 
 // List archived tasks via v_task_list_archived. See ListTasksForProject
@@ -722,6 +728,7 @@ func (q *Queries) ListArchivedTasksForWorkspace(ctx context.Context, arg ListArc
 			&i.ProjectIdentifier,
 			&i.TaskNumber,
 			&i.ParentTaskPublicID,
+			&i.ParentTaskTitle,
 			&i.Title,
 			&i.Visibility,
 			&i.DerivedState,
@@ -736,6 +743,8 @@ func (q *Queries) ListArchivedTasksForWorkspace(ctx context.Context, arg ListArc
 			&i.PrimaryAssigneePublicID,
 			&i.AssigneeCount,
 			&i.LabelIds,
+			&i.SubtaskCount,
+			&i.CommentCount,
 		); err != nil {
 			return nil, err
 		}
@@ -758,6 +767,7 @@ SELECT
   v.project_identifier,
   v.task_number,
   v.parent_task_public_id,
+  v.parent_task_title,
   v.title,
   v.visibility,
   v.derived_state,
@@ -771,7 +781,9 @@ SELECT
   v.created_at,
   v.primary_assignee_public_id,
   v.assignee_count,
-  v.label_ids
+  v.label_ids,
+  v.subtask_count,
+  v.comment_count
 FROM v_task_list_archived v
 WHERE v.workspace_id = ?
   -- Same Layer-4 filter as ListArchivedTasksForWorkspace.
@@ -819,6 +831,7 @@ type ListArchivedTasksForWorkspaceKeysetRow struct {
 	ProjectIdentifier       sql.NullString    `json:"projectIdentifier"`
 	TaskNumber              uint32            `json:"taskNumber"`
 	ParentTaskPublicID      sql.NullString    `json:"parentTaskPublicId"`
+	ParentTaskTitle         sql.NullString    `json:"parentTaskTitle"`
 	Title                   string            `json:"title"`
 	Visibility              TasksVisibility   `json:"visibility"`
 	DerivedState            TasksDerivedState `json:"derivedState"`
@@ -833,6 +846,8 @@ type ListArchivedTasksForWorkspaceKeysetRow struct {
 	PrimaryAssigneePublicID sql.NullString    `json:"primaryAssigneePublicId"`
 	AssigneeCount           int64             `json:"assigneeCount"`
 	LabelIds                string            `json:"labelIds"`
+	SubtaskCount            int64             `json:"subtaskCount"`
+	CommentCount            int64             `json:"commentCount"`
 }
 
 // Keyset-paginated variant of ListArchivedTasksForWorkspace.
@@ -870,6 +885,7 @@ func (q *Queries) ListArchivedTasksForWorkspaceKeyset(ctx context.Context, arg L
 			&i.ProjectIdentifier,
 			&i.TaskNumber,
 			&i.ParentTaskPublicID,
+			&i.ParentTaskTitle,
 			&i.Title,
 			&i.Visibility,
 			&i.DerivedState,
@@ -884,6 +900,8 @@ func (q *Queries) ListArchivedTasksForWorkspaceKeyset(ctx context.Context, arg L
 			&i.PrimaryAssigneePublicID,
 			&i.AssigneeCount,
 			&i.LabelIds,
+			&i.SubtaskCount,
+			&i.CommentCount,
 		); err != nil {
 			return nil, err
 		}
@@ -905,11 +923,28 @@ SELECT
   t.title,
   t.description,
   t.priority,
-  t.derived_state
+  t.derived_state,
+  t.due_on,
+  t.sort_weight,
+  t.created_at,
+  u.public_id AS primary_assignee_public_id,
+  u.display_name AS primary_assignee_name
 FROM tasks t
+LEFT JOIN task_actors pa
+  ON pa.id = (
+    SELECT ta.id
+    FROM task_actors ta
+    WHERE ta.task_id = t.id
+      AND ta.enabled = TRUE
+      AND ta.role = 'assignee'
+    ORDER BY ta.sort_weight ASC, ta.id ASC
+    LIMIT 1
+  )
+LEFT JOIN users u ON u.id = pa.user_id AND u.enabled = TRUE
 WHERE t.workspace_id = ?
   AND t.parent_task_id = ?
   AND t.enabled = TRUE
+  AND t.archived_at IS NULL
   -- Reaching this statement means the actor may see the parent; a child
   -- carries its own visibility and its title and description are on the
   -- wire. Elevated roles skip the check.
@@ -933,7 +968,7 @@ WHERE t.workspace_id = ?
       )
     ))
   )
-ORDER BY t.created_at ASC
+ORDER BY t.sort_weight ASC, t.created_at ASC, t.id ASC
 LIMIT 100
 `
 
@@ -945,16 +980,23 @@ type ListChildTasksByParentIDParams struct {
 }
 
 type ListChildTasksByParentIDRow struct {
-	ID           uint32            `json:"-"`
-	PublicID     types.PublicID    `json:"publicId"`
-	Title        string            `json:"title"`
-	Description  sql.NullString    `json:"description"`
-	Priority     int32             `json:"priority"`
-	DerivedState TasksDerivedState `json:"derivedState"`
+	ID                      uint32            `json:"-"`
+	PublicID                types.PublicID    `json:"publicId"`
+	Title                   string            `json:"title"`
+	Description             sql.NullString    `json:"description"`
+	Priority                int32             `json:"priority"`
+	DerivedState            TasksDerivedState `json:"derivedState"`
+	DueOn                   sql.NullTime      `json:"dueOn"`
+	SortWeight              int32             `json:"sortWeight"`
+	CreatedAt               time.Time         `json:"createdAt"`
+	PrimaryAssigneePublicID types.PublicID    `json:"primaryAssigneePublicId"`
+	PrimaryAssigneeName     sql.NullString    `json:"primaryAssigneeName"`
 }
 
-// List existing child tasks for a given parent task. Used by step
-// decomposition to avoid suggesting duplicates of already-created steps.
+// List enabled, non-archived child tasks of a parent. Backs the subtasks
+// endpoint and step decomposition (duplicate avoidance). The primary
+// assignee follows the v_task_list_all rule: first assignee in display
+// order, no name when that actor is an agent or a disabled user.
 func (q *Queries) ListChildTasksByParentID(ctx context.Context, arg ListChildTasksByParentIDParams) ([]ListChildTasksByParentIDRow, error) {
 	rows, err := q.db.QueryContext(ctx, listChildTasksByParentID,
 		arg.WorkspaceID,
@@ -978,6 +1020,11 @@ func (q *Queries) ListChildTasksByParentID(ctx context.Context, arg ListChildTas
 			&i.Description,
 			&i.Priority,
 			&i.DerivedState,
+			&i.DueOn,
+			&i.SortWeight,
+			&i.CreatedAt,
+			&i.PrimaryAssigneePublicID,
+			&i.PrimaryAssigneeName,
 		); err != nil {
 			return nil, err
 		}
@@ -1000,11 +1047,27 @@ SELECT
   t.description,
   t.priority,
   t.derived_state,
-  t.created_at
+  t.due_on,
+  t.sort_weight,
+  t.created_at,
+  u.public_id AS primary_assignee_public_id,
+  u.display_name AS primary_assignee_name
 FROM tasks t
+LEFT JOIN task_actors pa
+  ON pa.id = (
+    SELECT ta.id
+    FROM task_actors ta
+    WHERE ta.task_id = t.id
+      AND ta.enabled = TRUE
+      AND ta.role = 'assignee'
+    ORDER BY ta.sort_weight ASC, ta.id ASC
+    LIMIT 1
+  )
+LEFT JOIN users u ON u.id = pa.user_id AND u.enabled = TRUE
 WHERE t.workspace_id = ?
   AND t.parent_task_id = ?
   AND t.enabled = TRUE
+  AND t.archived_at IS NULL
   -- Same Layer-4 filter as ListChildTasksByParentID: the parent being
   -- visible says nothing about the children.
   AND (
@@ -1046,13 +1109,17 @@ type ListChildTasksByParentIDKeysetParams struct {
 }
 
 type ListChildTasksByParentIDKeysetRow struct {
-	ID           uint32            `json:"-"`
-	PublicID     types.PublicID    `json:"publicId"`
-	Title        string            `json:"title"`
-	Description  sql.NullString    `json:"description"`
-	Priority     int32             `json:"priority"`
-	DerivedState TasksDerivedState `json:"derivedState"`
-	CreatedAt    time.Time         `json:"createdAt"`
+	ID                      uint32            `json:"-"`
+	PublicID                types.PublicID    `json:"publicId"`
+	Title                   string            `json:"title"`
+	Description             sql.NullString    `json:"description"`
+	Priority                int32             `json:"priority"`
+	DerivedState            TasksDerivedState `json:"derivedState"`
+	DueOn                   sql.NullTime      `json:"dueOn"`
+	SortWeight              int32             `json:"sortWeight"`
+	CreatedAt               time.Time         `json:"createdAt"`
+	PrimaryAssigneePublicID types.PublicID    `json:"primaryAssigneePublicId"`
+	PrimaryAssigneeName     sql.NullString    `json:"primaryAssigneeName"`
 }
 
 // Keyset-paginated variant of ListChildTasksByParentID.
@@ -1091,7 +1158,11 @@ func (q *Queries) ListChildTasksByParentIDKeyset(ctx context.Context, arg ListCh
 			&i.Description,
 			&i.Priority,
 			&i.DerivedState,
+			&i.DueOn,
+			&i.SortWeight,
 			&i.CreatedAt,
+			&i.PrimaryAssigneePublicID,
+			&i.PrimaryAssigneeName,
 		); err != nil {
 			return nil, err
 		}
@@ -1961,6 +2032,7 @@ SELECT
   v.project_public_id,
   v.project_name,
   v.parent_task_public_id,
+  v.parent_task_title,
   v.title,
   v.visibility,
   v.derived_state,
@@ -1972,6 +2044,8 @@ SELECT
   v.task_number,
   v.archived_at,
   v.label_ids,
+  v.subtask_count,
+  v.comment_count,
   v.sort_weight,
   v.updated_at,
   v.created_at,
@@ -2018,6 +2092,7 @@ type ListTasksForProjectRow struct {
 	ProjectPublicID         []byte            `json:"projectPublicId"`
 	ProjectName             string            `json:"projectName"`
 	ParentTaskPublicID      sql.NullString    `json:"parentTaskPublicId"`
+	ParentTaskTitle         sql.NullString    `json:"parentTaskTitle"`
 	Title                   string            `json:"title"`
 	Visibility              TasksVisibility   `json:"visibility"`
 	DerivedState            TasksDerivedState `json:"derivedState"`
@@ -2029,6 +2104,8 @@ type ListTasksForProjectRow struct {
 	TaskNumber              uint32            `json:"taskNumber"`
 	ArchivedAt              sql.NullTime      `json:"archivedAt"`
 	LabelIds                string            `json:"labelIds"`
+	SubtaskCount            int64             `json:"subtaskCount"`
+	CommentCount            int64             `json:"commentCount"`
 	SortWeight              int32             `json:"sortWeight"`
 	UpdatedAt               sql.NullTime      `json:"updatedAt"`
 	CreatedAt               time.Time         `json:"createdAt"`
@@ -2068,6 +2145,7 @@ func (q *Queries) ListTasksForProject(ctx context.Context, arg ListTasksForProje
 			&i.ProjectPublicID,
 			&i.ProjectName,
 			&i.ParentTaskPublicID,
+			&i.ParentTaskTitle,
 			&i.Title,
 			&i.Visibility,
 			&i.DerivedState,
@@ -2079,6 +2157,8 @@ func (q *Queries) ListTasksForProject(ctx context.Context, arg ListTasksForProje
 			&i.TaskNumber,
 			&i.ArchivedAt,
 			&i.LabelIds,
+			&i.SubtaskCount,
+			&i.CommentCount,
 			&i.SortWeight,
 			&i.UpdatedAt,
 			&i.CreatedAt,
@@ -2104,6 +2184,7 @@ SELECT
   v.project_public_id,
   v.project_name,
   v.parent_task_public_id,
+  v.parent_task_title,
   v.title,
   v.visibility,
   v.derived_state,
@@ -2115,6 +2196,8 @@ SELECT
   v.task_number,
   v.archived_at,
   v.label_ids,
+  v.subtask_count,
+  v.comment_count,
   v.sort_weight,
   v.updated_at,
   v.created_at,
@@ -2166,6 +2249,7 @@ type ListTasksForProjectKeysetRow struct {
 	ProjectPublicID         []byte            `json:"projectPublicId"`
 	ProjectName             string            `json:"projectName"`
 	ParentTaskPublicID      sql.NullString    `json:"parentTaskPublicId"`
+	ParentTaskTitle         sql.NullString    `json:"parentTaskTitle"`
 	Title                   string            `json:"title"`
 	Visibility              TasksVisibility   `json:"visibility"`
 	DerivedState            TasksDerivedState `json:"derivedState"`
@@ -2177,6 +2261,8 @@ type ListTasksForProjectKeysetRow struct {
 	TaskNumber              uint32            `json:"taskNumber"`
 	ArchivedAt              sql.NullTime      `json:"archivedAt"`
 	LabelIds                string            `json:"labelIds"`
+	SubtaskCount            int64             `json:"subtaskCount"`
+	CommentCount            int64             `json:"commentCount"`
 	SortWeight              int32             `json:"sortWeight"`
 	UpdatedAt               sql.NullTime      `json:"updatedAt"`
 	CreatedAt               time.Time         `json:"createdAt"`
@@ -2222,6 +2308,7 @@ func (q *Queries) ListTasksForProjectKeyset(ctx context.Context, arg ListTasksFo
 			&i.ProjectPublicID,
 			&i.ProjectName,
 			&i.ParentTaskPublicID,
+			&i.ParentTaskTitle,
 			&i.Title,
 			&i.Visibility,
 			&i.DerivedState,
@@ -2233,6 +2320,8 @@ func (q *Queries) ListTasksForProjectKeyset(ctx context.Context, arg ListTasksFo
 			&i.TaskNumber,
 			&i.ArchivedAt,
 			&i.LabelIds,
+			&i.SubtaskCount,
+			&i.CommentCount,
 			&i.SortWeight,
 			&i.UpdatedAt,
 			&i.CreatedAt,
@@ -2258,6 +2347,7 @@ SELECT
   v.project_public_id,
   v.project_name,
   v.parent_task_public_id,
+  v.parent_task_title,
   v.title,
   v.visibility,
   v.derived_state,
@@ -2269,6 +2359,8 @@ SELECT
   v.task_number,
   v.archived_at,
   v.label_ids,
+  v.subtask_count,
+  v.comment_count,
   v.sort_weight,
   v.updated_at,
   v.created_at,
@@ -2322,6 +2414,7 @@ type ListTasksForWorkspaceRow struct {
 	ProjectPublicID         []byte            `json:"projectPublicId"`
 	ProjectName             string            `json:"projectName"`
 	ParentTaskPublicID      sql.NullString    `json:"parentTaskPublicId"`
+	ParentTaskTitle         sql.NullString    `json:"parentTaskTitle"`
 	Title                   string            `json:"title"`
 	Visibility              TasksVisibility   `json:"visibility"`
 	DerivedState            TasksDerivedState `json:"derivedState"`
@@ -2333,6 +2426,8 @@ type ListTasksForWorkspaceRow struct {
 	TaskNumber              uint32            `json:"taskNumber"`
 	ArchivedAt              sql.NullTime      `json:"archivedAt"`
 	LabelIds                string            `json:"labelIds"`
+	SubtaskCount            int64             `json:"subtaskCount"`
+	CommentCount            int64             `json:"commentCount"`
 	SortWeight              int32             `json:"sortWeight"`
 	UpdatedAt               sql.NullTime      `json:"updatedAt"`
 	CreatedAt               time.Time         `json:"createdAt"`
@@ -2365,6 +2460,7 @@ func (q *Queries) ListTasksForWorkspace(ctx context.Context, arg ListTasksForWor
 			&i.ProjectPublicID,
 			&i.ProjectName,
 			&i.ParentTaskPublicID,
+			&i.ParentTaskTitle,
 			&i.Title,
 			&i.Visibility,
 			&i.DerivedState,
@@ -2376,6 +2472,8 @@ func (q *Queries) ListTasksForWorkspace(ctx context.Context, arg ListTasksForWor
 			&i.TaskNumber,
 			&i.ArchivedAt,
 			&i.LabelIds,
+			&i.SubtaskCount,
+			&i.CommentCount,
 			&i.SortWeight,
 			&i.UpdatedAt,
 			&i.CreatedAt,
@@ -2402,6 +2500,7 @@ SELECT
   v.project_public_id,
   v.project_name,
   v.parent_task_public_id,
+  v.parent_task_title,
   v.title,
   v.visibility,
   v.derived_state,
@@ -2413,6 +2512,8 @@ SELECT
   v.task_number,
   v.archived_at,
   v.label_ids,
+  v.subtask_count,
+  v.comment_count,
   v.sort_weight,
   v.updated_at,
   v.created_at,
@@ -2464,6 +2565,7 @@ type ListTasksForWorkspaceKeysetRow struct {
 	ProjectPublicID         []byte            `json:"projectPublicId"`
 	ProjectName             string            `json:"projectName"`
 	ParentTaskPublicID      sql.NullString    `json:"parentTaskPublicId"`
+	ParentTaskTitle         sql.NullString    `json:"parentTaskTitle"`
 	Title                   string            `json:"title"`
 	Visibility              TasksVisibility   `json:"visibility"`
 	DerivedState            TasksDerivedState `json:"derivedState"`
@@ -2475,6 +2577,8 @@ type ListTasksForWorkspaceKeysetRow struct {
 	TaskNumber              uint32            `json:"taskNumber"`
 	ArchivedAt              sql.NullTime      `json:"archivedAt"`
 	LabelIds                string            `json:"labelIds"`
+	SubtaskCount            int64             `json:"subtaskCount"`
+	CommentCount            int64             `json:"commentCount"`
 	SortWeight              int32             `json:"sortWeight"`
 	UpdatedAt               sql.NullTime      `json:"updatedAt"`
 	CreatedAt               time.Time         `json:"createdAt"`
@@ -2520,6 +2624,7 @@ func (q *Queries) ListTasksForWorkspaceKeyset(ctx context.Context, arg ListTasks
 			&i.ProjectPublicID,
 			&i.ProjectName,
 			&i.ParentTaskPublicID,
+			&i.ParentTaskTitle,
 			&i.Title,
 			&i.Visibility,
 			&i.DerivedState,
@@ -2531,6 +2636,8 @@ func (q *Queries) ListTasksForWorkspaceKeyset(ctx context.Context, arg ListTasks
 			&i.TaskNumber,
 			&i.ArchivedAt,
 			&i.LabelIds,
+			&i.SubtaskCount,
+			&i.CommentCount,
 			&i.SortWeight,
 			&i.UpdatedAt,
 			&i.CreatedAt,

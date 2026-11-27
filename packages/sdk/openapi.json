@@ -12118,6 +12118,11 @@
             },
             "type": ["array", "null"]
           },
+          "commentCount": {
+            "description": "Number of comments on the task; 0 when it has none",
+            "format": "int64",
+            "type": "integer"
+          },
           "completedAt": {
             "format": "int64",
             "type": "integer"
@@ -12145,6 +12150,10 @@
           "parentTaskId": {
             "type": "string"
           },
+          "parentTaskTitle": {
+            "description": "Title of the parent task; omitted for a top-level task",
+            "type": "string"
+          },
           "primaryAssigneeId": {
             "type": ["string", "null"]
           },
@@ -12168,6 +12177,11 @@
           "startedOn": {
             "type": "string"
           },
+          "subtaskCount": {
+            "description": "Number of direct subtasks; 0 when the task has none",
+            "format": "int64",
+            "type": "integer"
+          },
           "taskNumber": {
             "format": "int32",
             "type": "integer"
@@ -12186,6 +12200,8 @@
         "required": [
           "id",
           "projectId",
+          "subtaskCount",
+          "commentCount",
           "title",
           "visibility",
           "derivedState",

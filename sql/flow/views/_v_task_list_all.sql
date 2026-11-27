@@ -5,7 +5,7 @@
 -- (archived) which filter this base view by archived_at. MySQL 8.4 expands
 -- single-level views via the MERGE optimizer, so there is no runtime cost.
 --
--- The three child-table columns are correlated scalar subqueries rather
+-- The child-table columns are correlated scalar subqueries rather
 -- than joined derived tables, and that is a tenancy property, not a
 -- micro-optimisation. A derived table cannot see the outer workspace
 -- predicate, so MySQL has to materialise it over every row in the
@@ -40,6 +40,8 @@ SELECT
   p.identifier AS project_identifier,
   t.task_number,
   pt.public_id AS parent_task_public_id,
+  -- NULL for top-level tasks and for a parent that is disabled.
+  pt.title AS parent_task_title,
   t.title,
   t.visibility,
   t.derived_state,
@@ -105,7 +107,18 @@ SELECT
      INNER JOIN labels l
        ON l.id = tl.label_id AND l.enabled = TRUE
     WHERE tl.task_id = t.id
-      AND tl.enabled = TRUE) AS label_ids
+      AND tl.enabled = TRUE) AS label_ids,
+  -- Enabled, non-archived direct children; COUNT(*) yields 0, never NULL.
+  (SELECT COUNT(*)
+     FROM tasks c
+    WHERE c.parent_task_id = t.id
+      AND c.enabled = TRUE
+      AND c.archived_at IS NULL) AS subtask_count,
+  -- Enabled comments on the task; COUNT(*) yields 0, never NULL.
+  (SELECT COUNT(*)
+     FROM comments cm
+    WHERE cm.task_id = t.id
+      AND cm.enabled = TRUE) AS comment_count
 FROM tasks t
 INNER JOIN projects p
   ON p.id = t.project_id AND p.enabled = TRUE

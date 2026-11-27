@@ -10792,6 +10792,11 @@ export interface components {
             assigneeCount: number;
             /** @description Human assignees in display order */
             assignees: components["schemas"]["TaskAssigneeRef"][] | null;
+            /**
+             * Format: int64
+             * @description Number of comments on the task; 0 when it has none
+             */
+            commentCount: number;
             /** Format: int64 */
             completedAt?: number;
             /** Format: int64 */
@@ -10802,6 +10807,8 @@ export interface components {
             /** @description Label public ids in display order, capped at the first 20 */
             labelIds?: string[] | null;
             parentTaskId?: string;
+            /** @description Title of the parent task; omitted for a top-level task */
+            parentTaskTitle?: string;
             primaryAssigneeId: string | null;
             /** Format: int32 */
             priority: number;
@@ -10811,6 +10818,11 @@ export interface components {
             /** Format: int32 */
             sortWeight: number;
             startedOn?: string;
+            /**
+             * Format: int64
+             * @description Number of direct subtasks; 0 when the task has none
+             */
+            subtaskCount: number;
             /** Format: int32 */
             taskNumber: number;
             title: string;

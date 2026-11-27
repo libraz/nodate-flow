@@ -1848,7 +1848,6 @@ const (
 	TaskDependenciesKindBlocks     TaskDependenciesKind = "blocks"
 	TaskDependenciesKindRelates    TaskDependenciesKind = "relates"
 	TaskDependenciesKindDuplicates TaskDependenciesKind = "duplicates"
-	TaskDependenciesKindSubtaskOf  TaskDependenciesKind = "subtask_of"
 	TaskDependenciesKindRetroOf    TaskDependenciesKind = "retro_of"
 )
 
@@ -4682,7 +4681,7 @@ type TaskDependency struct {
 	FromTaskID uint32 `json:"-"`
 	// Internal FK to tasks.id (target)
 	ToTaskID uint32 `json:"-"`
-	// Dependency kind. blocks: from_task waits on to_task. relates: informational link. duplicates: from_task duplicates to_task. subtask_of: from_task is a subtask of to_task. retro_of: created by the signal_judge Applier when an event-day signal triggers a retrospective draft task; from_task is the new draft, to_task is the original task whose lifecycle finished and prompted the retro.
+	// Dependency kind. blocks: from_task waits on to_task. relates: informational link. duplicates: from_task duplicates to_task. retro_of: created by the signal_judge Applier when an event-day signal triggers a retrospective draft task; from_task is the new draft, to_task is the original task whose lifecycle finished and prompted the retro.
 	Kind TaskDependenciesKind `json:"kind"`
 	// Display order
 	SortWeight int32 `json:"sortWeight"`
@@ -5319,6 +5318,7 @@ type VTaskList struct {
 	ProjectIdentifier       sql.NullString    `json:"projectIdentifier"`
 	TaskNumber              uint32            `json:"taskNumber"`
 	ParentTaskPublicID      sql.NullString    `json:"parentTaskPublicId"`
+	ParentTaskTitle         sql.NullString    `json:"parentTaskTitle"`
 	Title                   string            `json:"title"`
 	Visibility              TasksVisibility   `json:"visibility"`
 	DerivedState            TasksDerivedState `json:"derivedState"`
@@ -5333,6 +5333,8 @@ type VTaskList struct {
 	PrimaryAssigneePublicID sql.NullString    `json:"primaryAssigneePublicId"`
 	AssigneeCount           int64             `json:"assigneeCount"`
 	LabelIds                string            `json:"labelIds"`
+	SubtaskCount            int64             `json:"subtaskCount"`
+	CommentCount            int64             `json:"commentCount"`
 }
 
 type VTaskListAll struct {
@@ -5346,6 +5348,7 @@ type VTaskListAll struct {
 	ProjectIdentifier       sql.NullString    `json:"projectIdentifier"`
 	TaskNumber              uint32            `json:"taskNumber"`
 	ParentTaskPublicID      sql.NullString    `json:"parentTaskPublicId"`
+	ParentTaskTitle         sql.NullString    `json:"parentTaskTitle"`
 	Title                   string            `json:"title"`
 	Visibility              TasksVisibility   `json:"visibility"`
 	DerivedState            TasksDerivedState `json:"derivedState"`
@@ -5360,6 +5363,8 @@ type VTaskListAll struct {
 	PrimaryAssigneePublicID sql.NullString    `json:"primaryAssigneePublicId"`
 	AssigneeCount           int64             `json:"assigneeCount"`
 	LabelIds                string            `json:"labelIds"`
+	SubtaskCount            int64             `json:"subtaskCount"`
+	CommentCount            int64             `json:"commentCount"`
 }
 
 type VTaskListArchived struct {
@@ -5373,6 +5378,7 @@ type VTaskListArchived struct {
 	ProjectIdentifier       sql.NullString    `json:"projectIdentifier"`
 	TaskNumber              uint32            `json:"taskNumber"`
 	ParentTaskPublicID      sql.NullString    `json:"parentTaskPublicId"`
+	ParentTaskTitle         sql.NullString    `json:"parentTaskTitle"`
 	Title                   string            `json:"title"`
 	Visibility              TasksVisibility   `json:"visibility"`
 	DerivedState            TasksDerivedState `json:"derivedState"`
@@ -5387,6 +5393,8 @@ type VTaskListArchived struct {
 	PrimaryAssigneePublicID sql.NullString    `json:"primaryAssigneePublicId"`
 	AssigneeCount           int64             `json:"assigneeCount"`
 	LabelIds                string            `json:"labelIds"`
+	SubtaskCount            int64             `json:"subtaskCount"`
+	CommentCount            int64             `json:"commentCount"`
 }
 
 type VTaskTimeline struct {
