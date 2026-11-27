@@ -12,7 +12,8 @@ import { useNavigate } from '@tanstack/react-router';
 import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
-
+import SubmitHint from '../../components/submit-hint';
+import { onSubmitShortcut } from '../../lib/submit-shortcut';
 import { createSlugField, slugify, slugOrRandom } from '../../lib/validation/identifier';
 import { useCreateWorkspace } from './api';
 
@@ -121,6 +122,7 @@ export default function WorkspaceCreateDialog({
         }}
         noValidate
         style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-5)' }}
+        onKeyDown={onSubmitShortcut}
       >
         <FormField
           label={t('workspaces.form.name')}
@@ -195,6 +197,7 @@ export default function WorkspaceCreateDialog({
         </FormField>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--nf-space-3)' }}>
+          <SubmitHint />
           <Button type="button" variant="ghost" onClick={handleClose} disabled={submitting}>
             {t('workspaces.form.cancel')}
           </Button>

@@ -11,12 +11,17 @@ import { renderWithProviders } from '@tests/helpers/render';
 import { describe, expect, it, vi } from 'vitest';
 import TaskCreateDialog from '../task-create-dialog';
 
+const createSpy = vi.hoisted(() => vi.fn());
+
 vi.mock('../api', async () => {
   const actual = await vi.importActual<typeof import('../api')>('../api');
   return {
     ...actual,
     useCreateTask: () => ({
-      mutateAsync: vi.fn().mockRejectedValue(new Error('boom')),
+      mutateAsync: (input: unknown) => {
+        createSpy(input);
+        return Promise.reject(new Error('boom'));
+      },
       isPending: false,
     }),
   };
@@ -88,5 +93,29 @@ describe('<TaskCreateDialog>', () => {
     await waitFor(() => {
       expect(screen.queryByText(/tasks\.validation\.title_required/i)).toBeNull();
     });
+  });
+});
+
+describe('<TaskCreateDialog> submit shortcut', () => {
+  it('submits from the description box with Ctrl+Enter', async () => {
+    createSpy.mockClear();
+    renderWithProviders(<TaskCreateDialog projectId="proj-001" open={true} onClose={vi.fn()} />);
+    const titleInput = screen.getByRole('textbox', { name: /tasks\.form\.title/i });
+    fireEvent.change(titleInput, { target: { value: 'Shortcut task' } });
+    const description = screen.getByRole('textbox', { name: /tasks\.form\.description/i });
+    fireEvent.keyDown(description, { key: 'Enter', ctrlKey: true });
+    await waitFor(() => {
+      expect(createSpy).toHaveBeenCalledWith(expect.objectContaining({ title: 'Shortcut task' }));
+    });
+  });
+
+  it('does not submit on plain Enter in the description box', () => {
+    createSpy.mockClear();
+    renderWithProviders(<TaskCreateDialog projectId="proj-001" open={true} onClose={vi.fn()} />);
+    const titleInput = screen.getByRole('textbox', { name: /tasks\.form\.title/i });
+    fireEvent.change(titleInput, { target: { value: 'Shortcut task' } });
+    const description = screen.getByRole('textbox', { name: /tasks\.form\.description/i });
+    fireEvent.keyDown(description, { key: 'Enter' });
+    expect(createSpy).not.toHaveBeenCalled();
   });
 });

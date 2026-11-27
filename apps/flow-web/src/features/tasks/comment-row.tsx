@@ -22,9 +22,11 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { MoreHorizontal } from 'lucide-react';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import SubmitHint from '../../components/submit-hint';
 import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import { formatEpochDateTime } from '../../lib/format';
+import { onSubmitShortcut } from '../../lib/submit-shortcut';
 import { type TaskComment, useDeleteTaskComment, useEditTaskComment } from './api';
 import styles from './comment-row.module.css';
 import MarkdownEditor from './markdown-editor';
@@ -181,7 +183,14 @@ export default function CommentRow({
       </header>
 
       {editing ? (
-        <div className={styles.editor}>
+        <form
+          className={styles.editor}
+          onSubmit={(e) => {
+            e.preventDefault();
+            void handleSave();
+          }}
+          onKeyDown={onSubmitShortcut}
+        >
           {/*
            * Same editor as the new-comment box, so editing a comment can
            * name a person the same way writing one can. The Escape handler
@@ -204,20 +213,15 @@ export default function CommentRow({
             placeholder={t('tasks.comments.edit_placeholder')}
           />
           <div className={styles.editorActions}>
+            <SubmitHint />
             <Button type="button" variant="ghost" onClick={cancelEdit}>
               {t('tasks.comments.cancel')}
             </Button>
-            <Button
-              type="button"
-              disabled={saveDisabled}
-              onClick={() => {
-                void handleSave();
-              }}
-            >
+            <Button type="submit" disabled={saveDisabled}>
               {t('tasks.comments.save')}
             </Button>
           </div>
-        </div>
+        </form>
       ) : (
         <Markdown>{comment.body}</Markdown>
       )}

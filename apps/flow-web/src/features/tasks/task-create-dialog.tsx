@@ -21,8 +21,10 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type FormEvent, type ReactElement, Suspense, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
+import SubmitHint from '../../components/submit-hint';
 import { formatApiError } from '../../lib/api-error';
 import { formatDate } from '../../lib/format';
+import { onSubmitShortcut } from '../../lib/submit-shortcut';
 import { useSubmitGuard } from '../../lib/use-submit-guard';
 import { useWeekStart } from '../../lib/use-week-start';
 import { AiSparkle } from '../ai-suggestions/ai-consequence';
@@ -278,6 +280,7 @@ export default function TaskCreateDialog({
         }}
         noValidate
         className={styles.form}
+        onKeyDown={onSubmitShortcut}
       >
         <div className={styles.fieldWithError}>
           <FormField
@@ -392,6 +395,7 @@ export default function TaskCreateDialog({
         )}
 
         <div className={styles.actions}>
+          <SubmitHint />
           <Button type="button" variant="ghost" onClick={handleClose} disabled={submitting}>
             {t('tasks.form.cancel')}
           </Button>

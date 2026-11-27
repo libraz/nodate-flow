@@ -11,6 +11,8 @@ import Textarea from '@nodate-flow/ui/primitives/textarea';
 import { type FormEvent, type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
+import SubmitHint from '../../components/submit-hint';
+import { onSubmitShortcut } from '../../lib/submit-shortcut';
 
 import styles from './edit-suggestion-dialog.module.css';
 import type { AiSuggestion } from './store';
@@ -71,7 +73,7 @@ export default function EditSuggestionDialog({
 
   return (
     <Dialog open={open} onClose={onClose} title={t('edit.title')}>
-      <form onSubmit={handleSubmit} className={styles.form}>
+      <form onSubmit={handleSubmit} className={styles.form} onKeyDown={onSubmitShortcut}>
         <p className={styles.hint}>{t('edit.hint')}</p>
         <FormField label={t('edit.action_label')}>
           {(control) => (
@@ -102,6 +104,7 @@ export default function EditSuggestionDialog({
           )}
         </FormField>
         <div className={styles.actions}>
+          <SubmitHint />
           <Button type="button" variant="ghost" size="sm" onClick={onClose} disabled={saving}>
             {t('edit.cancel')}
           </Button>

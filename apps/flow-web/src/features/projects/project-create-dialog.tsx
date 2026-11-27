@@ -11,7 +11,8 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
-
+import SubmitHint from '../../components/submit-hint';
+import { onSubmitShortcut } from '../../lib/submit-shortcut';
 import {
   createIdentifierField,
   createSlugField,
@@ -148,6 +149,7 @@ export default function ProjectCreateDialog({
         }}
         noValidate
         style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-5)' }}
+        onKeyDown={onSubmitShortcut}
       >
         <FormField
           label={t('projects.form.name')}
@@ -241,6 +243,7 @@ export default function ProjectCreateDialog({
         </details>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--nf-space-3)' }}>
+          <SubmitHint />
           <Button type="button" variant="ghost" onClick={handleClose} disabled={submitting}>
             {t('projects.form.cancel')}
           </Button>

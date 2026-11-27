@@ -35,9 +35,11 @@ import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import SubmitHint from '../../components/submit-hint';
 import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import { formatEpochDateTime } from '../../lib/format';
+import { onSubmitShortcut } from '../../lib/submit-shortcut';
 import { selectUser, useAuth } from '../auth/auth-store';
 import {
   type EventComment,
@@ -159,7 +161,14 @@ function EventCommentRow({
         </span>
       </header>
       {editing ? (
-        <div className={styles.addRow}>
+        <form
+          className={styles.addRow}
+          onSubmit={(e) => {
+            e.preventDefault();
+            void handleSave();
+          }}
+          onKeyDown={onSubmitShortcut}
+        >
           <Textarea
             value={draft}
             onChange={(e) => {
@@ -176,21 +185,15 @@ function EventCommentRow({
             aria-label={t('event.comments.edit')}
           />
           <div className={styles.addRowControls}>
+            <SubmitHint />
             <Button type="button" variant="ghost" size="sm" onClick={cancelEdit}>
               {t('event.comments.edit_cancel')}
             </Button>
-            <Button
-              type="button"
-              size="sm"
-              disabled={saveDisabled}
-              onClick={() => {
-                void handleSave();
-              }}
-            >
+            <Button type="submit" size="sm" disabled={saveDisabled}>
               {t('event.comments.edit_save')}
             </Button>
           </div>
-        </div>
+        </form>
       ) : (
         <div className={styles.commentBody}>
           <Markdown>{comment.body}</Markdown>
@@ -281,7 +284,14 @@ export default function CommentsTab({
           ))}
         </ul>
       )}
-      <div className={styles.addRow}>
+      <form
+        className={styles.addRow}
+        onSubmit={(e) => {
+          e.preventDefault();
+          void handleAdd();
+        }}
+        onKeyDown={onSubmitShortcut}
+      >
         <Textarea
           value={draft}
           onChange={(e) => {
@@ -292,17 +302,12 @@ export default function CommentsTab({
           placeholder={t('event.comments.add_placeholder')}
         />
         <div className={styles.addRowControls}>
-          <Button
-            type="button"
-            disabled={!canSubmit}
-            onClick={() => {
-              void handleAdd();
-            }}
-          >
+          <SubmitHint />
+          <Button type="submit" disabled={!canSubmit}>
             {t('event.comments.add')}
           </Button>
         </div>
-      </div>
+      </form>
     </div>
   );
 }

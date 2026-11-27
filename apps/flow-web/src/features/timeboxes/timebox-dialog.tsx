@@ -19,8 +19,9 @@ import Textarea from '@nodate-flow/ui/primitives/textarea';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
+import SubmitHint from '../../components/submit-hint';
 import { formatApiError } from '../../lib/api-error';
+import { onSubmitShortcut } from '../../lib/submit-shortcut';
 import { useProjectsQuery } from '../projects/api';
 import { type Timebox, useCreateTimeboxMutation, useUpdateTimeboxMutation } from './api';
 import styles from './timeboxes-page.module.css';
@@ -193,6 +194,7 @@ export default function TimeboxDialog({
         }}
         noValidate
         className={styles.form}
+        onKeyDown={onSubmitShortcut}
       >
         <FormField
           label={t('timeboxes.field.name')}
@@ -286,6 +288,7 @@ export default function TimeboxDialog({
         ) : null}
 
         <div className={styles.formActions}>
+          <SubmitHint />
           <Button type="button" variant="ghost" onClick={handleClose} disabled={submitting}>
             {t('timeboxes.dialog.cancel')}
           </Button>

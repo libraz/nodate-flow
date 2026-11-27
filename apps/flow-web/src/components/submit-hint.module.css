@@ -1,0 +1,25 @@
+.hint {
+  display: inline-flex;
+  align-self: center;
+  align-items: baseline;
+  gap: var(--nf-space-1-5);
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
+.keys {
+  display: inline-flex;
+  gap: var(--nf-space-0-5);
+}
+
+.kbd {
+  composes: kbd from "./kbd.module.css";
+  background: var(--nf-color-bg-sunken);
+}
+
+/* No hardware keyboard to press the chord on. */
+@media (hover: none) and (pointer: coarse) {
+  .hint {
+    display: none;
+  }
+}

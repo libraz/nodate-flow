@@ -15,9 +15,10 @@ import Textarea from '@nodate-flow/ui/primitives/textarea';
 import { AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
 import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
 import PageHelp from '../../components/page-help';
+import SubmitHint from '../../components/submit-hint';
 import { confirmAction } from '../../lib/confirm-action';
+import { onSubmitShortcut } from '../../lib/submit-shortcut';
 import { AiSparkle } from '../ai-suggestions/ai-consequence';
 
 import {
@@ -168,7 +169,7 @@ export default function ConstraintEditor({ taskId }: ConstraintEditorProps): Rea
         </Button>
       </div>
 
-      <form onSubmit={onSubmit}>
+      <form onSubmit={onSubmit} onKeyDown={onSubmitShortcut}>
         <details className={styles.advanced} open={expression.length > 0}>
           <summary className={styles.advancedSummary}>{t('editor.advanced')}</summary>
           <FormField label={t('editor.kind')}>
@@ -203,6 +204,7 @@ export default function ConstraintEditor({ taskId }: ConstraintEditorProps): Rea
           </FormField>
         </details>
         <div className={styles.editorActions}>
+          <SubmitHint />
           <Button type="submit" disabled={addMut.isPending || !expression.trim()}>
             {t('editor.add')}
           </Button>

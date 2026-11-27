@@ -14,8 +14,9 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import Tooltip from '@nodate-flow/ui/primitives/tooltip';
 import { type ChangeEvent, type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
+import SubmitHint from '../../components/submit-hint';
 import { formatApiError } from '../../lib/api-error';
+import { onSubmitShortcut } from '../../lib/submit-shortcut';
 import AiConsequence, { AiSparkle } from '../ai-suggestions/ai-consequence';
 import MarkdownEditor from '../tasks/markdown-editor';
 import {
@@ -155,7 +156,7 @@ export default function PageEditor({
 
   return (
     <div className={styles.editorContainer}>
-      <form className={styles.form} onSubmit={handleSubmit}>
+      <form className={styles.form} onSubmit={handleSubmit} onKeyDown={onSubmitShortcut}>
         {/* Title */}
         <FormField label={t('page_title_label')}>
           {(control) => (
@@ -212,6 +213,7 @@ export default function PageEditor({
 
         {/* Actions */}
         <div className={styles.formActions}>
+          <SubmitHint />
           {!isEditing && (
             <>
               <Tooltip content={t('ai_generate_hint')}>

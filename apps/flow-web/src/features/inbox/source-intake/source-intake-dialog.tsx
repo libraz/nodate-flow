@@ -10,9 +10,10 @@ import Textarea from '@nodate-flow/ui/primitives/textarea';
 import { Link } from '@tanstack/react-router';
 import { type FormEvent, type ReactElement, useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
+import SubmitHint from '../../../components/submit-hint';
 import { formatApiError } from '../../../lib/api-error';
 import { formatDateOnly } from '../../../lib/format';
+import { onSubmitShortcut } from '../../../lib/submit-shortcut';
 import { useWeekStart } from '../../../lib/use-week-start';
 import { useProjectsQuery } from '../../projects/api';
 import CopyButton from '../../settings/copy-button';
@@ -223,7 +224,11 @@ export default function SourceIntakeDialog({
 
   return (
     <Dialog open={open} onClose={handleClose} title={t('sourceIntake.title')} size="lg">
-      <form className={styles.form} onSubmit={(event) => void handleSubmit(event)}>
+      <form
+        className={styles.form}
+        onSubmit={(event) => void handleSubmit(event)}
+        onKeyDown={onSubmitShortcut}
+      >
         <div className={styles.bodyScroll}>
           <section className={styles.sourceSummary} aria-label={t('sourceIntake.source_details')}>
             <p className={styles.sourceTitle}>{item.sourceDetail?.title}</p>
@@ -442,6 +447,7 @@ export default function SourceIntakeDialog({
           ) : null}
         </div>
         <div className={styles.footer}>
+          <SubmitHint />
           <Button
             type="button"
             variant="ghost"

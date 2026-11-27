@@ -5,6 +5,9 @@
     "unknown_role": "Unknown role",
     "deactivated_user": "Deactivated user",
     "network_error": "Network error. Check your connection and try again.",
+    "submit_shortcut": {
+      "hint": "to send"
+    },
     "date": {
       "placeholder": "Select a date",
       "clear": "Clear",
@@ -822,7 +825,9 @@
       "updated": "Updated"
     },
     "card": {
-      "blockedBy": "{count, plural, one {Blocked by # task} other {Blocked by # tasks}}"
+      "blockedBy": "{count, plural, one {Blocked by # task} other {Blocked by # tasks}}",
+      "labels_more": "+{count}",
+      "labels_more_aria": "{count, plural, one {# more label} other {# more labels}}"
     },
     "form": {
       "title": "Title",
@@ -895,7 +900,16 @@
       "drop_hint": "Drop here to move",
       "moved_to": "Moved to {state}",
       "move_menu": "Move task",
-      "move_to": "Move to {state}"
+      "move_to": "Move to {state}",
+      "dnd": {
+        "instructions": "Press space to pick up the task, the left and right arrow keys to choose a column, space to drop, and escape to cancel.",
+        "lifted": "Picked up \"{title}\". Current state: {state}.",
+        "over": "\"{title}\" can move to {state}.",
+        "over_blocked": "\"{title}\" cannot move to {state}.",
+        "dropped": "\"{title}\" moved to {state}.",
+        "dropped_none": "\"{title}\" dropped. No change.",
+        "cancelled": "Move cancelled. \"{title}\" stays where it was."
+      }
     },
     "assignee": {
       "plus_n": "+{n, plural, one {# more} other {# more}}",
@@ -1033,6 +1047,7 @@
       },
       "transitions": {
         "title": "Change state",
+        "current": "Current state",
         "start": "Start",
         "block": "Block",
         "unblock": "Unblock",

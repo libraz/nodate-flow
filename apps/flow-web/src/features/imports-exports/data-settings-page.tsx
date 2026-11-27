@@ -44,10 +44,11 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { getRouteApi, Link } from '@tanstack/react-router';
 import { type ChangeEvent, type FormEvent, type ReactElement, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
 import PageHeader from '../../components/page-header';
+import SubmitHint from '../../components/submit-hint';
 import { ApiError, formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
+import { onSubmitShortcut } from '../../lib/submit-shortcut';
 import { type Project, useProjectsQuery } from '../projects/api';
 import ui from '../settings/settings-ui.module.css';
 import {
@@ -358,7 +359,7 @@ function ImportCreateForm({ workspaceId }: ImportCreateFormProps): ReactElement 
   const submitDisabled = create.isPending || configError !== null;
 
   return (
-    <form className={styles.createForm} onSubmit={handleSubmit}>
+    <form className={styles.createForm} onSubmit={handleSubmit} onKeyDown={onSubmitShortcut}>
       <div className={styles.createGrid}>
         <FormField
           label={t('settings.data.imports.create.source')}
@@ -433,6 +434,7 @@ function ImportCreateForm({ workspaceId }: ImportCreateFormProps): ReactElement 
         )}
       </FormField>
       <div className={styles.createActions}>
+        <SubmitHint />
         <Button
           type="submit"
           variant="primary"

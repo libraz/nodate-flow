@@ -16,8 +16,9 @@ import Textarea from '@nodate-flow/ui/primitives/textarea';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
+import SubmitHint from '../../components/submit-hint';
 import { formatApiError } from '../../lib/api-error';
+import { onSubmitShortcut } from '../../lib/submit-shortcut';
 import { useCreateTask } from './api';
 import { useTaskFormState } from './use-task-form-state';
 
@@ -91,6 +92,7 @@ export default function QuickCaptureDialog({
         }}
         noValidate
         style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-4)' }}
+        onKeyDown={onSubmitShortcut}
       >
         <FormField
           label={t('tasks.form.title')}
@@ -124,6 +126,7 @@ export default function QuickCaptureDialog({
         </FormField>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--nf-space-3)' }}>
+          <SubmitHint />
           <Button type="button" variant="ghost" onClick={handleClose} disabled={submitting}>
             {t('tasks.form.cancel')}
           </Button>

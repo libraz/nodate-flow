@@ -15,10 +15,12 @@ import { type FormEvent, type ReactElement, Suspense, useEffect, useRef, useStat
 import { ErrorBoundary } from 'react-error-boundary';
 import { useTranslation } from 'react-i18next';
 import PageHelp from '../../../components/page-help';
+import SubmitHint from '../../../components/submit-hint';
 import { formatApiError } from '../../../lib/api-error';
 import { confirmAction } from '../../../lib/confirm-action';
 import { endOfDayUnix } from '../../../lib/date-utils';
 import { formatDateOnly, formatEpoch, formatEpochDateTime } from '../../../lib/format';
+import { onSubmitShortcut } from '../../../lib/submit-shortcut';
 import { useEffectiveZone } from '../../../lib/use-effective-timezone';
 import { useWeekStart } from '../../../lib/use-week-start';
 import { type ConstraintOutcome, useEvaluateConstraints } from '../../constraints/api';
@@ -756,7 +758,14 @@ function TaskWorkflowPanelContent({
               ) : null}
 
               {showDecisionActions ? (
-                <div className={css.form}>
+                <form
+                  className={css.form}
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    if (rejecting) void handleDecision('reject');
+                  }}
+                  onKeyDown={onSubmitShortcut}
+                >
                   {rejecting ? (
                     <FormField
                       label={t('taskWorkflow.rejectionReason')}
@@ -779,6 +788,7 @@ function TaskWorkflowPanelContent({
                   {errorFor('decision')}
                   {rejecting ? (
                     <div className={css.actions}>
+                      <SubmitHint />
                       <Button
                         type="button"
                         variant="ghost"
@@ -788,13 +798,10 @@ function TaskWorkflowPanelContent({
                         {t('taskWorkflow.cancel')}
                       </Button>
                       <Button
-                        type="button"
+                        type="submit"
                         variant="danger"
                         disabled={decisionMutation.isPending || !decisionReason.trim()}
                         aria-busy={pendingDecision === 'reject' || undefined}
-                        onClick={() => {
-                          void handleDecision('reject');
-                        }}
                       >
                         {pendingDecision === 'reject'
                           ? t('taskWorkflow.saving')
@@ -826,7 +833,7 @@ function TaskWorkflowPanelContent({
                       </Button>
                     </div>
                   )}
-                </div>
+                </form>
               ) : null}
             </section>
           ) : null}
@@ -952,7 +959,11 @@ function TaskWorkflowPanelContent({
               {reviewerActors.length === 0 ? (
                 <p className={css.muted}>{t('taskWorkflow.assignReviewerFirst')}</p>
               ) : (
-                <form className={css.form} onSubmit={(event) => void handleSubmit(event)}>
+                <form
+                  className={css.form}
+                  onSubmit={(event) => void handleSubmit(event)}
+                  onKeyDown={onSubmitShortcut}
+                >
                   <p className={css.muted}>{t('taskWorkflow.submitStartsReview')}</p>
                   <FormField label={t('taskWorkflow.reviewer')} required>
                     {() => (
@@ -1025,6 +1036,7 @@ function TaskWorkflowPanelContent({
                   ) : null}
                   {errorFor('submit')}
                   <div className={css.actions}>
+                    <SubmitHint />
                     <Button
                       type="submit"
                       variant="primary"

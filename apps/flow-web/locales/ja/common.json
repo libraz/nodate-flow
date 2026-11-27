@@ -5,6 +5,9 @@
     "unknown_role": "不明な権限",
     "deactivated_user": "無効化されたユーザー",
     "network_error": "ネットワークエラーです。接続を確認してもう一度お試しください。",
+    "submit_shortcut": {
+      "hint": "で送信"
+    },
     "date": {
       "placeholder": "日付を選択",
       "clear": "クリア",
@@ -822,7 +825,9 @@
       "updated": "更新日"
     },
     "card": {
-      "blockedBy": "{count, plural, other {# 件のタスクにブロックされています}}"
+      "blockedBy": "{count, plural, other {# 件のタスクにブロックされています}}",
+      "labels_more": "+{count}",
+      "labels_more_aria": "ほか{count}件のラベル"
     },
     "form": {
       "title": "タイトル",
@@ -895,7 +900,16 @@
       "drop_hint": "ここにドロップして移動",
       "moved_to": "{state} に移動しました",
       "move_menu": "タスクを移動",
-      "move_to": "{state} に移動"
+      "move_to": "{state} に移動",
+      "dnd": {
+        "instructions": "スペースキーでタスクを持ち上げ、左右の矢印キーで列を選び、スペースキーで置きます。Escapeでキャンセルします。",
+        "lifted": "「{title}」を持ち上げました。現在の状態: {state}",
+        "over": "「{title}」を「{state}」に移動できます",
+        "over_blocked": "「{title}」は「{state}」へ移動できません",
+        "dropped": "「{title}」を「{state}」に移動しました",
+        "dropped_none": "「{title}」を置きました。変更はありません",
+        "cancelled": "移動をキャンセルしました。「{title}」は元の位置に戻りました"
+      }
     },
     "assignee": {
       "plus_n": "+他{n}件",
@@ -1033,6 +1047,7 @@
       },
       "transitions": {
         "title": "状態を変更",
+        "current": "現在の状態",
         "start": "開始",
         "block": "ブロック",
         "unblock": "ブロック解除",

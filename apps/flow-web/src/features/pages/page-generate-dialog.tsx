@@ -17,8 +17,9 @@ import Textarea from '@nodate-flow/ui/primitives/textarea';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type FormEvent, type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
+import SubmitHint from '../../components/submit-hint';
 import { formatApiError } from '../../lib/api-error';
+import { onSubmitShortcut } from '../../lib/submit-shortcut';
 import { AiSparkle } from '../ai-suggestions/ai-consequence';
 import { type PageItem, useGeneratePage } from './api';
 import styles from './pages.module.css';
@@ -101,7 +102,7 @@ export default function PageGenerateDialog({
 
   return (
     <Dialog open={open} onClose={handleClose} title={t('generate.dialog_title')} size="lg">
-      <form onSubmit={handleSubmit} className={styles.generateForm}>
+      <form onSubmit={handleSubmit} className={styles.generateForm} onKeyDown={onSubmitShortcut}>
         <div className={styles.generateContext}>
           <span className={styles.generateContextLabel}>{t('generate.context_label')}</span>
           <span className={styles.generateContextValue}>{title}</span>
@@ -124,6 +125,7 @@ export default function PageGenerateDialog({
         <p className={styles.generateHelp}>{t('generate.prompt_help')}</p>
 
         <div className={styles.generateActions}>
+          <SubmitHint />
           <Button
             type="button"
             variant="ghost"

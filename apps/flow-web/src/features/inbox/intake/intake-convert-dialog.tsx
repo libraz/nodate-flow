@@ -32,9 +32,10 @@ import {
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-
+import SubmitHint from '../../../components/submit-hint';
 import { formatApiError } from '../../../lib/api-error';
 import { formatDate } from '../../../lib/format';
+import { onSubmitShortcut } from '../../../lib/submit-shortcut';
 import { useWeekStart } from '../../../lib/use-week-start';
 import { useProjectsQuery } from '../../projects/api';
 import { useWorkspaceMembersQuery } from '../../workspaces/api';
@@ -165,6 +166,7 @@ export default function IntakeConvertDialog({
       <form
         onSubmit={handleSubmit}
         style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-4)' }}
+        onKeyDown={onSubmitShortcut}
       >
         <FormField
           label={t('sourceIntake.task_title')}
@@ -250,6 +252,7 @@ export default function IntakeConvertDialog({
           )}
         </FormField>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--nf-space-2)' }}>
+          <SubmitHint />
           <Button type="button" variant="ghost" size="sm" onClick={onClose}>
             {t('intake.convert.cancel')}
           </Button>

@@ -25,9 +25,10 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { useNavigate } from '@tanstack/react-router';
 import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
 import PageHeader from '../../components/page-header';
+import SubmitHint from '../../components/submit-hint';
 import { formatApiError } from '../../lib/api-error';
+import { onSubmitShortcut } from '../../lib/submit-shortcut';
 import { clearActiveWorkspaceId } from '../../lib/use-current-workspace';
 import { isWorkspaceAdmin, useCurrentWorkspaceRole } from '../../lib/use-current-workspace-role';
 import SaveStatus, { useSaveStatus } from '../settings/save-status';
@@ -366,6 +367,7 @@ export default function WorkspaceSettingsForm({
         }}
         className={ui.section}
         noValidate
+        onKeyDown={onSubmitShortcut}
       >
         {showReadOnlyNote ? (
           <p className={ui.sectionDescription}>{t('workspace.general.read_only_note')}</p>
@@ -442,6 +444,7 @@ export default function WorkspaceSettingsForm({
 
         {canEdit ? (
           <div className={ui.actions}>
+            <SubmitHint />
             <SaveStatus saved={saveStatus.saved} dirty={dirty} />
             <Button
               type="submit"

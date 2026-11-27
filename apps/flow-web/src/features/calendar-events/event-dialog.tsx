@@ -47,7 +47,6 @@ import {
 } from 'lucide-react';
 import {
   type FormEvent,
-  type KeyboardEvent,
   type ReactElement,
   useEffect,
   useId,
@@ -56,6 +55,7 @@ import {
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
+import SubmitHint from '../../components/submit-hint';
 import { ApiError, formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import {
@@ -67,6 +67,7 @@ import {
   wallClockToUnix,
 } from '../../lib/date-utils';
 import { formatDate } from '../../lib/format';
+import { onSubmitShortcut } from '../../lib/submit-shortcut';
 import { useWeekStart } from '../../lib/use-week-start';
 import { selectUser, useAuth } from '../auth/auth-store';
 import { calendarLabelKeys } from '../calendars/labels-api';
@@ -1335,13 +1336,6 @@ export default function EventDialog({
     }
   }
 
-  function handleKeyDown(e: KeyboardEvent<HTMLFormElement>): void {
-    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-      e.preventDefault();
-      void handleSubmit(null);
-    }
-  }
-
   /** Any control moved since the dialog opened — gates discard-confirm. */
   function isDirty(): boolean {
     return dirtyFieldsRef.current.size > 0;
@@ -1385,7 +1379,7 @@ export default function EventDialog({
         title={headerTitle}
         size="lg"
       >
-        <form onSubmit={handleSubmit} onKeyDown={handleKeyDown} className={styles.body}>
+        <form onSubmit={handleSubmit} onKeyDown={onSubmitShortcut} className={styles.body}>
           <div className={styles.bodyScroll}>
             <SegmentedControl
               ariaLabel={t('a11y.kind_picker')}
@@ -1934,6 +1928,7 @@ export default function EventDialog({
               </p>
             ) : null}
             <div className={styles.footerActions}>
+              <SubmitHint />
               {/* Stays live while a write runs — see {@link handleClose}. */}
               <Button
                 type="button"

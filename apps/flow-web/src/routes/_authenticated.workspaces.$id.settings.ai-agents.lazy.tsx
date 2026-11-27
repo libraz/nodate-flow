@@ -28,6 +28,7 @@ import { createLazyFileRoute, getRouteApi, Link } from '@tanstack/react-router';
 import { type FormEvent, type ReactElement, Suspense, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import PageHeader from '../components/page-header';
+import SubmitHint from '../components/submit-hint';
 import {
   AGENT_SCHEDULE_KINDS,
   type AgentScheduleKind,
@@ -42,6 +43,7 @@ import {
 import SaveStatus, { useSaveStatus } from '../features/settings/save-status';
 import ui from '../features/settings/settings-ui.module.css';
 import { formatApiError } from '../lib/api-error';
+import { onSubmitShortcut } from '../lib/submit-shortcut';
 import styles from './_authenticated.workspaces.$id.settings.ai-agents.module.css';
 
 const routeApi = getRouteApi('/_authenticated/workspaces/$id/settings/ai-agents');
@@ -404,6 +406,7 @@ function CreateAgentForm({
       onSubmit={(e) => {
         void handleSubmit(e);
       }}
+      onKeyDown={onSubmitShortcut}
     >
       <h2 id="agent-create-title" className={ui.sectionTitle}>
         {t('agents.create.title')}
@@ -518,6 +521,7 @@ function CreateAgentForm({
         </FormField>
       ) : null}
       <div className={ui.actions}>
+        <SubmitHint />
         <Button type="button" variant="ghost" onClick={onDone}>
           {t('agents.create.cancel')}
         </Button>

@@ -19,10 +19,11 @@ import Textarea from '@nodate-flow/ui/primitives/textarea';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
+import SubmitHint from '../../components/submit-hint';
 import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import { CALENDAR_EVENT_PALETTE } from '../../lib/source-colors';
+import { onSubmitShortcut } from '../../lib/submit-shortcut';
 import {
   useCalendarEventCountQuery,
   useCalendarQuery,
@@ -128,6 +129,7 @@ export default function GeneralTab({
     <form
       onSubmit={handleSave}
       style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-3)' }}
+      onKeyDown={onSubmitShortcut}
     >
       <FormField label={t('calendar.settings.general.name_label')} required>
         {(control) => (
@@ -182,6 +184,7 @@ export default function GeneralTab({
       </FormField>
 
       <div className={styles.actions}>
+        <SubmitHint />
         <Button
           type="submit"
           variant="primary"
