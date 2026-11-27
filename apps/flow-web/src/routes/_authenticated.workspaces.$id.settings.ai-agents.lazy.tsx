@@ -27,8 +27,8 @@ import Tooltip from '@nodate-flow/ui/primitives/tooltip';
 import { createLazyFileRoute, getRouteApi, Link } from '@tanstack/react-router';
 import { type FormEvent, type ReactElement, Suspense, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import FormActions from '../components/form-actions';
 import PageHeader from '../components/page-header';
-import SubmitHint from '../components/submit-hint';
 import {
   AGENT_SCHEDULE_KINDS,
   type AgentScheduleKind,
@@ -520,8 +520,7 @@ function CreateAgentForm({
           )}
         </FormField>
       ) : null}
-      <div className={ui.actions}>
-        <SubmitHint />
+      <FormActions hint={{ disabled: createMut.isPending }}>
         <Button type="button" variant="ghost" onClick={onDone}>
           {t('agents.create.cancel')}
         </Button>
@@ -533,7 +532,7 @@ function CreateAgentForm({
         >
           {t('agents.create.submit')}
         </Button>
-      </div>
+      </FormActions>
     </form>
   );
 }

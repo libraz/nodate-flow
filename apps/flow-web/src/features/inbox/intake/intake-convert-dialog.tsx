@@ -32,7 +32,7 @@ import {
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-import SubmitHint from '../../../components/submit-hint';
+import FormActions from '../../../components/form-actions';
 import { formatApiError } from '../../../lib/api-error';
 import { formatDate } from '../../../lib/format';
 import { onSubmitShortcut } from '../../../lib/submit-shortcut';
@@ -251,8 +251,7 @@ export default function IntakeConvertDialog({
             />
           )}
         </FormField>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--nf-space-2)' }}>
-          <SubmitHint />
+        <FormActions hint={{ disabled: convert.isPending || projects.length === 0 }}>
           <Button type="button" variant="ghost" size="sm" onClick={onClose}>
             {t('intake.convert.cancel')}
           </Button>
@@ -264,7 +263,7 @@ export default function IntakeConvertDialog({
           >
             {t('intake.convert.submit')}
           </Button>
-        </div>
+        </FormActions>
         {projects.length === 0 ? (
           <p
             style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: 'var(--nf-text-xs)' }}

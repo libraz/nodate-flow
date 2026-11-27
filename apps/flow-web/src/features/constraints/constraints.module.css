@@ -113,12 +113,6 @@
   white-space: nowrap;
 }
 
-.editorActions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--nf-space-2);
-}
-
 .subheading {
   margin: 0 0 var(--nf-space-1-5);
   font-size: var(--nf-text-sm);

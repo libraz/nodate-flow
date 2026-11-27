@@ -322,12 +322,6 @@
   gap: var(--nf-space-4);
 }
 
-.formActions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--nf-space-3);
-}
-
 .formActionsSpacer {
   flex: 1;
 }
@@ -371,12 +365,6 @@
   font-size: var(--nf-text-xs);
   color: var(--nf-color-fg-muted);
   margin: 0;
-}
-
-.generateActions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--nf-space-2);
 }
 
 /* ---------------------------------------------------------------------------

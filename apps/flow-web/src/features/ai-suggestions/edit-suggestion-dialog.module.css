@@ -13,9 +13,3 @@
   font-size: var(--nf-text-sm);
   color: var(--nf-color-fg-muted);
 }
-
-.actions {
-  display: flex;
-  gap: var(--nf-space-2);
-  justify-content: flex-end;
-}

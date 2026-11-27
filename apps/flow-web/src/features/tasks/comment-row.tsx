@@ -22,7 +22,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { MoreHorizontal } from 'lucide-react';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import SubmitHint from '../../components/submit-hint';
+import FormActions from '../../components/form-actions';
 import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import { formatEpochDateTime } from '../../lib/format';
@@ -212,15 +212,14 @@ export default function CommentRow({
             aria-label={t('tasks.comments.edit')}
             placeholder={t('tasks.comments.edit_placeholder')}
           />
-          <div className={styles.editorActions}>
-            <SubmitHint />
+          <FormActions hint={{ disabled: saveDisabled }}>
             <Button type="button" variant="ghost" onClick={cancelEdit}>
               {t('tasks.comments.cancel')}
             </Button>
             <Button type="submit" disabled={saveDisabled}>
               {t('tasks.comments.save')}
             </Button>
-          </div>
+          </FormActions>
         </form>
       ) : (
         <Markdown>{comment.body}</Markdown>

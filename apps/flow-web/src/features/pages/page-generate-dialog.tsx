@@ -17,7 +17,7 @@ import Textarea from '@nodate-flow/ui/primitives/textarea';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type FormEvent, type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import SubmitHint from '../../components/submit-hint';
+import FormActions from '../../components/form-actions';
 import { formatApiError } from '../../lib/api-error';
 import { onSubmitShortcut } from '../../lib/submit-shortcut';
 import { AiSparkle } from '../ai-suggestions/ai-consequence';
@@ -124,8 +124,7 @@ export default function PageGenerateDialog({
 
         <p className={styles.generateHelp}>{t('generate.prompt_help')}</p>
 
-        <div className={styles.generateActions}>
-          <SubmitHint />
+        <FormActions hint={{ disabled: submitDisabled }}>
           <Button
             type="button"
             variant="ghost"
@@ -145,7 +144,7 @@ export default function PageGenerateDialog({
             <AiSparkle kind="applies" />
             {t('generate.submit_creates')}
           </Button>
-        </div>
+        </FormActions>
       </form>
     </Dialog>
   );

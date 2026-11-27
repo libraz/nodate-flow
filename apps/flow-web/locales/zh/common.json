@@ -6,7 +6,7 @@
     "deactivated_user": "已停用的用户",
     "network_error": "网络错误。请检查您的连接并重试。",
     "submit_shortcut": {
-      "hint": "发送"
+      "hint": "提交"
     },
     "date": {
       "placeholder": "请选择日期",
@@ -1010,11 +1010,9 @@
         "blocks": "阻塞",
         "blockedBy": "被阻塞于",
         "relates": "相关",
-        "parent": "父任务",
-        "subtasks": "子任务",
         "duplicateOf": "重复于",
         "duplicatedBy": "被…重复",
-        "empty": "还没有依赖关系。添加后可表示阻塞此任务的任务、被此任务阻塞的任务，以及父任务、子任务或重复任务。",
+        "empty": "还没有依赖关系。添加后可表示阻塞此任务的任务、被此任务阻塞的任务，以及重复任务。",
         "add": "添加依赖",
         "addCancel": "取消",
         "remove": "移除",
@@ -1024,7 +1022,6 @@
           "blocks": "阻塞",
           "blockedBy": "被阻塞于",
           "relates": "相关",
-          "subtask_of": "子任务于",
           "duplicates": "重复于"
         },
         "search": "搜索任务…",
@@ -1033,7 +1030,27 @@
         "addError": "添加依赖失败。",
         "removeError": "移除依赖失败。",
         "removed": "已移除与“{title}”的依赖关系。",
-        "kindHint": "请这样理解：此任务 [阻塞／关联／是其子任务／与其重复] 你所选的任务。"
+        "kindHint": "请这样理解：此任务 [阻塞／关联／与其重复] 你所选的任务。"
+      },
+      "parent_label": "父任务",
+      "subtasks": {
+        "title": "子任务",
+        "count": "{done}/{total}",
+        "progress_aria": "子任务进度：共 {total} 项，已完成 {done} 项",
+        "add": "添加子任务",
+        "input_label": "子任务名称",
+        "placeholder": "输入子任务名称后按 Enter",
+        "hint": "Enter 添加 · Esc 关闭",
+        "creating": "正在添加…",
+        "add_error": "无法添加子任务。",
+        "add_existing": "添加已有任务",
+        "existing_placeholder": "搜索要添加的任务…",
+        "existing_hint": "在此项目内按任务标题搜索。",
+        "existing_empty": "没有匹配的任务。",
+        "detach": "移出子任务",
+        "detach_named": "将“{title}”移出子任务",
+        "detach_error": "无法移出子任务。",
+        "attach_error": "无法将该任务设为子任务。"
       },
       "infer_state": {
         "title": "建议的下一步",
@@ -1048,6 +1065,7 @@
       "transitions": {
         "title": "更改状态",
         "current": "当前状态",
+        "pending": "正在更改状态…",
         "start": "开始",
         "block": "阻塞",
         "unblock": "解除阻塞",
@@ -1363,7 +1381,8 @@
     "go_settings": "前往设置",
     "show_help": "显示快捷键",
     "chord_hint": "按键需依次按下：先按 G，再按第二个键。",
-    "command_palette": "打开命令面板"
+    "command_palette": "打开命令面板",
+    "submit_form": "提交表单"
   },
   "timeboxes": {
     "title": "冲刺",

@@ -11,7 +11,7 @@ import Textarea from '@nodate-flow/ui/primitives/textarea';
 import { type FormEvent, type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
-import SubmitHint from '../../components/submit-hint';
+import FormActions from '../../components/form-actions';
 import { onSubmitShortcut } from '../../lib/submit-shortcut';
 
 import styles from './edit-suggestion-dialog.module.css';
@@ -103,15 +103,14 @@ export default function EditSuggestionDialog({
             />
           )}
         </FormField>
-        <div className={styles.actions}>
-          <SubmitHint />
+        <FormActions hint={{ disabled: saving }}>
           <Button type="button" variant="ghost" size="sm" onClick={onClose} disabled={saving}>
             {t('edit.cancel')}
           </Button>
           <Button type="submit" variant="primary" size="sm" disabled={saving}>
             {saving ? t('edit.saving') : t('edit.save')}
           </Button>
-        </div>
+        </FormActions>
       </form>
     </Dialog>
   );

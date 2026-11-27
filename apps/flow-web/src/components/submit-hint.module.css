@@ -1,10 +1,15 @@
 .hint {
   display: inline-flex;
-  align-self: center;
+  flex-shrink: 0;
   align-items: baseline;
   gap: var(--nf-space-1-5);
   font-size: var(--nf-text-xs);
   color: var(--nf-color-fg-muted);
+  white-space: nowrap;
+}
+
+.hint[data-disabled] {
+  opacity: var(--nf-opacity-disabled);
 }
 
 .keys {
@@ -14,7 +19,6 @@
 
 .kbd {
   composes: kbd from "./kbd.module.css";
-  background: var(--nf-color-bg-sunken);
 }
 
 /* No hardware keyboard to press the chord on. */

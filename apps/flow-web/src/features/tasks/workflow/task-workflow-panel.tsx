@@ -14,8 +14,8 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 import { type FormEvent, type ReactElement, Suspense, useEffect, useRef, useState } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { useTranslation } from 'react-i18next';
+import FormActions from '../../../components/form-actions';
 import PageHelp from '../../../components/page-help';
-import SubmitHint from '../../../components/submit-hint';
 import { formatApiError } from '../../../lib/api-error';
 import { confirmAction } from '../../../lib/confirm-action';
 import { endOfDayUnix } from '../../../lib/date-utils';
@@ -787,8 +787,9 @@ function TaskWorkflowPanelContent({
                   ) : null}
                   {errorFor('decision')}
                   {rejecting ? (
-                    <div className={css.actions}>
-                      <SubmitHint />
+                    <FormActions
+                      hint={{ disabled: decisionMutation.isPending || !decisionReason.trim() }}
+                    >
                       <Button
                         type="button"
                         variant="ghost"
@@ -807,7 +808,7 @@ function TaskWorkflowPanelContent({
                           ? t('taskWorkflow.saving')
                           : t('taskWorkflow.rejectSubmission')}
                       </Button>
-                    </div>
+                    </FormActions>
                   ) : (
                     <div className={css.actions}>
                       <Button
@@ -1035,8 +1036,9 @@ function TaskWorkflowPanelContent({
                     </fieldset>
                   ) : null}
                   {errorFor('submit')}
-                  <div className={css.actions}>
-                    <SubmitHint />
+                  <FormActions
+                    hint={{ disabled: !canSubmitCurrent || submissionMutation.isPending }}
+                  >
                     <Button
                       type="submit"
                       variant="primary"
@@ -1047,7 +1049,7 @@ function TaskWorkflowPanelContent({
                         ? t('taskWorkflow.submitting')
                         : t(submission ? 'taskWorkflow.resubmitWork' : 'taskWorkflow.submitWork')}
                     </Button>
-                  </div>
+                  </FormActions>
                 </form>
               )}
             </section>

@@ -55,7 +55,7 @@ import {
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-import SubmitHint from '../../components/submit-hint';
+import FormActions from '../../components/form-actions';
 import { ApiError, formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import {
@@ -1927,8 +1927,7 @@ export default function EventDialog({
                 {t('action.submit.slow')}
               </p>
             ) : null}
-            <div className={styles.footerActions}>
-              <SubmitHint />
+            <FormActions hint={{ disabled: isPending }} className={styles.footerActions}>
               {/* Stays live while a write runs — see {@link handleClose}. */}
               <Button
                 type="button"
@@ -1947,7 +1946,7 @@ export default function EventDialog({
               >
                 {t(isCreate ? 'action.submit.create' : 'action.submit.edit')}
               </Button>
-            </div>
+            </FormActions>
           </div>
         </form>
       </Dialog>

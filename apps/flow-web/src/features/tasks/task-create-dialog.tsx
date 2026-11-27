@@ -21,7 +21,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type FormEvent, type ReactElement, Suspense, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
-import SubmitHint from '../../components/submit-hint';
+import FormActions from '../../components/form-actions';
 import { formatApiError } from '../../lib/api-error';
 import { formatDate } from '../../lib/format';
 import { onSubmitShortcut } from '../../lib/submit-shortcut';
@@ -394,8 +394,7 @@ export default function TaskCreateDialog({
           />
         )}
 
-        <div className={styles.actions}>
-          <SubmitHint />
+        <FormActions hint={{ disabled: submitting || title.trim().length === 0 }}>
           <Button type="button" variant="ghost" onClick={handleClose} disabled={submitting}>
             {t('tasks.form.cancel')}
           </Button>
@@ -410,7 +409,7 @@ export default function TaskCreateDialog({
           >
             {t('tasks.form.submit')}
           </Button>
-        </div>
+        </FormActions>
       </form>
     </Dialog>
   );

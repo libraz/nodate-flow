@@ -19,6 +19,11 @@ describe('<ShortcutsHelpDialog>', () => {
 
     // Each binding should render its key sequence as <kbd> elements.
     for (const binding of SHORTCUT_BINDINGS) {
+      // The submit chord is labelled per platform (⌘↵ / Ctrl+↵).
+      if (binding.keys === 'mod+enter') {
+        expect(screen.getAllByText(/^(⌘↵|Ctrl\+↵)$/).some((el) => el.tagName === 'KBD')).toBe(true);
+        continue;
+      }
       const keys = binding.keys.split(' ');
       for (const key of keys) {
         // There should be at least one <kbd> containing this key text.

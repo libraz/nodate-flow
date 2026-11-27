@@ -15,8 +15,8 @@ import Textarea from '@nodate-flow/ui/primitives/textarea';
 import { AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
 import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import FormActions from '../../components/form-actions';
 import PageHelp from '../../components/page-help';
-import SubmitHint from '../../components/submit-hint';
 import { confirmAction } from '../../lib/confirm-action';
 import { onSubmitShortcut } from '../../lib/submit-shortcut';
 import { AiSparkle } from '../ai-suggestions/ai-consequence';
@@ -203,8 +203,7 @@ export default function ConstraintEditor({ taskId }: ConstraintEditorProps): Rea
             )}
           </FormField>
         </details>
-        <div className={styles.editorActions}>
-          <SubmitHint />
+        <FormActions hint={{ disabled: addMut.isPending || !expression.trim() }}>
           <Button type="submit" disabled={addMut.isPending || !expression.trim()}>
             {t('editor.add')}
           </Button>
@@ -225,7 +224,7 @@ export default function ConstraintEditor({ taskId }: ConstraintEditorProps): Rea
             <AiSparkle kind="suggests" />
             {t('editor.explain')}
           </Button>
-        </div>
+        </FormActions>
       </form>
 
       {explanation ? (

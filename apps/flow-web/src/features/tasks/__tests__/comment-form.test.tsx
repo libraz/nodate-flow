@@ -46,9 +46,10 @@ describe('<CommentForm> shortcut', () => {
     expect((box as HTMLTextAreaElement).value).toContain('\n');
   });
 
-  it('shows the shortcut hint next to the submit button', () => {
+  it('shows the shortcut hint, dimmed while the submit button is disabled', () => {
     renderWithProviders(<CommentForm taskId="t1" workspaceId="ws1" />);
-    expect(screen.getByText('common.submit_shortcut.hint')).toBeTruthy();
-    expect(screen.getByText('Enter')).toBeTruthy();
+    const hint = screen.getByText('common.submit_shortcut.hint');
+    expect(hint.hasAttribute('data-disabled')).toBe(true);
+    expect(screen.getByText('↵')).toBeTruthy();
   });
 });

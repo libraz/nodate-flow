@@ -32,12 +32,15 @@ export function onSubmitShortcut(event: KeyboardEvent<HTMLFormElement>): void {
   form.requestSubmit(button);
 }
 
-/** True on Apple platforms, where the chord is Cmd rather than Ctrl. */
+/** True on Apple platforms, where the modifier is Cmd rather than Ctrl. */
 export function isApplePlatform(): boolean {
-  return typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
+  if (typeof navigator === 'undefined') return false;
+  const nav = navigator as Navigator & { userAgentData?: { platform?: string } };
+  const platform = nav.userAgentData?.platform ?? nav.platform ?? '';
+  return /mac|iphone|ipad|ipod/i.test(platform);
 }
 
 /** Keycap labels for the chord, matching {@link isApplePlatform}. */
 export function submitShortcutKeys(): readonly string[] {
-  return isApplePlatform() ? ['⌘', 'Enter'] : ['Ctrl', 'Enter'];
+  return [isApplePlatform() ? '⌘' : 'Ctrl', '↵'];
 }

@@ -9,6 +9,7 @@ import Dialog from '@nodate-flow/ui/primitives/dialog';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { isApplePlatform } from '../lib/submit-shortcut';
 import { SHORTCUT_BINDINGS } from '../lib/use-keyboard-shortcuts';
 import { paletteShortcutLabel } from './layout/palette-shortcut';
 import styles from './shortcuts-help-dialog.module.css';
@@ -22,6 +23,10 @@ interface ShortcutRow {
   /** Space-separated keys pressed in sequence; a single entry is one key or combination. */
   keys: string[];
   label: string;
+}
+
+function submitChordLabel(): string {
+  return isApplePlatform() ? '⌘↵' : 'Ctrl+↵';
 }
 
 function KeySequence({ keys }: { keys: string[] }): ReactElement {
@@ -51,7 +56,9 @@ export default function ShortcutsHelpDialog({
   const sections = new Map<string, ShortcutRow[]>();
   for (const b of SHORTCUT_BINDINGS) {
     const existing = sections.get(b.sectionKey) ?? [];
-    existing.push({ keys: b.keys.split(' '), label: t(b.labelKey) });
+    // `mod+enter` is the form-submit chord, labelled per platform like the palette's.
+    const keys = b.keys === 'mod+enter' ? [submitChordLabel()] : b.keys.split(' ');
+    existing.push({ keys, label: t(b.labelKey) });
     sections.set(b.sectionKey, existing);
   }
   // The palette shortcut is bound by the top bar, not the global key handler.

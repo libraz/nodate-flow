@@ -1,0 +1,12 @@
+.root {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--nf-space-2);
+}
+
+/* Stays at the start of the row, including when the buttons wrap below it. */
+.hint {
+  margin-inline-end: auto;
+}

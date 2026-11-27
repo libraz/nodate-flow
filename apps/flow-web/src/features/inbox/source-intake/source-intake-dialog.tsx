@@ -10,7 +10,7 @@ import Textarea from '@nodate-flow/ui/primitives/textarea';
 import { Link } from '@tanstack/react-router';
 import { type FormEvent, type ReactElement, useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import SubmitHint from '../../../components/submit-hint';
+import FormActions from '../../../components/form-actions';
 import { formatApiError } from '../../../lib/api-error';
 import { formatDateOnly } from '../../../lib/format';
 import { onSubmitShortcut } from '../../../lib/submit-shortcut';
@@ -446,8 +446,13 @@ export default function SourceIntakeDialog({
             </div>
           ) : null}
         </div>
-        <div className={styles.footer}>
-          <SubmitHint />
+        <FormActions
+          hint={
+            !completedTaskId
+              ? { disabled: submitting || (destination === 'existing' && !existingTaskId) }
+              : false
+          }
+        >
           <Button
             type="button"
             variant="ghost"
@@ -474,7 +479,7 @@ export default function SourceIntakeDialog({
                   : t('sourceIntake.create_task')}
             </Button>
           ) : null}
-        </div>
+        </FormActions>
       </form>
     </Dialog>
   );

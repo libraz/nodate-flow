@@ -275,13 +275,6 @@
   padding-block-start: var(--nf-space-3);
 }
 
-.addRowControls {
-  display: flex;
-  align-items: center;
-  gap: var(--nf-space-2);
-  justify-content: flex-end;
-}
-
 .checklistRow {
   display: flex;
   align-items: center;

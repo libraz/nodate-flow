@@ -11,7 +11,7 @@ import FormField from '@nodate-flow/ui/primitives/form-field';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import SubmitHint from '../../components/submit-hint';
+import FormActions from '../../components/form-actions';
 import { formatApiError } from '../../lib/api-error';
 import { onSubmitShortcut } from '../../lib/submit-shortcut';
 import { useAddTaskComment } from './api';
@@ -66,19 +66,11 @@ export default function CommentForm({ taskId, workspaceId }: CommentFormProps): 
           />
         )}
       </FormField>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'baseline',
-          justifyContent: 'flex-end',
-          gap: 'var(--nf-space-3)',
-        }}
-      >
-        <SubmitHint />
+      <FormActions hint={{ disabled: body.trim().length === 0 || add.isPending }}>
         <Button type="submit" disabled={body.trim().length === 0 || add.isPending}>
           {t('tasks.comments.add')}
         </Button>
-      </div>
+      </FormActions>
     </form>
   );
 }

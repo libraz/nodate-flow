@@ -6,7 +6,7 @@
     "deactivated_user": "Deactivated user",
     "network_error": "Network error. Check your connection and try again.",
     "submit_shortcut": {
-      "hint": "to send"
+      "hint": "to submit"
     },
     "date": {
       "placeholder": "Select a date",
@@ -1010,11 +1010,9 @@
         "blocks": "Blocks",
         "blockedBy": "Blocked by",
         "relates": "Relates to",
-        "parent": "Parent task",
-        "subtasks": "Subtasks",
         "duplicateOf": "Duplicate of",
         "duplicatedBy": "Duplicated by",
-        "empty": "No dependencies yet. Add one to show what blocks this task, what it blocks, or which tasks are its parent, subtasks or duplicates.",
+        "empty": "No dependencies yet. Add one to show what blocks this task, what it blocks, or which tasks are its duplicates.",
         "add": "Add dependency",
         "addCancel": "Cancel",
         "remove": "Remove",
@@ -1024,7 +1022,6 @@
           "blocks": "Blocks",
           "blockedBy": "Blocked by",
           "relates": "Relates to",
-          "subtask_of": "Subtask of",
           "duplicates": "Duplicates"
         },
         "search": "Search tasks…",
@@ -1033,7 +1030,27 @@
         "addError": "Failed to add dependency.",
         "removeError": "Failed to remove dependency.",
         "removed": "Removed dependency on \"{title}\".",
-        "kindHint": "Read it as: this task [Blocks / Relates to / Is a subtask of / Duplicates] the task you pick."
+        "kindHint": "Read it as: this task [Blocks / Relates to / Duplicates] the task you pick."
+      },
+      "parent_label": "Parent task",
+      "subtasks": {
+        "title": "Subtasks",
+        "count": "{done}/{total}",
+        "progress_aria": "Subtask progress: {done} of {total} done",
+        "add": "Add subtask",
+        "input_label": "Subtask name",
+        "placeholder": "Type a subtask name and press Enter",
+        "hint": "Enter to add · Esc to close",
+        "creating": "Adding…",
+        "add_error": "Could not add the subtask.",
+        "add_existing": "Add existing task",
+        "existing_placeholder": "Search for a task to add…",
+        "existing_hint": "Search by task title within this project.",
+        "existing_empty": "No matching tasks.",
+        "detach": "Remove from subtasks",
+        "detach_named": "Remove “{title}” from subtasks",
+        "detach_error": "Could not remove the subtask.",
+        "attach_error": "Could not make the task a subtask."
       },
       "infer_state": {
         "title": "Suggested next step",
@@ -1048,6 +1065,7 @@
       "transitions": {
         "title": "Change state",
         "current": "Current state",
+        "pending": "Changing state…",
         "start": "Start",
         "block": "Block",
         "unblock": "Unblock",
@@ -1363,7 +1381,8 @@
     "go_settings": "Go to Settings",
     "show_help": "Show shortcuts",
     "chord_hint": "Press the keys one after another: G, then the second key.",
-    "command_palette": "Open the command palette"
+    "command_palette": "Open the command palette",
+    "submit_form": "Submit form"
   },
   "timeboxes": {
     "title": "Sprints",

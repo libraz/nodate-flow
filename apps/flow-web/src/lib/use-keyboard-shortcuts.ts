@@ -50,6 +50,7 @@ export const SHORTCUT_BINDINGS: ShortcutBinding[] = [
   { keys: 'g w', labelKey: 'shortcuts.go_workspaces', sectionKey: 'shortcuts.section_navigation' },
   { keys: 'g s', labelKey: 'shortcuts.go_settings', sectionKey: 'shortcuts.section_navigation' },
   { keys: '?', labelKey: 'shortcuts.show_help', sectionKey: 'shortcuts.section_general' },
+  { keys: 'mod+enter', labelKey: 'shortcuts.submit_form', sectionKey: 'shortcuts.section_general' },
 ];
 
 export interface UseKeyboardShortcutsOptions {

@@ -34,8 +34,8 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import FormActions from '../../components/form-actions';
 
-import SubmitHint from '../../components/submit-hint';
 import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import { formatEpochDateTime } from '../../lib/format';
@@ -184,15 +184,14 @@ function EventCommentRow({
             autoFocus
             aria-label={t('event.comments.edit')}
           />
-          <div className={styles.addRowControls}>
-            <SubmitHint />
+          <FormActions hint={{ disabled: saveDisabled }}>
             <Button type="button" variant="ghost" size="sm" onClick={cancelEdit}>
               {t('event.comments.edit_cancel')}
             </Button>
             <Button type="submit" size="sm" disabled={saveDisabled}>
               {t('event.comments.edit_save')}
             </Button>
-          </div>
+          </FormActions>
         </form>
       ) : (
         <div className={styles.commentBody}>
@@ -301,12 +300,11 @@ export default function CommentsTab({
           aria-label={t('event.comments.add')}
           placeholder={t('event.comments.add_placeholder')}
         />
-        <div className={styles.addRowControls}>
-          <SubmitHint />
+        <FormActions hint={{ disabled: !canSubmit }}>
           <Button type="submit" disabled={!canSubmit}>
             {t('event.comments.add')}
           </Button>
-        </div>
+        </FormActions>
       </form>
     </div>
   );

@@ -55,8 +55,8 @@ import {
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
+import FormActions from '../../components/form-actions';
 import PageHeader from '../../components/page-header';
-import SubmitHint from '../../components/submit-hint';
 import { ApiError, formatApiError, isNetworkError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import { onSubmitShortcut } from '../../lib/submit-shortcut';
@@ -486,8 +486,7 @@ function CreateWebhookDialog({ workspaceId, open, onClose }: CreateDialogProps):
               />
             )}
           </FormField>
-          <div className={styles.dialogActions}>
-            <SubmitHint />
+          <FormActions hint={{ disabled: submitDisabled }}>
             <Button type="button" variant="ghost" onClick={handleClose}>
               {t('settings.webhooks.create.cancel')}
             </Button>
@@ -499,7 +498,7 @@ function CreateWebhookDialog({ workspaceId, open, onClose }: CreateDialogProps):
             >
               {t('settings.webhooks.create.submit')}
             </Button>
-          </div>
+          </FormActions>
         </form>
       ) : (
         <div className={styles.dialogForm}>

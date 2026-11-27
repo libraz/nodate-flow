@@ -19,7 +19,7 @@ import Textarea from '@nodate-flow/ui/primitives/textarea';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import SubmitHint from '../../components/submit-hint';
+import FormActions from '../../components/form-actions';
 import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import { CALENDAR_EVENT_PALETTE } from '../../lib/source-colors';
@@ -183,8 +183,7 @@ export default function GeneralTab({
         )}
       </FormField>
 
-      <div className={styles.actions}>
-        <SubmitHint />
+      <FormActions hint={{ disabled: isReadonly || !dirty || update.isPending }}>
         <Button
           type="submit"
           variant="primary"
@@ -194,7 +193,7 @@ export default function GeneralTab({
         >
           {t('calendar.settings.general.save')}
         </Button>
-      </div>
+      </FormActions>
 
       <section className={styles.dangerZone} aria-label={t('calendar.settings.delete.title')}>
         <h3 className={styles.dangerTitle}>{t('calendar.settings.delete.title')}</h3>

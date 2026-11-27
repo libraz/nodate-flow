@@ -8,12 +8,6 @@
   gap: var(--nf-space-5);
 }
 
-.actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--nf-space-3);
-}
-
 /* Wraps fields whose validation error can mount; spacing comes from the form gap. */
 .fieldWithError {
   display: flex;

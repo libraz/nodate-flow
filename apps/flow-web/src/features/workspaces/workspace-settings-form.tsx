@@ -25,8 +25,8 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { useNavigate } from '@tanstack/react-router';
 import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import FormActions from '../../components/form-actions';
 import PageHeader from '../../components/page-header';
-import SubmitHint from '../../components/submit-hint';
 import { formatApiError } from '../../lib/api-error';
 import { onSubmitShortcut } from '../../lib/submit-shortcut';
 import { clearActiveWorkspaceId } from '../../lib/use-current-workspace';
@@ -443,8 +443,7 @@ export default function WorkspaceSettingsForm({
         </FormField>
 
         {canEdit ? (
-          <div className={ui.actions}>
-            <SubmitHint />
+          <FormActions hint={{ disabled: submitting }}>
             <SaveStatus saved={saveStatus.saved} dirty={dirty} />
             <Button
               type="submit"
@@ -454,7 +453,7 @@ export default function WorkspaceSettingsForm({
             >
               {t('workspace.general.save')}
             </Button>
-          </div>
+          </FormActions>
         ) : null}
       </form>
 
