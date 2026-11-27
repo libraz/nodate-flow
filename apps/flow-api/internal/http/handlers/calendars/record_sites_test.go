@@ -322,7 +322,7 @@ func TestAPublishedBatchAndARefusedOneAreToldApart(t *testing.T) {
 func TestThePublishedAndRefusedRecordsAreDistinct(t *testing.T) {
 	t.Parallel()
 
-	sites := recordSitesIn(t, "public_shares.go", "AttachEventsToShare")
+	sites := recordSitesIn(t, "public_shares_events.go", "AttachEventsToShare")
 	published := siteFor(t, sites, "calendar.share.events_attach")
 	refused := siteFor(t, sites, "calendar.share.events_attach_refused")
 

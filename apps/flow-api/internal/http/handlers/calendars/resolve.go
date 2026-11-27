@@ -396,3 +396,32 @@ func resolveCalendarAdmin(
 ) (calendar.FindCalendarByPublicIdRow, calendar.FindCalendarMemberRow, error) {
 	return resolveCalendarAtLeast(ctx, cq, wsID, actorID, calIDStr, calendar.CalendarMembersRoleManager)
 }
+
+// resolveWorkspaceNonGuest verifies the actor is a ws member and not a guest.
+// Guests (read-only role) cannot touch share pages.
+func resolveWorkspaceNonGuest(ctx context.Context, q *generated.Queries, wsIDStr string) (uint32, uint32, error) {
+	wsID, actorID, err := resolveWorkspace(ctx, q, wsIDStr)
+	if err != nil {
+		return 0, 0, err
+	}
+	member, err := q.FindWorkspaceMemberByUserId(ctx, generated.FindWorkspaceMemberByUserIdParams{
+		WorkspaceID: wsID,
+		UserID:      actorID,
+	})
+	if err != nil {
+		return 0, 0, errAccessDenied
+	}
+	if member.Role == generated.WorkspaceMembersRoleGuest {
+		return 0, 0, errAccessDenied
+	}
+	return wsID, actorID, nil
+}
+
+// parsePublicID parses a UUID-v7 string into the DB public id type.
+func parsePublicID(s string) (types.PublicID, error) {
+	uid, err := uuid.Parse(s)
+	if err != nil {
+		return types.PublicID{}, err
+	}
+	return types.FromUUID(uid), nil
+}
