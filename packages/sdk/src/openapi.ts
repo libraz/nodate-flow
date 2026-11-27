@@ -1562,6 +1562,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tasks/{id}/agent-proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List agent proposals on a task
+         * @description Returns the operations agents proposed on the task and are waiting for a person to approve. status=pending returns every live pending proposal (expired ones are left out); status=all returns the newest proposals of any status, up to limit.
+         */
+        get: operations["tasks-agent-proposals-list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{id}/agent-proposals/{proposalId}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve an agent proposal and apply it
+         * @description Applies the proposed operation as the agent, provided the caller could make that change themselves. Nothing is applied when the target value changed since the proposal (WS.AGENT_PROPOSAL.STALE), the proposal expired (WS.AGENT_PROPOSAL.EXPIRED) or was already decided (WS.AGENT_PROPOSAL.ALREADY_DECIDED); a paused agent leaves the proposal pending (AI.AGENT.PAUSED).
+         */
+        post: operations["tasks-agent-proposals-approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{id}/agent-proposals/{proposalId}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reject an agent proposal
+         * @description Marks the proposal rejected and keeps the optional reason (up to 500 characters), which the agent reads on its next run. Rejecting does not start a run.
+         */
+        post: operations["tasks-agent-proposals-reject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tasks/{id}/agent-runs": {
         parameters: {
             query?: never;
@@ -1574,6 +1634,26 @@ export interface paths {
          * @description Returns the agent run lifecycle events (started / completed / failed) the orchestrator has appended for this task. Most recent first. Empty until the orchestrator stamps task_id and actor_agent_id on its ai.agent.run.* events.
          */
         get: operations["tasks-agent-runs-list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{id}/agent-runs/{runKey}/steps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the steps of one agent run on a task
+         * @description Returns the tool calls an agent made during one task-work run, in step order, with each outcome (applied, proposed, noop, skipped, not_permitted, invalid, failed, stopped). The run key comes from the run's agent-runs payload. At most 64 steps.
+         */
+        get: operations["tasks-agent-run-steps-list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1600,6 +1680,26 @@ export interface paths {
          * @description Attaches an AI agent so the agent's runtime can be scheduled on or triggered for the task. Idempotent per (task, agent).
          */
         post: operations["tasks-agents-add"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{id}/agents/{agentId}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ask an assigned AI agent to work on the task now
+         * @description Records a run request for an agent that is assigned to the task and returns 202; the agent's runtime picks it up. Refused when the agent is not assigned (WS.TASK_AGENT.NOT_ASSIGNED), is paused (AI.AGENT.PAUSED), has no allowed operations (WS.TASK_AGENT.NO_GRANTS), the task is private, finished or archived (WS.TASK_AGENT.TASK_NOT_WORKABLE), or a budget is used up (AI.COST.GUARD_EXCEEDED, WS.TASK_AGENT.COST_CAP_EXCEEDED).
+         */
+        post: operations["tasks-agents-run"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2700,6 +2800,26 @@ export interface paths {
          * @description Updates the agent's schedule_kind (disabled / interval / on_event / manual). Takes effect on the next scheduler tick.
          */
         patch: operations["ai-agent-schedule-update"];
+        trace?: never;
+    };
+    "/workspaces/{wsId}/ai/agents/{agentId}/tools": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Replace what an AI agent is allowed to do on tasks
+         * @description Replaces the agent's per-operation grants: each of add_comment, set_priority, set_due_on, transition_task and create_subtask maps to auto (apply directly when the person who assigned the agent and the person who triggered it could also do it) or approval (wait for a person to approve). An operation left out is not permitted, and {} permits nothing. Only task agents have grants. Requires workspace admin role.
+         */
+        patch: operations["ai-agent-tools-update"];
         trace?: never;
     };
     "/workspaces/{wsId}/ai/agents/{agentId}/trigger": {
@@ -5653,6 +5773,56 @@ export interface components {
             readonly $schema?: string;
             ok: boolean;
         };
+        AgentProposal: {
+            agent: components["schemas"]["AgentRef"];
+            args: components["schemas"]["AgentProposalArgs"];
+            before: components["schemas"]["AgentProposalBefore"];
+            /** Format: int64 */
+            createdAt: number;
+            /** Format: int64 */
+            decidedAt?: number;
+            decidedBy?: components["schemas"]["AgentProposalUser"];
+            decisionReason?: string;
+            errorCode?: string;
+            /** Format: int64 */
+            expiresAt: number;
+            id: string;
+            /** @enum {string} */
+            kind: "add_comment" | "set_priority" | "set_due_on" | "transition_task" | "create_subtask";
+            /** @enum {string} */
+            status: "pending" | "applied" | "rejected" | "stale" | "expired" | "failed";
+        };
+        AgentProposalArgs: {
+            body?: string;
+            /** @description YYYY-MM-DD */
+            dueOn?: string;
+            /** Format: int32 */
+            priority?: number;
+            title?: string;
+            transition?: string;
+        };
+        AgentProposalBefore: {
+            derivedState?: string;
+            /** @description YYYY-MM-DD */
+            dueOn?: string;
+            /** Format: int32 */
+            priority?: number;
+        };
+        AgentProposalDecision: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AgentProposalDecision.json
+             */
+            readonly $schema?: string;
+            id: string;
+            /** @enum {string} */
+            status: "applied" | "rejected";
+        };
+        AgentProposalUser: {
+            id: string;
+            name: string;
+        };
         AgentRef: {
             id: string;
             name?: string;
@@ -5669,6 +5839,19 @@ export interface components {
             type: string;
             wasReversed: boolean;
         };
+        AgentStep: {
+            argsSummary: string;
+            /** Format: int64 */
+            createdAt: number;
+            errorCode?: string;
+            /** @enum {string} */
+            outcome: "applied" | "proposed" | "noop" | "skipped" | "not_permitted" | "invalid" | "failed" | "stopped";
+            proposalId?: string;
+            /** Format: int64 */
+            step: number;
+            thought: string;
+            tool: string;
+        };
         AgentSummary: {
             /**
              * Format: uri
@@ -5682,14 +5865,30 @@ export interface components {
             eventTriggerTypes?: string[] | null;
             /** @description Agent public id (UUID v7) */
             id: string;
+            /** @enum {string} */
+            kind: "task_agent" | "signal_judge";
             modelId: string;
             modelName: string;
             name: string;
             paused: boolean;
             scheduleKind: string;
             systemPrompt: string;
+            tools: {
+                [key: string]: string;
+            } | null;
             /** Format: int64 */
             updatedAt?: number;
+        };
+        AgentToolsResult: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AgentToolsResult.json
+             */
+            readonly $schema?: string;
+            tools: {
+                [key: string]: string;
+            };
         };
         AiSuggestionListBody: {
             /**
@@ -7964,6 +8163,17 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        ListAgentProposalsBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListAgentProposalsBody.json
+             */
+            readonly $schema?: string;
+            proposals: components["schemas"]["AgentProposal"][] | null;
+            /** Format: int64 */
+            total: number;
+        };
         ListAgentRunsBody: {
             /**
              * Format: uri
@@ -7972,6 +8182,17 @@ export interface components {
              */
             readonly $schema?: string;
             runs: components["schemas"]["AgentRunEvent"][] | null;
+            /** Format: int64 */
+            total: number;
+        };
+        ListAgentStepsBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListAgentStepsBody.json
+             */
+            readonly $schema?: string;
+            steps: components["schemas"]["AgentStep"][] | null;
             /** Format: int64 */
             total: number;
         };
@@ -10054,6 +10275,16 @@ export interface components {
             password: string;
             timezone?: string;
         };
+        RejectAgentProposalInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/RejectAgentProposalInputBody.json
+             */
+            readonly $schema?: string;
+            /** @description Why the proposal is rejected; the agent reads it on its next run */
+            reason?: string;
+        };
         RemoveAttendeeOutputBody: {
             /**
              * Format: uri
@@ -10361,6 +10592,19 @@ export interface components {
              */
             readonly $schema?: string;
             ok: boolean;
+        };
+        RunAgentBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/RunAgentBody.json
+             */
+            readonly $schema?: string;
+            /**
+             * Format: int64
+             * @description Unix seconds when the request was recorded
+             */
+            runRequestedAt: number;
         };
         SavedLens: {
             /**
@@ -10815,7 +11059,11 @@ export interface components {
             agentName: string;
             /** Format: int64 */
             createdAt: number;
+            hasGrants: boolean;
             id: string;
+            /** @enum {string} */
+            kind: "task_agent" | "signal_judge";
+            paused: boolean;
             role: string;
             /** Format: int64 */
             updatedAt?: number;
@@ -11443,6 +11691,18 @@ export interface components {
              */
             readonly $schema?: string;
             ok: boolean;
+        };
+        UpdateAgentToolsInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/UpdateAgentToolsInputBody.json
+             */
+            readonly $schema?: string;
+            /** @description Operation to mode (auto or approval). Operations: add_comment, set_priority, set_due_on, transition_task, create_subtask. An operation left out is not permitted; {} permits nothing. */
+            tools: {
+                [key: string]: string;
+            };
         };
         UpdateCalendarLabelInputBody: {
             /**
@@ -15159,6 +15419,112 @@ export interface operations {
             };
         };
     };
+    "tasks-agent-proposals-list": {
+        parameters: {
+            query?: {
+                /** @description pending returns every live pending proposal; all returns the newest, up to limit */
+                status?: "pending" | "all";
+                /** @description Applies to status=all */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListAgentProposalsBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "tasks-agent-proposals-approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                /** @description Proposal public id (UUID v7) */
+                proposalId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentProposalDecision"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "tasks-agent-proposals-reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                /** @description Proposal public id (UUID v7) */
+                proposalId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RejectAgentProposalInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentProposalDecision"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "tasks-agent-runs-list": {
         parameters: {
             query?: {
@@ -15179,6 +15545,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ListAgentRunsBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "tasks-agent-run-steps-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                /** @description Run key from the run's agent-runs payload (UUID) */
+                runKey: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListAgentStepsBody"];
                 };
             };
             /** @description Error */
@@ -15248,6 +15647,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TaskAgentActor"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "tasks-agents-run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                /** @description AI agent public id (UUID v7) */
+                agentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Accepted */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunAgentBody"];
                 };
             };
             /** @description Error */
@@ -17355,6 +17787,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UpdateAgentScheduleOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "ai-agent-tools-update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+                agentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAgentToolsInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentToolsResult"];
                 };
             };
             /** @description Error */

@@ -553,6 +553,134 @@
         "required": ["ok"],
         "type": "object"
       },
+      "AgentProposal": {
+        "additionalProperties": false,
+        "properties": {
+          "agent": {
+            "$ref": "#/components/schemas/AgentRef"
+          },
+          "args": {
+            "$ref": "#/components/schemas/AgentProposalArgs"
+          },
+          "before": {
+            "$ref": "#/components/schemas/AgentProposalBefore"
+          },
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "decidedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "decidedBy": {
+            "$ref": "#/components/schemas/AgentProposalUser"
+          },
+          "decisionReason": {
+            "type": "string"
+          },
+          "errorCode": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "add_comment",
+              "set_priority",
+              "set_due_on",
+              "transition_task",
+              "create_subtask"
+            ],
+            "type": "string"
+          },
+          "status": {
+            "enum": ["pending", "applied", "rejected", "stale", "expired", "failed"],
+            "type": "string"
+          }
+        },
+        "required": ["id", "agent", "kind", "args", "before", "status", "createdAt", "expiresAt"],
+        "type": "object"
+      },
+      "AgentProposalArgs": {
+        "additionalProperties": false,
+        "properties": {
+          "body": {
+            "type": "string"
+          },
+          "dueOn": {
+            "description": "YYYY-MM-DD",
+            "type": "string"
+          },
+          "priority": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "transition": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "AgentProposalBefore": {
+        "additionalProperties": false,
+        "properties": {
+          "derivedState": {
+            "type": "string"
+          },
+          "dueOn": {
+            "description": "YYYY-MM-DD",
+            "type": "string"
+          },
+          "priority": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "AgentProposalDecision": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/AgentProposalDecision.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "enum": ["applied", "rejected"],
+            "type": "string"
+          }
+        },
+        "required": ["id", "status"],
+        "type": "object"
+      },
+      "AgentProposalUser": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "name"],
+        "type": "object"
+      },
       "AgentRef": {
         "additionalProperties": false,
         "properties": {
@@ -601,6 +729,49 @@
         "required": ["eventId", "type", "occurredAt", "agent", "wasReversed"],
         "type": "object"
       },
+      "AgentStep": {
+        "additionalProperties": false,
+        "properties": {
+          "argsSummary": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "errorCode": {
+            "type": "string"
+          },
+          "outcome": {
+            "enum": [
+              "applied",
+              "proposed",
+              "noop",
+              "skipped",
+              "not_permitted",
+              "invalid",
+              "failed",
+              "stopped"
+            ],
+            "type": "string"
+          },
+          "proposalId": {
+            "type": "string"
+          },
+          "step": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "thought": {
+            "type": "string"
+          },
+          "tool": {
+            "type": "string"
+          }
+        },
+        "required": ["step", "tool", "thought", "argsSummary", "outcome", "createdAt"],
+        "type": "object"
+      },
       "AgentSummary": {
         "additionalProperties": false,
         "properties": {
@@ -628,6 +799,10 @@
             "description": "Agent public id (UUID v7)",
             "type": "string"
           },
+          "kind": {
+            "enum": ["task_agent", "signal_judge"],
+            "type": "string"
+          },
           "modelId": {
             "type": "string"
           },
@@ -646,6 +821,12 @@
           "systemPrompt": {
             "type": "string"
           },
+          "tools": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": ["object", "null"]
+          },
           "updatedAt": {
             "format": "int64",
             "type": "integer"
@@ -659,8 +840,30 @@
           "modelName",
           "scheduleKind",
           "paused",
+          "kind",
+          "tools",
           "createdAt"
         ],
+        "type": "object"
+      },
+      "AgentToolsResult": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/AgentToolsResult.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "tools": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          }
+        },
+        "required": ["tools"],
         "type": "object"
       },
       "AiSuggestionListBody": {
@@ -5521,6 +5724,30 @@
         "required": ["total", "items"],
         "type": "object"
       },
+      "ListAgentProposalsBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListAgentProposalsBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "proposals": {
+            "items": {
+              "$ref": "#/components/schemas/AgentProposal"
+            },
+            "type": ["array", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["total", "proposals"],
+        "type": "object"
+      },
       "ListAgentRunsBody": {
         "additionalProperties": false,
         "properties": {
@@ -5543,6 +5770,30 @@
           }
         },
         "required": ["total", "runs"],
+        "type": "object"
+      },
+      "ListAgentStepsBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListAgentStepsBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/AgentStep"
+            },
+            "type": ["array", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["total", "steps"],
         "type": "object"
       },
       "ListAgentsOutputBody": {
@@ -10200,6 +10451,24 @@
         "required": ["email", "password", "displayName"],
         "type": "object"
       },
+      "RejectAgentProposalInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/RejectAgentProposalInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "reason": {
+            "description": "Why the proposal is rejected; the agent reads it on its next run",
+            "maxLength": 500,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "RemoveAttendeeOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -10795,6 +11064,25 @@
           }
         },
         "required": ["ok"],
+        "type": "object"
+      },
+      "RunAgentBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/RunAgentBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "runRequestedAt": {
+            "description": "Unix seconds when the request was recorded",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["runRequestedAt"],
         "type": "object"
       },
       "SavedLens": {
@@ -11805,8 +12093,18 @@
             "format": "int64",
             "type": "integer"
           },
+          "hasGrants": {
+            "type": "boolean"
+          },
           "id": {
             "type": "string"
+          },
+          "kind": {
+            "enum": ["task_agent", "signal_judge"],
+            "type": "string"
+          },
+          "paused": {
+            "type": "boolean"
           },
           "role": {
             "type": "string"
@@ -11816,7 +12114,16 @@
             "type": "integer"
           }
         },
-        "required": ["id", "agentId", "agentName", "role", "createdAt"],
+        "required": [
+          "id",
+          "agentId",
+          "agentName",
+          "role",
+          "kind",
+          "paused",
+          "hasGrants",
+          "createdAt"
+        ],
         "type": "object"
       },
       "TaskAgentContext": {
@@ -13227,6 +13534,27 @@
           }
         },
         "required": ["ok"],
+        "type": "object"
+      },
+      "UpdateAgentToolsInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/UpdateAgentToolsInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "tools": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Operation to mode (auto or approval). Operations: add_comment, set_priority, set_due_on, transition_task, create_subtask. An operation left out is not permitted; {} permits nothing.",
+            "type": "object"
+          }
+        },
+        "required": ["tools"],
         "type": "object"
       },
       "UpdateCalendarLabelInputBody": {
@@ -19676,6 +20004,197 @@
         "tags": ["Tasks"]
       }
     },
+    "/tasks/{id}/agent-proposals": {
+      "get": {
+        "description": "Returns the operations agents proposed on the task and are waiting for a person to approve. status=pending returns every live pending proposal (expired ones are left out); status=all returns the newest proposals of any status, up to limit.",
+        "operationId": "tasks-agent-proposals-list",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "pending returns every live pending proposal; all returns the newest, up to limit",
+            "explode": false,
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "default": "pending",
+              "description": "pending returns every live pending proposal; all returns the newest, up to limit",
+              "enum": ["pending", "all"],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Applies to status=all",
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 20,
+              "description": "Applies to status=all",
+              "format": "int32",
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListAgentProposalsBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List agent proposals on a task",
+        "tags": ["Tasks"]
+      }
+    },
+    "/tasks/{id}/agent-proposals/{proposalId}/approve": {
+      "post": {
+        "description": "Applies the proposed operation as the agent, provided the caller could make that change themselves. Nothing is applied when the target value changed since the proposal (WS.AGENT_PROPOSAL.STALE), the proposal expired (WS.AGENT_PROPOSAL.EXPIRED) or was already decided (WS.AGENT_PROPOSAL.ALREADY_DECIDED); a paused agent leaves the proposal pending (AI.AGENT.PAUSED).",
+        "operationId": "tasks-agent-proposals-approve",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Proposal public id (UUID v7)",
+            "in": "path",
+            "name": "proposalId",
+            "required": true,
+            "schema": {
+              "description": "Proposal public id (UUID v7)",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentProposalDecision"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Approve an agent proposal and apply it",
+        "tags": ["Tasks"]
+      }
+    },
+    "/tasks/{id}/agent-proposals/{proposalId}/reject": {
+      "post": {
+        "description": "Marks the proposal rejected and keeps the optional reason (up to 500 characters), which the agent reads on its next run. Rejecting does not start a run.",
+        "operationId": "tasks-agent-proposals-reject",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Proposal public id (UUID v7)",
+            "in": "path",
+            "name": "proposalId",
+            "required": true,
+            "schema": {
+              "description": "Proposal public id (UUID v7)",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectAgentProposalInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentProposalDecision"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Reject an agent proposal",
+        "tags": ["Tasks"]
+      }
+    },
     "/tasks/{id}/agent-runs": {
       "get": {
         "description": "Returns the agent run lifecycle events (started / completed / failed) the orchestrator has appended for this task. Most recent first. Empty until the orchestrator stamps task_id and actor_agent_id on its ai.agent.run.* events.",
@@ -19730,6 +20249,61 @@
           }
         ],
         "summary": "List recent agent run events scoped to a task",
+        "tags": ["Tasks"]
+      }
+    },
+    "/tasks/{id}/agent-runs/{runKey}/steps": {
+      "get": {
+        "description": "Returns the tool calls an agent made during one task-work run, in step order, with each outcome (applied, proposed, noop, skipped, not_permitted, invalid, failed, stopped). The run key comes from the run's agent-runs payload. At most 64 steps.",
+        "operationId": "tasks-agent-run-steps-list",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Run key from the run's agent-runs payload (UUID)",
+            "in": "path",
+            "name": "runKey",
+            "required": true,
+            "schema": {
+              "description": "Run key from the run's agent-runs payload (UUID)",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListAgentStepsBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List the steps of one agent run on a task",
         "tags": ["Tasks"]
       }
     },
@@ -19851,6 +20425,61 @@
           }
         ],
         "summary": "Attach an AI agent to a task",
+        "tags": ["Tasks"]
+      }
+    },
+    "/tasks/{id}/agents/{agentId}/run": {
+      "post": {
+        "description": "Records a run request for an agent that is assigned to the task and returns 202; the agent's runtime picks it up. Refused when the agent is not assigned (WS.TASK_AGENT.NOT_ASSIGNED), is paused (AI.AGENT.PAUSED), has no allowed operations (WS.TASK_AGENT.NO_GRANTS), the task is private, finished or archived (WS.TASK_AGENT.TASK_NOT_WORKABLE), or a budget is used up (AI.COST.GUARD_EXCEEDED, WS.TASK_AGENT.COST_CAP_EXCEEDED).",
+        "operationId": "tasks-agents-run",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "AI agent public id (UUID v7)",
+            "in": "path",
+            "name": "agentId",
+            "required": true,
+            "schema": {
+              "description": "AI agent public id (UUID v7)",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunAgentBody"
+                }
+              }
+            },
+            "description": "Accepted"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Ask an assigned AI agent to work on the task now",
         "tags": ["Tasks"]
       }
     },
@@ -23360,6 +23989,69 @@
           }
         ],
         "summary": "Update an AI agent's schedule_kind trigger mode",
+        "tags": ["Public"]
+      }
+    },
+    "/workspaces/{wsId}/ai/agents/{agentId}/tools": {
+      "patch": {
+        "description": "Replaces the agent's per-operation grants: each of add_comment, set_priority, set_due_on, transition_task and create_subtask maps to auto (apply directly when the person who assigned the agent and the person who triggered it could also do it) or approval (wait for a person to approve). An operation left out is not permitted, and {} permits nothing. Only task agents have grants. Requires workspace admin role.",
+        "operationId": "ai-agent-tools-update",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "agentId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAgentToolsInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentToolsResult"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Replace what an AI agent is allowed to do on tasks",
         "tags": ["Public"]
       }
     },
