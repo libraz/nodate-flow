@@ -38,3 +38,13 @@ func TestValidEventTriggerTypes_RuntimeKindsRefused(t *testing.T) {
 		}
 	}
 }
+
+func TestDerefToolModes_NullModeRejected(t *testing.T) {
+	auto := "auto"
+	if got, ok := derefToolModes(map[string]*string{"add_comment": &auto}); !ok || got["add_comment"] != "auto" {
+		t.Fatalf("got %v, %v", got, ok)
+	}
+	if _, ok := derefToolModes(map[string]*string{"add_comment": nil}); ok {
+		t.Fatal("null mode must be rejected")
+	}
+}

@@ -520,6 +520,18 @@ func UpdateAgentEventTriggers(deps Deps) func(context.Context, *UpdateAgentEvent
 	}
 }
 
+// derefToolModes flattens the request map; a null mode reports false.
+func derefToolModes(in map[string]*string) (map[string]string, bool) {
+	out := make(map[string]string, len(in))
+	for k, v := range in {
+		if v == nil {
+			return nil, false
+		}
+		out[k] = *v
+	}
+	return out, true
+}
+
 // UpdateAgentTools handles PATCH /workspaces/{wsId}/ai/agents/{agentId}/tools.
 // The body replaces the agent's grants wholesale; an empty object grants
 // nothing, so the agent no longer acts on tasks.
@@ -546,7 +558,11 @@ func UpdateAgentTools(deps Deps) func(context.Context, *UpdateAgentToolsInput) (
 		if agent.Kind != generated.AiAgentsKindTaskAgent {
 			return nil, httpErr(apierrors.WsAgentToolsKindNotGrantable)
 		}
-		grants, err := execution.ValidateToolGrants(in.Body.Tools)
+		modes, ok := derefToolModes(in.Body.Tools)
+		if !ok {
+			return nil, httpErr(apierrors.WsAgentToolsUnknownEntry)
+		}
+		grants, err := execution.ValidateToolGrants(modes)
 		if err != nil {
 			return nil, httpErr(apierrors.WsAgentToolsUnknownEntry)
 		}
@@ -565,7 +581,7 @@ func UpdateAgentTools(deps Deps) func(context.Context, *UpdateAgentToolsInput) (
 		}
 		recordAudit(ctx, deps, ws.ID, "ai_agent.update_tools", "ai_agent", agentPub.String(), map[string]any{
 			"from": agentToolsView(agent.Kind, agent.ToolsJson),
-			"to":   in.Body.Tools,
+			"to":   modes,
 		})
 		out := &UpdateAgentToolsOutput{}
 		out.Body.Tools = agentToolsView(generated.AiAgentsKindTaskAgent, raw)
