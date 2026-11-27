@@ -1,0 +1,150 @@
+/* Pending agent proposals: a stacked list of compact cards inside the side panel. */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+}
+
+.heading {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-semibold);
+  color: var(--nf-color-fg);
+}
+
+.count {
+  font-size: var(--nf-text-xs);
+  font-weight: var(--nf-weight-medium);
+  color: var(--nf-color-fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+  padding: var(--nf-space-3);
+  border: var(--nf-space-px) solid var(--nf-color-hairline);
+  border-radius: var(--nf-radius-sm);
+  background: var(--nf-color-surface);
+}
+
+.card[aria-busy="true"] {
+  opacity: 0.7;
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  flex-wrap: wrap;
+}
+
+.agent {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.expiry {
+  margin-inline-start: auto;
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-subtle);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.change {
+  display: flex;
+  align-items: baseline;
+  gap: var(--nf-space-2);
+  flex-wrap: wrap;
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg);
+}
+
+.arrow,
+.none {
+  color: var(--nf-color-fg-muted);
+}
+
+.textBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--nf-space-1);
+}
+
+.text {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  line-height: var(--nf-leading-relaxed);
+  color: var(--nf-color-fg);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.text[data-expanded="true"] {
+  display: block;
+  -webkit-line-clamp: unset;
+  overflow: visible;
+}
+
+.toggle {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-accent-fg);
+  cursor: pointer;
+  text-underline-offset: 0.2em;
+}
+
+.toggle:hover {
+  text-decoration: underline;
+}
+
+.actions {
+  display: flex;
+  gap: var(--nf-space-2);
+}
+
+.note {
+  margin: 0;
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
+.rejectForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-4);
+}
+
+.dialogActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--nf-space-2);
+}
