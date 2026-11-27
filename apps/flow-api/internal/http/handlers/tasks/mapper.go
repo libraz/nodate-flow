@@ -159,6 +159,7 @@ type taskListRow struct {
 	ProjectName             string
 	ParentTaskPublicID      sql.NullString
 	ParentTaskTitle         sql.NullString
+	ParentVisible           bool
 	SubtaskCount            int64
 	CommentCount            int64
 	Title                   string
@@ -217,14 +218,20 @@ func splitLabelIDs(v string) []string {
 // every caller must route through here so OFFSET and keyset variants
 // stay observable-identical at the wire level.
 func taskListRowToDTO(r taskListRow) TaskListItem {
+	// The raw parent columns leak a parent the caller cannot see.
+	var parentID, parentTitle string
+	if r.ParentVisible {
+		parentID = nullBytesToUUIDString(r.ParentTaskPublicID)
+		parentTitle = r.ParentTaskTitle.String
+	}
 	return TaskListItem{
 		ID:                r.PublicID.String(),
 		ProjectID:         bytesToUUIDString(r.ProjectPublicID),
 		ProjectName:       r.ProjectName,
 		ProjectIdentifier: r.ProjectIdentifier.String,
 		TaskNumber:        int32(r.TaskNumber), //#nosec G115 -- task_number is per-project sequence (uint32), fits int32 within realistic deployments
-		ParentTaskID:      nullBytesToUUIDString(r.ParentTaskPublicID),
-		ParentTaskTitle:   r.ParentTaskTitle.String,
+		ParentTaskID:      parentID,
+		ParentTaskTitle:   parentTitle,
 		SubtaskCount:      r.SubtaskCount,
 		CommentCount:      r.CommentCount,
 		Title:             r.Title,
@@ -255,6 +262,7 @@ func taskListRowFromProject(r generated.ListTasksForProjectRow) taskListRow {
 		ProjectName:             r.ProjectName,
 		ParentTaskPublicID:      r.ParentTaskPublicID,
 		ParentTaskTitle:         r.ParentTaskTitle,
+		ParentVisible:           r.ParentVisible == 1,
 		SubtaskCount:            r.SubtaskCount,
 		CommentCount:            r.CommentCount,
 		Title:                   r.Title,
@@ -288,6 +296,7 @@ func taskListRowFromProjectKeyset(r generated.ListTasksForProjectKeysetRow) task
 		ProjectName:             r.ProjectName,
 		ParentTaskPublicID:      r.ParentTaskPublicID,
 		ParentTaskTitle:         r.ParentTaskTitle,
+		ParentVisible:           r.ParentVisible == 1,
 		SubtaskCount:            r.SubtaskCount,
 		CommentCount:            r.CommentCount,
 		Title:                   r.Title,
@@ -317,6 +326,7 @@ func taskListRowFromWorkspace(r generated.ListTasksForWorkspaceRow) taskListRow 
 		ProjectName:             r.ProjectName,
 		ParentTaskPublicID:      r.ParentTaskPublicID,
 		ParentTaskTitle:         r.ParentTaskTitle,
+		ParentVisible:           r.ParentVisible == 1,
 		SubtaskCount:            r.SubtaskCount,
 		CommentCount:            r.CommentCount,
 		Title:                   r.Title,
@@ -346,6 +356,7 @@ func taskListRowFromWorkspaceKeyset(r generated.ListTasksForWorkspaceKeysetRow) 
 		ProjectName:             r.ProjectName,
 		ParentTaskPublicID:      r.ParentTaskPublicID,
 		ParentTaskTitle:         r.ParentTaskTitle,
+		ParentVisible:           r.ParentVisible == 1,
 		SubtaskCount:            r.SubtaskCount,
 		CommentCount:            r.CommentCount,
 		Title:                   r.Title,

@@ -404,7 +404,16 @@ func resolveView(v view, known map[string]*Source) *Source {
 	}
 
 	out := &Source{Name: v.name, Content: map[string]string{}}
-	anchors := map[string]string{}
+	// Anchors are kept per alias: a self-join (a task and its parent)
+	// exposes two anchor sets, and mixing them builds a rule that checks
+	// one row's visibility against another row's members.
+	perAlias := map[string]map[string]string{}
+	expose := func(alias, need, exposed string) {
+		if perAlias[alias] == nil {
+			perAlias[alias] = map[string]string{}
+		}
+		perAlias[alias][need] = exposed
+	}
 	for _, item := range v.items {
 		alias, column, exposed, ok := selectItemColumn(item)
 		if !ok {
@@ -419,10 +428,10 @@ func resolveView(v view, known map[string]*Source) *Source {
 				out.Content[name] = origin
 			}
 			if src.Carries {
-				anchors["visibility"] = src.Anchors.Visibility
-				anchors["project_id"] = src.Anchors.ProjectID
-				anchors["created_by_user_id"] = src.Anchors.CreatedBy
-				anchors["id"] = src.Anchors.InternalID
+				expose(alias, "visibility", src.Anchors.Visibility)
+				expose(alias, "project_id", src.Anchors.ProjectID)
+				expose(alias, "created_by_user_id", src.Anchors.CreatedBy)
+				expose(alias, "id", src.Anchors.InternalID)
 			}
 			continue
 		}
@@ -432,30 +441,52 @@ func resolveView(v view, known map[string]*Source) *Source {
 		if src.Carries {
 			switch column {
 			case src.Anchors.Visibility:
-				anchors["visibility"] = exposed
+				expose(alias, "visibility", exposed)
 			case src.Anchors.ProjectID:
-				anchors["project_id"] = exposed
+				expose(alias, "project_id", exposed)
 			case src.Anchors.CreatedBy:
-				anchors["created_by_user_id"] = exposed
+				expose(alias, "created_by_user_id", exposed)
 			case src.Anchors.InternalID:
-				anchors["id"] = exposed
+				expose(alias, "id", exposed)
 			}
 		}
 	}
 	if len(out.Content) == 0 {
 		return nil
 	}
-	complete := true
-	for _, need := range anchorSources {
-		if anchors[need] == "" {
-			complete = false
+	var complete, ownNamed []string
+	for alias, anchors := range perAlias {
+		whole := true
+		for _, need := range anchorSources {
+			if anchors[need] == "" {
+				whole = false
+			}
+		}
+		if !whole {
+			continue
+		}
+		complete = append(complete, alias)
+		if anchors["visibility"] == inputs[alias].Anchors.Visibility {
+			ownNamed = append(ownNamed, alias)
 		}
 	}
-	out.Carries = complete
-	if complete {
+	// One complete set wins outright; among several, the one exposing
+	// visibility under its source's own name is the row's. Anything else
+	// is ambiguous and carries nothing, so the gate fails instead of
+	// guessing.
+	winner := ""
+	switch {
+	case len(complete) == 1:
+		winner = complete[0]
+	case len(ownNamed) == 1:
+		winner = ownNamed[0]
+	}
+	out.Carries = winner != ""
+	if out.Carries {
+		a := perAlias[winner]
 		out.Anchors = AnchorColumns{
-			Visibility: anchors["visibility"], ProjectID: anchors["project_id"],
-			CreatedBy: anchors["created_by_user_id"], InternalID: anchors["id"],
+			Visibility: a["visibility"], ProjectID: a["project_id"],
+			CreatedBy: a["created_by_user_id"], InternalID: a["id"],
 		}
 	}
 	return out

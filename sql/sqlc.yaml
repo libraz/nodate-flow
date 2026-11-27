@@ -449,6 +449,12 @@ sql:
             go_struct_tag: 'json:"-"'
           - column: "*.task_created_by_user_id"
             go_struct_tag: 'json:"-"'
+          - column: "*.parent_task_internal_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.parent_task_created_by_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.parent_task_project_id"
+            go_struct_tag: 'json:"-"'
           - column: "*.task_project_id"
             go_struct_tag: 'json:"-"'
           - column: "v_task_detail.agent_assignee_name"
@@ -697,6 +703,12 @@ sql:
           - column: "*.target_task_id"
             go_struct_tag: 'json:"-"'
           - column: "*.task_created_by_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.parent_task_internal_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.parent_task_created_by_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.parent_task_project_id"
             go_struct_tag: 'json:"-"'
           - column: "*.task_project_id"
             go_struct_tag: 'json:"-"'
@@ -1007,6 +1019,12 @@ sql:
           - column: "*.target_task_id"
             go_struct_tag: 'json:"-"'
           - column: "*.task_created_by_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.parent_task_internal_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.parent_task_created_by_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.parent_task_project_id"
             go_struct_tag: 'json:"-"'
           - column: "*.task_id"
             go_struct_tag: 'json:"-"'

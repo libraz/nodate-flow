@@ -484,3 +484,90 @@ func names(kinds []FindingKind) []string {
 	}
 	return out
 }
+
+// selfJoinSchema has a view that joins each task to its parent and exposes
+// both rows' anchors, and one that renames both rows' visibility so
+// neither is recognisably the row's own.
+const selfJoinSchema = `
+CREATE TABLE tasks (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  parent_task_id INT UNSIGNED NULL,
+  project_id INT UNSIGNED NOT NULL,
+  created_by_user_id INT UNSIGNED NULL,
+  title VARCHAR(255) NOT NULL,
+  visibility ENUM('public','project','private') NOT NULL
+);
+
+CREATE OR REPLACE VIEW v_ctl_with_parent AS
+SELECT
+  t.id AS task_internal_id,
+  t.project_id,
+  t.created_by_user_id,
+  t.title,
+  t.visibility,
+  pt.id AS parent_task_internal_id,
+  pt.visibility AS parent_task_visibility,
+  pt.created_by_user_id AS parent_task_created_by_user_id,
+  pt.project_id AS parent_task_project_id,
+  pt.title AS parent_task_title
+FROM tasks t
+LEFT JOIN tasks pt ON pt.id = t.parent_task_id;
+
+CREATE OR REPLACE VIEW v_ctl_with_parent_list AS
+SELECT v.*
+FROM v_ctl_with_parent v;
+
+CREATE OR REPLACE VIEW v_ctl_ambiguous AS
+SELECT
+  t.id AS task_internal_id,
+  t.project_id,
+  t.created_by_user_id,
+  t.title,
+  t.visibility AS task_visibility,
+  pt.id AS parent_task_internal_id,
+  pt.visibility AS parent_task_visibility,
+  pt.created_by_user_id AS parent_task_created_by_user_id,
+  pt.project_id AS parent_task_project_id
+FROM tasks t
+LEFT JOIN tasks pt ON pt.id = t.parent_task_id;
+`
+
+// TestSelfJoinAnchorsOnTheRowItself is the control for a view that reads
+// tasks twice. Anchors taken across both aliases would check the row's
+// visibility against its parent's members and creator; the derivation has
+// to keep the row's own set, and refuse to pick when it cannot tell which
+// set is the row's.
+func TestSelfJoinAnchorsOnTheRowItself(t *testing.T) {
+	t.Parallel()
+
+	sources := Sources(selfJoinSchema)
+	own := AnchorColumns{
+		Visibility: "visibility", ProjectID: "project_id",
+		CreatedBy: "created_by_user_id", InternalID: "task_internal_id",
+	}
+	for _, name := range []string{"v_ctl_with_parent", "v_ctl_with_parent_list"} {
+		src, ok := sources[name]
+		if !ok {
+			t.Fatalf("the view walk did not find %s, so the control proves nothing", name)
+		}
+		if !src.Carries {
+			t.Fatalf("%s exposes the row's own anchors and should carry the rule", name)
+		}
+		if src.Anchors != own {
+			t.Fatalf("%s anchors on %+v; want the row's own %+v", name, src.Anchors, own)
+		}
+		if src.Content["parent_task_title"] != "title" {
+			t.Fatalf("%s should still expose the parent's title as task content; content is %v",
+				name, src.Content)
+		}
+	}
+
+	amb, ok := sources["v_ctl_ambiguous"]
+	if !ok {
+		t.Fatal("the view walk did not find v_ctl_ambiguous, so the control proves nothing")
+	}
+	if amb.Carries {
+		t.Fatalf("v_ctl_ambiguous renames both rows' visibility, so neither set is "+
+			"recognisably the row's; it must not carry the rule, but anchors on %+v", amb.Anchors)
+	}
+}

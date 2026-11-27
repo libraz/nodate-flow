@@ -79,6 +79,27 @@ SELECT
   v.project_name,
   v.parent_task_public_id,
   v.parent_task_title,
+  -- The mapper drops the parent reference when parent_visible = 0.
+  CAST(CASE WHEN (
+    CAST(sqlc.arg('is_elevated') AS SIGNED) = 1
+    OR v.parent_task_visibility = 'public'
+    OR (v.parent_task_visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_pvis
+      WHERE pm_pvis.project_id = v.parent_task_project_id
+        AND pm_pvis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+        AND pm_pvis.enabled = TRUE
+    ))
+    OR (v.parent_task_visibility = 'private' AND (
+      v.parent_task_created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_pvis
+        WHERE ta_pvis.task_id = v.parent_task_internal_id
+          AND ta_pvis.kind = 'user'
+          AND ta_pvis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+          AND ta_pvis.enabled = TRUE
+      )
+    ))
+  ) THEN 1 ELSE 0 END AS SIGNED) AS parent_visible,
   v.title,
   v.visibility,
   v.derived_state,
@@ -90,7 +111,31 @@ SELECT
   v.task_number,
   v.archived_at,
   v.label_ids,
-  v.subtask_count,
+  -- Subtask count only includes children the viewer may see.
+  (SELECT COUNT(*) FROM tasks c
+     WHERE c.parent_task_id = v.task_internal_id
+       AND c.enabled = TRUE
+       AND c.archived_at IS NULL
+       AND (
+         CAST(sqlc.arg('is_elevated') AS SIGNED) = 1
+         OR c.visibility = 'public'
+         OR (c.visibility = 'project' AND EXISTS (
+           SELECT 1 FROM project_members pm_cvis
+           WHERE pm_cvis.project_id = c.project_id
+             AND pm_cvis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+             AND pm_cvis.enabled = TRUE
+         ))
+         OR (c.visibility = 'private' AND (
+           c.created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+           OR EXISTS (
+             SELECT 1 FROM task_actors ta_cvis
+             WHERE ta_cvis.task_id = c.id
+               AND ta_cvis.kind = 'user'
+               AND ta_cvis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+               AND ta_cvis.enabled = TRUE
+           )
+         ))
+       )) AS subtask_count,
   v.comment_count,
   v.sort_weight,
   v.updated_at,
@@ -172,6 +217,27 @@ SELECT
   v.project_name,
   v.parent_task_public_id,
   v.parent_task_title,
+  -- The mapper drops the parent reference when parent_visible = 0.
+  CAST(CASE WHEN (
+    CAST(sqlc.arg('is_elevated') AS SIGNED) = 1
+    OR v.parent_task_visibility = 'public'
+    OR (v.parent_task_visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_pvis
+      WHERE pm_pvis.project_id = v.parent_task_project_id
+        AND pm_pvis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+        AND pm_pvis.enabled = TRUE
+    ))
+    OR (v.parent_task_visibility = 'private' AND (
+      v.parent_task_created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_pvis
+        WHERE ta_pvis.task_id = v.parent_task_internal_id
+          AND ta_pvis.kind = 'user'
+          AND ta_pvis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+          AND ta_pvis.enabled = TRUE
+      )
+    ))
+  ) THEN 1 ELSE 0 END AS SIGNED) AS parent_visible,
   v.title,
   v.visibility,
   v.derived_state,
@@ -183,7 +249,31 @@ SELECT
   v.task_number,
   v.archived_at,
   v.label_ids,
-  v.subtask_count,
+  -- Subtask count only includes children the viewer may see.
+  (SELECT COUNT(*) FROM tasks c
+     WHERE c.parent_task_id = v.task_internal_id
+       AND c.enabled = TRUE
+       AND c.archived_at IS NULL
+       AND (
+         CAST(sqlc.arg('is_elevated') AS SIGNED) = 1
+         OR c.visibility = 'public'
+         OR (c.visibility = 'project' AND EXISTS (
+           SELECT 1 FROM project_members pm_cvis
+           WHERE pm_cvis.project_id = c.project_id
+             AND pm_cvis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+             AND pm_cvis.enabled = TRUE
+         ))
+         OR (c.visibility = 'private' AND (
+           c.created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+           OR EXISTS (
+             SELECT 1 FROM task_actors ta_cvis
+             WHERE ta_cvis.task_id = c.id
+               AND ta_cvis.kind = 'user'
+               AND ta_cvis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+               AND ta_cvis.enabled = TRUE
+           )
+         ))
+       )) AS subtask_count,
   v.comment_count,
   v.sort_weight,
   v.updated_at,
@@ -229,6 +319,27 @@ SELECT
   v.project_name,
   v.parent_task_public_id,
   v.parent_task_title,
+  -- The mapper drops the parent reference when parent_visible = 0.
+  CAST(CASE WHEN (
+    CAST(sqlc.arg('is_elevated') AS SIGNED) = 1
+    OR v.parent_task_visibility = 'public'
+    OR (v.parent_task_visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_pvis
+      WHERE pm_pvis.project_id = v.parent_task_project_id
+        AND pm_pvis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+        AND pm_pvis.enabled = TRUE
+    ))
+    OR (v.parent_task_visibility = 'private' AND (
+      v.parent_task_created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_pvis
+        WHERE ta_pvis.task_id = v.parent_task_internal_id
+          AND ta_pvis.kind = 'user'
+          AND ta_pvis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+          AND ta_pvis.enabled = TRUE
+      )
+    ))
+  ) THEN 1 ELSE 0 END AS SIGNED) AS parent_visible,
   v.title,
   v.visibility,
   v.derived_state,
@@ -240,7 +351,31 @@ SELECT
   v.task_number,
   v.archived_at,
   v.label_ids,
-  v.subtask_count,
+  -- Subtask count only includes children the viewer may see.
+  (SELECT COUNT(*) FROM tasks c
+     WHERE c.parent_task_id = v.task_internal_id
+       AND c.enabled = TRUE
+       AND c.archived_at IS NULL
+       AND (
+         CAST(sqlc.arg('is_elevated') AS SIGNED) = 1
+         OR c.visibility = 'public'
+         OR (c.visibility = 'project' AND EXISTS (
+           SELECT 1 FROM project_members pm_cvis
+           WHERE pm_cvis.project_id = c.project_id
+             AND pm_cvis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+             AND pm_cvis.enabled = TRUE
+         ))
+         OR (c.visibility = 'private' AND (
+           c.created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+           OR EXISTS (
+             SELECT 1 FROM task_actors ta_cvis
+             WHERE ta_cvis.task_id = c.id
+               AND ta_cvis.kind = 'user'
+               AND ta_cvis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+               AND ta_cvis.enabled = TRUE
+           )
+         ))
+       )) AS subtask_count,
   v.comment_count,
   v.sort_weight,
   v.updated_at,
@@ -328,6 +463,27 @@ SELECT
   v.project_name,
   v.parent_task_public_id,
   v.parent_task_title,
+  -- The mapper drops the parent reference when parent_visible = 0.
+  CAST(CASE WHEN (
+    CAST(sqlc.arg('is_elevated') AS SIGNED) = 1
+    OR v.parent_task_visibility = 'public'
+    OR (v.parent_task_visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_pvis
+      WHERE pm_pvis.project_id = v.parent_task_project_id
+        AND pm_pvis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+        AND pm_pvis.enabled = TRUE
+    ))
+    OR (v.parent_task_visibility = 'private' AND (
+      v.parent_task_created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_pvis
+        WHERE ta_pvis.task_id = v.parent_task_internal_id
+          AND ta_pvis.kind = 'user'
+          AND ta_pvis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+          AND ta_pvis.enabled = TRUE
+      )
+    ))
+  ) THEN 1 ELSE 0 END AS SIGNED) AS parent_visible,
   v.title,
   v.visibility,
   v.derived_state,
@@ -339,7 +495,31 @@ SELECT
   v.task_number,
   v.archived_at,
   v.label_ids,
-  v.subtask_count,
+  -- Subtask count only includes children the viewer may see.
+  (SELECT COUNT(*) FROM tasks c
+     WHERE c.parent_task_id = v.task_internal_id
+       AND c.enabled = TRUE
+       AND c.archived_at IS NULL
+       AND (
+         CAST(sqlc.arg('is_elevated') AS SIGNED) = 1
+         OR c.visibility = 'public'
+         OR (c.visibility = 'project' AND EXISTS (
+           SELECT 1 FROM project_members pm_cvis
+           WHERE pm_cvis.project_id = c.project_id
+             AND pm_cvis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+             AND pm_cvis.enabled = TRUE
+         ))
+         OR (c.visibility = 'private' AND (
+           c.created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+           OR EXISTS (
+             SELECT 1 FROM task_actors ta_cvis
+             WHERE ta_cvis.task_id = c.id
+               AND ta_cvis.kind = 'user'
+               AND ta_cvis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+               AND ta_cvis.enabled = TRUE
+           )
+         ))
+       )) AS subtask_count,
   v.comment_count,
   v.sort_weight,
   v.updated_at,
@@ -816,6 +996,27 @@ SELECT
   v.task_number,
   v.parent_task_public_id,
   v.parent_task_title,
+  -- The mapper drops the parent reference when parent_visible = 0.
+  CAST(CASE WHEN (
+    CAST(sqlc.arg('is_elevated') AS SIGNED) = 1
+    OR v.parent_task_visibility = 'public'
+    OR (v.parent_task_visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_pvis
+      WHERE pm_pvis.project_id = v.parent_task_project_id
+        AND pm_pvis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+        AND pm_pvis.enabled = TRUE
+    ))
+    OR (v.parent_task_visibility = 'private' AND (
+      v.parent_task_created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_pvis
+        WHERE ta_pvis.task_id = v.parent_task_internal_id
+          AND ta_pvis.kind = 'user'
+          AND ta_pvis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+          AND ta_pvis.enabled = TRUE
+      )
+    ))
+  ) THEN 1 ELSE 0 END AS SIGNED) AS parent_visible,
   v.title,
   v.visibility,
   v.derived_state,
@@ -830,7 +1031,31 @@ SELECT
   v.primary_assignee_public_id,
   v.assignee_count,
   v.label_ids,
-  v.subtask_count,
+  -- Subtask count only includes children the viewer may see.
+  (SELECT COUNT(*) FROM tasks c
+     WHERE c.parent_task_id = v.task_internal_id
+       AND c.enabled = TRUE
+       AND c.archived_at IS NULL
+       AND (
+         CAST(sqlc.arg('is_elevated') AS SIGNED) = 1
+         OR c.visibility = 'public'
+         OR (c.visibility = 'project' AND EXISTS (
+           SELECT 1 FROM project_members pm_cvis
+           WHERE pm_cvis.project_id = c.project_id
+             AND pm_cvis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+             AND pm_cvis.enabled = TRUE
+         ))
+         OR (c.visibility = 'private' AND (
+           c.created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+           OR EXISTS (
+             SELECT 1 FROM task_actors ta_cvis
+             WHERE ta_cvis.task_id = c.id
+               AND ta_cvis.kind = 'user'
+               AND ta_cvis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+               AND ta_cvis.enabled = TRUE
+           )
+         ))
+       )) AS subtask_count,
   v.comment_count
 FROM v_task_list_archived v
 WHERE v.workspace_id = ?
@@ -905,6 +1130,27 @@ SELECT
   v.task_number,
   v.parent_task_public_id,
   v.parent_task_title,
+  -- The mapper drops the parent reference when parent_visible = 0.
+  CAST(CASE WHEN (
+    CAST(sqlc.arg('is_elevated') AS SIGNED) = 1
+    OR v.parent_task_visibility = 'public'
+    OR (v.parent_task_visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_pvis
+      WHERE pm_pvis.project_id = v.parent_task_project_id
+        AND pm_pvis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+        AND pm_pvis.enabled = TRUE
+    ))
+    OR (v.parent_task_visibility = 'private' AND (
+      v.parent_task_created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_pvis
+        WHERE ta_pvis.task_id = v.parent_task_internal_id
+          AND ta_pvis.kind = 'user'
+          AND ta_pvis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+          AND ta_pvis.enabled = TRUE
+      )
+    ))
+  ) THEN 1 ELSE 0 END AS SIGNED) AS parent_visible,
   v.title,
   v.visibility,
   v.derived_state,
@@ -919,7 +1165,31 @@ SELECT
   v.primary_assignee_public_id,
   v.assignee_count,
   v.label_ids,
-  v.subtask_count,
+  -- Subtask count only includes children the viewer may see.
+  (SELECT COUNT(*) FROM tasks c
+     WHERE c.parent_task_id = v.task_internal_id
+       AND c.enabled = TRUE
+       AND c.archived_at IS NULL
+       AND (
+         CAST(sqlc.arg('is_elevated') AS SIGNED) = 1
+         OR c.visibility = 'public'
+         OR (c.visibility = 'project' AND EXISTS (
+           SELECT 1 FROM project_members pm_cvis
+           WHERE pm_cvis.project_id = c.project_id
+             AND pm_cvis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+             AND pm_cvis.enabled = TRUE
+         ))
+         OR (c.visibility = 'private' AND (
+           c.created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+           OR EXISTS (
+             SELECT 1 FROM task_actors ta_cvis
+             WHERE ta_cvis.task_id = c.id
+               AND ta_cvis.kind = 'user'
+               AND ta_cvis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+               AND ta_cvis.enabled = TRUE
+           )
+         ))
+       )) AS subtask_count,
   v.comment_count
 FROM v_task_list_archived v
 WHERE v.workspace_id = ?

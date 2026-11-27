@@ -47,6 +47,63 @@ func listTotal(offset, limit int32, pageLen int, count func() (int64, error)) (i
 	return count()
 }
 
+// visibilityFragmentFor re-targets the Layer 4 fragment from
+// [middleware.TaskVisibilityFilter] at a different row: it rewrites the four
+// columns the fragment reads off alias `v` to the given alias and column
+// names, so the rule keeps one spelling. cols maps the fragment's column
+// (visibility, project_id, created_by_user_id, task_internal_id) to its
+// replacement.
+func visibilityFragmentFor(frag string, cols map[string]string) string {
+	pairs := make([]string, 0, len(cols)*2)
+	for from, to := range cols {
+		pairs = append(pairs, "v."+from, to)
+	}
+	return strings.NewReplacer(pairs...).Replace(frag)
+}
+
+// parentVisibilityColumns and childVisibilityColumns name where the Layer 4
+// inputs live for the parent of a v_task_list row and for a child row read
+// through v_task_list_all under alias `cv`.
+var (
+	parentVisibilityColumns = map[string]string{
+		"visibility":         "v.parent_task_visibility",
+		"project_id":         "v.parent_task_project_id",
+		"created_by_user_id": "v.parent_task_created_by_user_id",
+		"task_internal_id":   "v.parent_task_internal_id",
+	}
+	childVisibilityColumns = map[string]string{
+		"visibility":         "cv.visibility",
+		"project_id":         "cv.project_id",
+		"created_by_user_id": "cv.created_by_user_id",
+		"task_internal_id":   "cv.task_internal_id",
+	}
+)
+
+// parentAndSubtaskProjections returns the SELECT expressions for the
+// parent-visible flag and the subtask count, with their bind args. The
+// flag is 1 when the actor passes Layer 4 on the parent; the count covers
+// only children the actor can see. Admins and owners get ungated expressions.
+func parentAndSubtaskProjections(actorID uint32, wsRole middleware.WorkspaceRole) (parentVisible, subtaskCount string, args []any) {
+	frag, visArgs := middleware.TaskVisibilityFilter(actorID, wsRole)
+	if frag == "" {
+		return "CAST(1 AS SIGNED)",
+			`(SELECT COUNT(*) FROM v_task_list_all cv
+    WHERE cv.parent_task_internal_id = v.task_internal_id
+      AND cv.archived_at IS NULL)`, nil
+	}
+	parentGate := visibilityFragmentFor(frag, parentVisibilityColumns)
+	childGate := visibilityFragmentFor(frag, childVisibilityColumns)
+	parentVisible = "CAST(CASE WHEN " + parentGate + " THEN 1 ELSE 0 END AS SIGNED)"
+	subtaskCount = `(SELECT COUNT(*) FROM v_task_list_all cv
+    WHERE cv.parent_task_internal_id = v.task_internal_id
+      AND cv.archived_at IS NULL
+      AND ` + childGate + `)`
+	// Placeholders appear in SELECT order: parent-visible flag, count.
+	args = append(args, visArgs...)
+	args = append(args, visArgs...)
+	return parentVisible, subtaskCount, args
+}
+
 // listTasksFiltered runs a dynamic SELECT against v_task_list applying the
 // optional q / state / assignee / priority / due date filters. It bypasses sqlc
 // because sqlc cannot express dynamic WHERE fragments. The shape of the
@@ -184,7 +241,9 @@ func listTasksFiltered(
 		args = append(args, pub[:])
 	}
 
-	//#nosec G201 -- WHERE fragments are static literals composed in this file; all user-supplied values are bound via parameter placeholders.
+	parentVisibleExpr, subtaskExpr, projArgs := parentAndSubtaskProjections(actorID, wsRole)
+
+	//#nosec G201 -- WHERE fragments and projections are static literals composed in this file; all user-supplied values are bound via parameter placeholders.
 	query := fmt.Sprintf(`SELECT
   v.public_id,
   v.project_public_id,
@@ -192,6 +251,8 @@ func listTasksFiltered(
   v.project_identifier,
   v.task_number,
   v.parent_task_public_id,
+  v.parent_task_title,
+  %s,
   v.title,
   v.visibility,
   v.derived_state,
@@ -201,6 +262,7 @@ func listTasksFiltered(
   v.completed_at,
   v.archived_at,
   v.label_ids,
+  %s,
   v.sort_weight,
   v.updated_at,
   v.created_at,
@@ -209,9 +271,9 @@ func listTasksFiltered(
 FROM v_task_list v
 WHERE %s
 ORDER BY v.sort_weight ASC, v.priority DESC, v.due_on ASC, v.created_at DESC, v.public_id DESC
-LIMIT ? OFFSET ?`, strings.Join(where, " AND "))
+LIMIT ? OFFSET ?`, parentVisibleExpr, subtaskExpr, strings.Join(where, " AND "))
 
-	pageArgs := append(append([]any{}, args...), in.Limit, in.Offset)
+	pageArgs := append(append(append([]any{}, projArgs...), args...), in.Limit, in.Offset)
 	rows, err := db.QueryContext(ctx, query, pageArgs...)
 	if err != nil {
 		return nil, 0, err
@@ -231,6 +293,8 @@ LIMIT ? OFFSET ?`, strings.Join(where, " AND "))
 			&r.ProjectIdentifier,
 			&r.TaskNumber,
 			&r.ParentTaskPublicID,
+			&r.ParentTaskTitle,
+			&r.ParentVisible,
 			&r.Title,
 			&r.Visibility,
 			&r.DerivedState,
@@ -240,6 +304,7 @@ LIMIT ? OFFSET ?`, strings.Join(where, " AND "))
 			&r.CompletedAt,
 			&r.ArchivedAt,
 			&r.LabelIds,
+			&r.SubtaskCount,
 			&r.SortWeight,
 			&r.UpdatedAt,
 			&r.CreatedAt,

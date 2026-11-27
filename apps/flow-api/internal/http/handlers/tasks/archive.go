@@ -223,60 +223,60 @@ func listArchivedPage(deps Deps) func(context.Context, *ListArchivedTasksInput) 
 
 // mapArchivedTaskListItem converts an archived task row to a TaskListItem DTO.
 func mapArchivedTaskListItem(r generated.ListArchivedTasksForWorkspaceRow) TaskListItem {
-	item := TaskListItem{
-		ID:                r.PublicID.String(),
-		ProjectID:         bytesToUUIDString(r.ProjectPublicID),
-		ProjectName:       r.ProjectName,
-		ProjectIdentifier: r.ProjectIdentifier.String,
-		TaskNumber:        int32(r.TaskNumber), //#nosec G115 -- task_number is per-project sequence (uint32), fits int32 within realistic deployments
-		ParentTaskID:      nullBytesToUUIDString(r.ParentTaskPublicID),
-		ParentTaskTitle:   r.ParentTaskTitle.String,
-		SubtaskCount:      r.SubtaskCount,
-		CommentCount:      r.CommentCount,
-		Title:             r.Title,
-		Visibility:        string(r.Visibility),
-		DerivedState:      string(r.DerivedState),
-		Priority:          r.Priority,
-		DueOn:             nullDate(r.DueOn),
-		StartedOn:         nullDate(r.StartedOn),
-		CompletedAt:       nullTimeUnix(r.CompletedAt),
-		ArchivedAt:        nullTimeUnix(r.ArchivedAt),
-		LabelIDs:          splitLabelIDs(r.LabelIds),
-		SortWeight:        r.SortWeight,
-		PrimaryAssigneeID: rawBytesToUUIDPtr(r.PrimaryAssigneePublicID),
-		AssigneeCount:     r.AssigneeCount,
-		UpdatedAt:         nullTimeUnix(r.UpdatedAt),
-		CreatedAt:         r.CreatedAt.Unix(),
-	}
-	return item
+	return taskListRowToDTO(taskListRow{
+		PublicID:                r.PublicID,
+		ProjectPublicID:         r.ProjectPublicID,
+		ProjectName:             r.ProjectName,
+		ParentTaskPublicID:      r.ParentTaskPublicID,
+		ParentTaskTitle:         r.ParentTaskTitle,
+		SubtaskCount:            r.SubtaskCount,
+		CommentCount:            r.CommentCount,
+		Title:                   r.Title,
+		Visibility:              r.Visibility,
+		DerivedState:            r.DerivedState,
+		Priority:                r.Priority,
+		DueOn:                   r.DueOn,
+		StartedOn:               r.StartedOn,
+		CompletedAt:             r.CompletedAt,
+		ProjectIdentifier:       r.ProjectIdentifier,
+		TaskNumber:              r.TaskNumber,
+		ArchivedAt:              r.ArchivedAt,
+		SortWeight:              r.SortWeight,
+		UpdatedAt:               r.UpdatedAt,
+		CreatedAt:               r.CreatedAt,
+		PrimaryAssigneePublicID: r.PrimaryAssigneePublicID,
+		AssigneeCount:           r.AssigneeCount,
+		ParentVisible:           r.ParentVisible == 1,
+		LabelIDs:                r.LabelIds,
+	})
 }
 
-// mapArchivedTaskListItemKeyset is the keyset twin of
-// mapArchivedTaskListItem — same projection, no Total column.
+// mapArchivedTaskListItemKeyset is the keyset twin of mapArchivedTaskListItem.
 func mapArchivedTaskListItemKeyset(r generated.ListArchivedTasksForWorkspaceKeysetRow) TaskListItem {
-	return TaskListItem{
-		ID:                r.PublicID.String(),
-		ProjectID:         bytesToUUIDString(r.ProjectPublicID),
-		ProjectName:       r.ProjectName,
-		ProjectIdentifier: r.ProjectIdentifier.String,
-		TaskNumber:        int32(r.TaskNumber), //#nosec G115 -- task_number is per-project sequence (uint32), fits int32 within realistic deployments
-		ParentTaskID:      nullBytesToUUIDString(r.ParentTaskPublicID),
-		ParentTaskTitle:   r.ParentTaskTitle.String,
-		SubtaskCount:      r.SubtaskCount,
-		CommentCount:      r.CommentCount,
-		Title:             r.Title,
-		Visibility:        string(r.Visibility),
-		DerivedState:      string(r.DerivedState),
-		Priority:          r.Priority,
-		DueOn:             nullDate(r.DueOn),
-		StartedOn:         nullDate(r.StartedOn),
-		CompletedAt:       nullTimeUnix(r.CompletedAt),
-		ArchivedAt:        nullTimeUnix(r.ArchivedAt),
-		LabelIDs:          splitLabelIDs(r.LabelIds),
-		SortWeight:        r.SortWeight,
-		PrimaryAssigneeID: rawBytesToUUIDPtr(r.PrimaryAssigneePublicID),
-		AssigneeCount:     r.AssigneeCount,
-		UpdatedAt:         nullTimeUnix(r.UpdatedAt),
-		CreatedAt:         r.CreatedAt.Unix(),
-	}
+	return taskListRowToDTO(taskListRow{
+		PublicID:                r.PublicID,
+		ProjectPublicID:         r.ProjectPublicID,
+		ProjectName:             r.ProjectName,
+		ParentTaskPublicID:      r.ParentTaskPublicID,
+		ParentTaskTitle:         r.ParentTaskTitle,
+		SubtaskCount:            r.SubtaskCount,
+		CommentCount:            r.CommentCount,
+		Title:                   r.Title,
+		Visibility:              r.Visibility,
+		DerivedState:            r.DerivedState,
+		Priority:                r.Priority,
+		DueOn:                   r.DueOn,
+		StartedOn:               r.StartedOn,
+		CompletedAt:             r.CompletedAt,
+		ProjectIdentifier:       r.ProjectIdentifier,
+		TaskNumber:              r.TaskNumber,
+		ArchivedAt:              r.ArchivedAt,
+		SortWeight:              r.SortWeight,
+		UpdatedAt:               r.UpdatedAt,
+		CreatedAt:               r.CreatedAt,
+		PrimaryAssigneePublicID: r.PrimaryAssigneePublicID,
+		AssigneeCount:           r.AssigneeCount,
+		ParentVisible:           r.ParentVisible == 1,
+		LabelIDs:                r.LabelIds,
+	})
 }

@@ -4279,9 +4279,18 @@ SELECT
   p.name AS project_name,
   p.identifier AS project_identifier,
   t.task_number,
+  -- The raw parent_task_* columns carry no viewer, so a caller must gate
+  -- them with its Layer 4 visibility predicate (built from the parent's
+  -- internal id, visibility, creator and project below) before projecting
+  -- them. They are view columns, not API fields, and no mapper projects
+  -- the internal ones.
+  pt.id AS parent_task_internal_id,
   pt.public_id AS parent_task_public_id,
   -- NULL for top-level tasks and for a parent that is disabled.
   pt.title AS parent_task_title,
+  pt.visibility AS parent_task_visibility,
+  pt.created_by_user_id AS parent_task_created_by_user_id,
+  pt.project_id AS parent_task_project_id,
   t.title,
   t.visibility,
   t.derived_state,
@@ -4348,12 +4357,6 @@ SELECT
        ON l.id = tl.label_id AND l.enabled = TRUE
     WHERE tl.task_id = t.id
       AND tl.enabled = TRUE) AS label_ids,
-  -- Enabled, non-archived direct children; COUNT(*) yields 0, never NULL.
-  (SELECT COUNT(*)
-     FROM tasks c
-    WHERE c.parent_task_id = t.id
-      AND c.enabled = TRUE
-      AND c.archived_at IS NULL) AS subtask_count,
   -- Enabled comments on the task; COUNT(*) yields 0, never NULL.
   (SELECT COUNT(*)
      FROM comments cm

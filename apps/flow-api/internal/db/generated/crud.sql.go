@@ -656,6 +656,27 @@ SELECT
   v.task_number,
   v.parent_task_public_id,
   v.parent_task_title,
+  -- The mapper drops the parent reference when parent_visible = 0.
+  CAST(CASE WHEN (
+    CAST(? AS SIGNED) = 1
+    OR v.parent_task_visibility = 'public'
+    OR (v.parent_task_visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_pvis
+      WHERE pm_pvis.project_id = v.parent_task_project_id
+        AND pm_pvis.user_id = CAST(? AS UNSIGNED)
+        AND pm_pvis.enabled = TRUE
+    ))
+    OR (v.parent_task_visibility = 'private' AND (
+      v.parent_task_created_by_user_id = CAST(? AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_pvis
+        WHERE ta_pvis.task_id = v.parent_task_internal_id
+          AND ta_pvis.kind = 'user'
+          AND ta_pvis.user_id = CAST(? AS UNSIGNED)
+          AND ta_pvis.enabled = TRUE
+      )
+    ))
+  ) THEN 1 ELSE 0 END AS SIGNED) AS parent_visible,
   v.title,
   v.visibility,
   v.derived_state,
@@ -670,7 +691,31 @@ SELECT
   v.primary_assignee_public_id,
   v.assignee_count,
   v.label_ids,
-  v.subtask_count,
+  -- Subtask count only includes children the viewer may see.
+  (SELECT COUNT(*) FROM tasks c
+     WHERE c.parent_task_id = v.task_internal_id
+       AND c.enabled = TRUE
+       AND c.archived_at IS NULL
+       AND (
+         CAST(? AS SIGNED) = 1
+         OR c.visibility = 'public'
+         OR (c.visibility = 'project' AND EXISTS (
+           SELECT 1 FROM project_members pm_cvis
+           WHERE pm_cvis.project_id = c.project_id
+             AND pm_cvis.user_id = CAST(? AS UNSIGNED)
+             AND pm_cvis.enabled = TRUE
+         ))
+         OR (c.visibility = 'private' AND (
+           c.created_by_user_id = CAST(? AS UNSIGNED)
+           OR EXISTS (
+             SELECT 1 FROM task_actors ta_cvis
+             WHERE ta_cvis.task_id = c.id
+               AND ta_cvis.kind = 'user'
+               AND ta_cvis.user_id = CAST(? AS UNSIGNED)
+               AND ta_cvis.enabled = TRUE
+           )
+         ))
+       )) AS subtask_count,
   v.comment_count
 FROM v_task_list_archived v
 WHERE v.workspace_id = ?
@@ -702,9 +747,9 @@ LIMIT ? OFFSET ?
 `
 
 type ListArchivedTasksForWorkspaceParams struct {
-	WorkspaceID uint32 `json:"-"`
 	IsElevated  int64  `json:"isElevated"`
 	ActorUserID int64  `json:"actorUserId"`
+	WorkspaceID uint32 `json:"-"`
 	Limit       int32  `json:"limit"`
 	Offset      int32  `json:"offset"`
 }
@@ -717,6 +762,7 @@ type ListArchivedTasksForWorkspaceRow struct {
 	TaskNumber              uint32            `json:"taskNumber"`
 	ParentTaskPublicID      sql.NullString    `json:"parentTaskPublicId"`
 	ParentTaskTitle         sql.NullString    `json:"parentTaskTitle"`
+	ParentVisible           int64             `json:"parentVisible"`
 	Title                   string            `json:"title"`
 	Visibility              TasksVisibility   `json:"visibility"`
 	DerivedState            TasksDerivedState `json:"derivedState"`
@@ -739,6 +785,14 @@ type ListArchivedTasksForWorkspaceRow struct {
 // for why the total is a separate query.
 func (q *Queries) ListArchivedTasksForWorkspace(ctx context.Context, arg ListArchivedTasksForWorkspaceParams) ([]ListArchivedTasksForWorkspaceRow, error) {
 	rows, err := q.db.QueryContext(ctx, listArchivedTasksForWorkspace,
+		arg.IsElevated,
+		arg.ActorUserID,
+		arg.ActorUserID,
+		arg.ActorUserID,
+		arg.IsElevated,
+		arg.ActorUserID,
+		arg.ActorUserID,
+		arg.ActorUserID,
 		arg.WorkspaceID,
 		arg.IsElevated,
 		arg.ActorUserID,
@@ -762,6 +816,7 @@ func (q *Queries) ListArchivedTasksForWorkspace(ctx context.Context, arg ListArc
 			&i.TaskNumber,
 			&i.ParentTaskPublicID,
 			&i.ParentTaskTitle,
+			&i.ParentVisible,
 			&i.Title,
 			&i.Visibility,
 			&i.DerivedState,
@@ -801,6 +856,27 @@ SELECT
   v.task_number,
   v.parent_task_public_id,
   v.parent_task_title,
+  -- The mapper drops the parent reference when parent_visible = 0.
+  CAST(CASE WHEN (
+    CAST(? AS SIGNED) = 1
+    OR v.parent_task_visibility = 'public'
+    OR (v.parent_task_visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_pvis
+      WHERE pm_pvis.project_id = v.parent_task_project_id
+        AND pm_pvis.user_id = CAST(? AS UNSIGNED)
+        AND pm_pvis.enabled = TRUE
+    ))
+    OR (v.parent_task_visibility = 'private' AND (
+      v.parent_task_created_by_user_id = CAST(? AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_pvis
+        WHERE ta_pvis.task_id = v.parent_task_internal_id
+          AND ta_pvis.kind = 'user'
+          AND ta_pvis.user_id = CAST(? AS UNSIGNED)
+          AND ta_pvis.enabled = TRUE
+      )
+    ))
+  ) THEN 1 ELSE 0 END AS SIGNED) AS parent_visible,
   v.title,
   v.visibility,
   v.derived_state,
@@ -815,7 +891,31 @@ SELECT
   v.primary_assignee_public_id,
   v.assignee_count,
   v.label_ids,
-  v.subtask_count,
+  -- Subtask count only includes children the viewer may see.
+  (SELECT COUNT(*) FROM tasks c
+     WHERE c.parent_task_id = v.task_internal_id
+       AND c.enabled = TRUE
+       AND c.archived_at IS NULL
+       AND (
+         CAST(? AS SIGNED) = 1
+         OR c.visibility = 'public'
+         OR (c.visibility = 'project' AND EXISTS (
+           SELECT 1 FROM project_members pm_cvis
+           WHERE pm_cvis.project_id = c.project_id
+             AND pm_cvis.user_id = CAST(? AS UNSIGNED)
+             AND pm_cvis.enabled = TRUE
+         ))
+         OR (c.visibility = 'private' AND (
+           c.created_by_user_id = CAST(? AS UNSIGNED)
+           OR EXISTS (
+             SELECT 1 FROM task_actors ta_cvis
+             WHERE ta_cvis.task_id = c.id
+               AND ta_cvis.kind = 'user'
+               AND ta_cvis.user_id = CAST(? AS UNSIGNED)
+               AND ta_cvis.enabled = TRUE
+           )
+         ))
+       )) AS subtask_count,
   v.comment_count
 FROM v_task_list_archived v
 WHERE v.workspace_id = ?
@@ -849,9 +949,9 @@ LIMIT ?
 `
 
 type ListArchivedTasksForWorkspaceKeysetParams struct {
-	WorkspaceID      uint32         `json:"-"`
 	IsElevated       int64          `json:"isElevated"`
 	ActorUserID      int64          `json:"actorUserId"`
+	WorkspaceID      uint32         `json:"-"`
 	CursorArchivedAt sql.NullTime   `json:"cursorArchivedAt"`
 	CursorPublicID   types.PublicID `json:"cursorPublicId"`
 	Limit            int32          `json:"limit"`
@@ -865,6 +965,7 @@ type ListArchivedTasksForWorkspaceKeysetRow struct {
 	TaskNumber              uint32            `json:"taskNumber"`
 	ParentTaskPublicID      sql.NullString    `json:"parentTaskPublicId"`
 	ParentTaskTitle         sql.NullString    `json:"parentTaskTitle"`
+	ParentVisible           int64             `json:"parentVisible"`
 	Title                   string            `json:"title"`
 	Visibility              TasksVisibility   `json:"visibility"`
 	DerivedState            TasksDerivedState `json:"derivedState"`
@@ -893,6 +994,14 @@ type ListArchivedTasksForWorkspaceKeysetRow struct {
 // only emits rows with archived_at IS NOT NULL.
 func (q *Queries) ListArchivedTasksForWorkspaceKeyset(ctx context.Context, arg ListArchivedTasksForWorkspaceKeysetParams) ([]ListArchivedTasksForWorkspaceKeysetRow, error) {
 	rows, err := q.db.QueryContext(ctx, listArchivedTasksForWorkspaceKeyset,
+		arg.IsElevated,
+		arg.ActorUserID,
+		arg.ActorUserID,
+		arg.ActorUserID,
+		arg.IsElevated,
+		arg.ActorUserID,
+		arg.ActorUserID,
+		arg.ActorUserID,
 		arg.WorkspaceID,
 		arg.IsElevated,
 		arg.ActorUserID,
@@ -919,6 +1028,7 @@ func (q *Queries) ListArchivedTasksForWorkspaceKeyset(ctx context.Context, arg L
 			&i.TaskNumber,
 			&i.ParentTaskPublicID,
 			&i.ParentTaskTitle,
+			&i.ParentVisible,
 			&i.Title,
 			&i.Visibility,
 			&i.DerivedState,
@@ -2066,6 +2176,27 @@ SELECT
   v.project_name,
   v.parent_task_public_id,
   v.parent_task_title,
+  -- The mapper drops the parent reference when parent_visible = 0.
+  CAST(CASE WHEN (
+    CAST(? AS SIGNED) = 1
+    OR v.parent_task_visibility = 'public'
+    OR (v.parent_task_visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_pvis
+      WHERE pm_pvis.project_id = v.parent_task_project_id
+        AND pm_pvis.user_id = CAST(? AS UNSIGNED)
+        AND pm_pvis.enabled = TRUE
+    ))
+    OR (v.parent_task_visibility = 'private' AND (
+      v.parent_task_created_by_user_id = CAST(? AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_pvis
+        WHERE ta_pvis.task_id = v.parent_task_internal_id
+          AND ta_pvis.kind = 'user'
+          AND ta_pvis.user_id = CAST(? AS UNSIGNED)
+          AND ta_pvis.enabled = TRUE
+      )
+    ))
+  ) THEN 1 ELSE 0 END AS SIGNED) AS parent_visible,
   v.title,
   v.visibility,
   v.derived_state,
@@ -2077,7 +2208,31 @@ SELECT
   v.task_number,
   v.archived_at,
   v.label_ids,
-  v.subtask_count,
+  -- Subtask count only includes children the viewer may see.
+  (SELECT COUNT(*) FROM tasks c
+     WHERE c.parent_task_id = v.task_internal_id
+       AND c.enabled = TRUE
+       AND c.archived_at IS NULL
+       AND (
+         CAST(? AS SIGNED) = 1
+         OR c.visibility = 'public'
+         OR (c.visibility = 'project' AND EXISTS (
+           SELECT 1 FROM project_members pm_cvis
+           WHERE pm_cvis.project_id = c.project_id
+             AND pm_cvis.user_id = CAST(? AS UNSIGNED)
+             AND pm_cvis.enabled = TRUE
+         ))
+         OR (c.visibility = 'private' AND (
+           c.created_by_user_id = CAST(? AS UNSIGNED)
+           OR EXISTS (
+             SELECT 1 FROM task_actors ta_cvis
+             WHERE ta_cvis.task_id = c.id
+               AND ta_cvis.kind = 'user'
+               AND ta_cvis.user_id = CAST(? AS UNSIGNED)
+               AND ta_cvis.enabled = TRUE
+           )
+         ))
+       )) AS subtask_count,
   v.comment_count,
   v.sort_weight,
   v.updated_at,
@@ -2112,10 +2267,10 @@ LIMIT ? OFFSET ?
 `
 
 type ListTasksForProjectParams struct {
-	WorkspaceID     uint32 `json:"-"`
-	ProjectPublicID []byte `json:"projectPublicId"`
 	IsElevated      int64  `json:"isElevated"`
 	ActorUserID     int64  `json:"actorUserId"`
+	WorkspaceID     uint32 `json:"-"`
+	ProjectPublicID []byte `json:"projectPublicId"`
 	Limit           int32  `json:"limit"`
 	Offset          int32  `json:"offset"`
 }
@@ -2126,6 +2281,7 @@ type ListTasksForProjectRow struct {
 	ProjectName             string            `json:"projectName"`
 	ParentTaskPublicID      sql.NullString    `json:"parentTaskPublicId"`
 	ParentTaskTitle         sql.NullString    `json:"parentTaskTitle"`
+	ParentVisible           int64             `json:"parentVisible"`
 	Title                   string            `json:"title"`
 	Visibility              TasksVisibility   `json:"visibility"`
 	DerivedState            TasksDerivedState `json:"derivedState"`
@@ -2157,6 +2313,14 @@ type ListTasksForProjectRow struct {
 // when the page came back full (a short page already pins the total).
 func (q *Queries) ListTasksForProject(ctx context.Context, arg ListTasksForProjectParams) ([]ListTasksForProjectRow, error) {
 	rows, err := q.db.QueryContext(ctx, listTasksForProject,
+		arg.IsElevated,
+		arg.ActorUserID,
+		arg.ActorUserID,
+		arg.ActorUserID,
+		arg.IsElevated,
+		arg.ActorUserID,
+		arg.ActorUserID,
+		arg.ActorUserID,
 		arg.WorkspaceID,
 		arg.ProjectPublicID,
 		arg.IsElevated,
@@ -2179,6 +2343,7 @@ func (q *Queries) ListTasksForProject(ctx context.Context, arg ListTasksForProje
 			&i.ProjectName,
 			&i.ParentTaskPublicID,
 			&i.ParentTaskTitle,
+			&i.ParentVisible,
 			&i.Title,
 			&i.Visibility,
 			&i.DerivedState,
@@ -2218,6 +2383,27 @@ SELECT
   v.project_name,
   v.parent_task_public_id,
   v.parent_task_title,
+  -- The mapper drops the parent reference when parent_visible = 0.
+  CAST(CASE WHEN (
+    CAST(? AS SIGNED) = 1
+    OR v.parent_task_visibility = 'public'
+    OR (v.parent_task_visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_pvis
+      WHERE pm_pvis.project_id = v.parent_task_project_id
+        AND pm_pvis.user_id = CAST(? AS UNSIGNED)
+        AND pm_pvis.enabled = TRUE
+    ))
+    OR (v.parent_task_visibility = 'private' AND (
+      v.parent_task_created_by_user_id = CAST(? AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_pvis
+        WHERE ta_pvis.task_id = v.parent_task_internal_id
+          AND ta_pvis.kind = 'user'
+          AND ta_pvis.user_id = CAST(? AS UNSIGNED)
+          AND ta_pvis.enabled = TRUE
+      )
+    ))
+  ) THEN 1 ELSE 0 END AS SIGNED) AS parent_visible,
   v.title,
   v.visibility,
   v.derived_state,
@@ -2229,7 +2415,31 @@ SELECT
   v.task_number,
   v.archived_at,
   v.label_ids,
-  v.subtask_count,
+  -- Subtask count only includes children the viewer may see.
+  (SELECT COUNT(*) FROM tasks c
+     WHERE c.parent_task_id = v.task_internal_id
+       AND c.enabled = TRUE
+       AND c.archived_at IS NULL
+       AND (
+         CAST(? AS SIGNED) = 1
+         OR c.visibility = 'public'
+         OR (c.visibility = 'project' AND EXISTS (
+           SELECT 1 FROM project_members pm_cvis
+           WHERE pm_cvis.project_id = c.project_id
+             AND pm_cvis.user_id = CAST(? AS UNSIGNED)
+             AND pm_cvis.enabled = TRUE
+         ))
+         OR (c.visibility = 'private' AND (
+           c.created_by_user_id = CAST(? AS UNSIGNED)
+           OR EXISTS (
+             SELECT 1 FROM task_actors ta_cvis
+             WHERE ta_cvis.task_id = c.id
+               AND ta_cvis.kind = 'user'
+               AND ta_cvis.user_id = CAST(? AS UNSIGNED)
+               AND ta_cvis.enabled = TRUE
+           )
+         ))
+       )) AS subtask_count,
   v.comment_count,
   v.sort_weight,
   v.updated_at,
@@ -2268,10 +2478,10 @@ LIMIT ?
 `
 
 type ListTasksForProjectKeysetParams struct {
-	WorkspaceID     uint32         `json:"-"`
-	ProjectPublicID []byte         `json:"projectPublicId"`
 	IsElevated      int64          `json:"isElevated"`
 	ActorUserID     int64          `json:"actorUserId"`
+	WorkspaceID     uint32         `json:"-"`
+	ProjectPublicID []byte         `json:"projectPublicId"`
 	CursorCreatedAt sql.NullTime   `json:"cursorCreatedAt"`
 	CursorPublicID  types.PublicID `json:"cursorPublicId"`
 	Limit           int32          `json:"limit"`
@@ -2283,6 +2493,7 @@ type ListTasksForProjectKeysetRow struct {
 	ProjectName             string            `json:"projectName"`
 	ParentTaskPublicID      sql.NullString    `json:"parentTaskPublicId"`
 	ParentTaskTitle         sql.NullString    `json:"parentTaskTitle"`
+	ParentVisible           int64             `json:"parentVisible"`
 	Title                   string            `json:"title"`
 	Visibility              TasksVisibility   `json:"visibility"`
 	DerivedState            TasksDerivedState `json:"derivedState"`
@@ -2317,6 +2528,14 @@ type ListTasksForProjectKeysetRow struct {
 // Index used: idx_tasks_workspace_id_keyset (workspace_id, created_at, public_id).
 func (q *Queries) ListTasksForProjectKeyset(ctx context.Context, arg ListTasksForProjectKeysetParams) ([]ListTasksForProjectKeysetRow, error) {
 	rows, err := q.db.QueryContext(ctx, listTasksForProjectKeyset,
+		arg.IsElevated,
+		arg.ActorUserID,
+		arg.ActorUserID,
+		arg.ActorUserID,
+		arg.IsElevated,
+		arg.ActorUserID,
+		arg.ActorUserID,
+		arg.ActorUserID,
 		arg.WorkspaceID,
 		arg.ProjectPublicID,
 		arg.IsElevated,
@@ -2342,6 +2561,7 @@ func (q *Queries) ListTasksForProjectKeyset(ctx context.Context, arg ListTasksFo
 			&i.ProjectName,
 			&i.ParentTaskPublicID,
 			&i.ParentTaskTitle,
+			&i.ParentVisible,
 			&i.Title,
 			&i.Visibility,
 			&i.DerivedState,
@@ -2381,6 +2601,27 @@ SELECT
   v.project_name,
   v.parent_task_public_id,
   v.parent_task_title,
+  -- The mapper drops the parent reference when parent_visible = 0.
+  CAST(CASE WHEN (
+    CAST(? AS SIGNED) = 1
+    OR v.parent_task_visibility = 'public'
+    OR (v.parent_task_visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_pvis
+      WHERE pm_pvis.project_id = v.parent_task_project_id
+        AND pm_pvis.user_id = CAST(? AS UNSIGNED)
+        AND pm_pvis.enabled = TRUE
+    ))
+    OR (v.parent_task_visibility = 'private' AND (
+      v.parent_task_created_by_user_id = CAST(? AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_pvis
+        WHERE ta_pvis.task_id = v.parent_task_internal_id
+          AND ta_pvis.kind = 'user'
+          AND ta_pvis.user_id = CAST(? AS UNSIGNED)
+          AND ta_pvis.enabled = TRUE
+      )
+    ))
+  ) THEN 1 ELSE 0 END AS SIGNED) AS parent_visible,
   v.title,
   v.visibility,
   v.derived_state,
@@ -2392,7 +2633,31 @@ SELECT
   v.task_number,
   v.archived_at,
   v.label_ids,
-  v.subtask_count,
+  -- Subtask count only includes children the viewer may see.
+  (SELECT COUNT(*) FROM tasks c
+     WHERE c.parent_task_id = v.task_internal_id
+       AND c.enabled = TRUE
+       AND c.archived_at IS NULL
+       AND (
+         CAST(? AS SIGNED) = 1
+         OR c.visibility = 'public'
+         OR (c.visibility = 'project' AND EXISTS (
+           SELECT 1 FROM project_members pm_cvis
+           WHERE pm_cvis.project_id = c.project_id
+             AND pm_cvis.user_id = CAST(? AS UNSIGNED)
+             AND pm_cvis.enabled = TRUE
+         ))
+         OR (c.visibility = 'private' AND (
+           c.created_by_user_id = CAST(? AS UNSIGNED)
+           OR EXISTS (
+             SELECT 1 FROM task_actors ta_cvis
+             WHERE ta_cvis.task_id = c.id
+               AND ta_cvis.kind = 'user'
+               AND ta_cvis.user_id = CAST(? AS UNSIGNED)
+               AND ta_cvis.enabled = TRUE
+           )
+         ))
+       )) AS subtask_count,
   v.comment_count,
   v.sort_weight,
   v.updated_at,
@@ -2435,9 +2700,9 @@ LIMIT ? OFFSET ?
 `
 
 type ListTasksForWorkspaceParams struct {
-	WorkspaceID uint32 `json:"-"`
 	IsElevated  int64  `json:"isElevated"`
 	ActorUserID int64  `json:"actorUserId"`
+	WorkspaceID uint32 `json:"-"`
 	Limit       int32  `json:"limit"`
 	Offset      int32  `json:"offset"`
 }
@@ -2448,6 +2713,7 @@ type ListTasksForWorkspaceRow struct {
 	ProjectName             string            `json:"projectName"`
 	ParentTaskPublicID      sql.NullString    `json:"parentTaskPublicId"`
 	ParentTaskTitle         sql.NullString    `json:"parentTaskTitle"`
+	ParentVisible           int64             `json:"parentVisible"`
 	Title                   string            `json:"title"`
 	Visibility              TasksVisibility   `json:"visibility"`
 	DerivedState            TasksDerivedState `json:"derivedState"`
@@ -2473,6 +2739,14 @@ type ListTasksForWorkspaceRow struct {
 // ListTasksForProject for why the total is a separate query.
 func (q *Queries) ListTasksForWorkspace(ctx context.Context, arg ListTasksForWorkspaceParams) ([]ListTasksForWorkspaceRow, error) {
 	rows, err := q.db.QueryContext(ctx, listTasksForWorkspace,
+		arg.IsElevated,
+		arg.ActorUserID,
+		arg.ActorUserID,
+		arg.ActorUserID,
+		arg.IsElevated,
+		arg.ActorUserID,
+		arg.ActorUserID,
+		arg.ActorUserID,
 		arg.WorkspaceID,
 		arg.IsElevated,
 		arg.ActorUserID,
@@ -2494,6 +2768,7 @@ func (q *Queries) ListTasksForWorkspace(ctx context.Context, arg ListTasksForWor
 			&i.ProjectName,
 			&i.ParentTaskPublicID,
 			&i.ParentTaskTitle,
+			&i.ParentVisible,
 			&i.Title,
 			&i.Visibility,
 			&i.DerivedState,
@@ -2534,6 +2809,27 @@ SELECT
   v.project_name,
   v.parent_task_public_id,
   v.parent_task_title,
+  -- The mapper drops the parent reference when parent_visible = 0.
+  CAST(CASE WHEN (
+    CAST(? AS SIGNED) = 1
+    OR v.parent_task_visibility = 'public'
+    OR (v.parent_task_visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_pvis
+      WHERE pm_pvis.project_id = v.parent_task_project_id
+        AND pm_pvis.user_id = CAST(? AS UNSIGNED)
+        AND pm_pvis.enabled = TRUE
+    ))
+    OR (v.parent_task_visibility = 'private' AND (
+      v.parent_task_created_by_user_id = CAST(? AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_pvis
+        WHERE ta_pvis.task_id = v.parent_task_internal_id
+          AND ta_pvis.kind = 'user'
+          AND ta_pvis.user_id = CAST(? AS UNSIGNED)
+          AND ta_pvis.enabled = TRUE
+      )
+    ))
+  ) THEN 1 ELSE 0 END AS SIGNED) AS parent_visible,
   v.title,
   v.visibility,
   v.derived_state,
@@ -2545,7 +2841,31 @@ SELECT
   v.task_number,
   v.archived_at,
   v.label_ids,
-  v.subtask_count,
+  -- Subtask count only includes children the viewer may see.
+  (SELECT COUNT(*) FROM tasks c
+     WHERE c.parent_task_id = v.task_internal_id
+       AND c.enabled = TRUE
+       AND c.archived_at IS NULL
+       AND (
+         CAST(? AS SIGNED) = 1
+         OR c.visibility = 'public'
+         OR (c.visibility = 'project' AND EXISTS (
+           SELECT 1 FROM project_members pm_cvis
+           WHERE pm_cvis.project_id = c.project_id
+             AND pm_cvis.user_id = CAST(? AS UNSIGNED)
+             AND pm_cvis.enabled = TRUE
+         ))
+         OR (c.visibility = 'private' AND (
+           c.created_by_user_id = CAST(? AS UNSIGNED)
+           OR EXISTS (
+             SELECT 1 FROM task_actors ta_cvis
+             WHERE ta_cvis.task_id = c.id
+               AND ta_cvis.kind = 'user'
+               AND ta_cvis.user_id = CAST(? AS UNSIGNED)
+               AND ta_cvis.enabled = TRUE
+           )
+         ))
+       )) AS subtask_count,
   v.comment_count,
   v.sort_weight,
   v.updated_at,
@@ -2584,10 +2904,10 @@ LIMIT ?
 `
 
 type ListTasksForWorkspaceKeysetParams struct {
-	WorkspaceID     uint32            `json:"-"`
-	StateFilter     TasksDerivedState `json:"stateFilter"`
 	IsElevated      int64             `json:"isElevated"`
 	ActorUserID     int64             `json:"actorUserId"`
+	WorkspaceID     uint32            `json:"-"`
+	StateFilter     TasksDerivedState `json:"stateFilter"`
 	CursorCreatedAt sql.NullTime      `json:"cursorCreatedAt"`
 	CursorPublicID  types.PublicID    `json:"cursorPublicId"`
 	Limit           int32             `json:"limit"`
@@ -2599,6 +2919,7 @@ type ListTasksForWorkspaceKeysetRow struct {
 	ProjectName             string            `json:"projectName"`
 	ParentTaskPublicID      sql.NullString    `json:"parentTaskPublicId"`
 	ParentTaskTitle         sql.NullString    `json:"parentTaskTitle"`
+	ParentVisible           int64             `json:"parentVisible"`
 	Title                   string            `json:"title"`
 	Visibility              TasksVisibility   `json:"visibility"`
 	DerivedState            TasksDerivedState `json:"derivedState"`
@@ -2632,6 +2953,14 @@ type ListTasksForWorkspaceKeysetRow struct {
 // Index used: idx_tasks_workspace_id_keyset (workspace_id, created_at, public_id).
 func (q *Queries) ListTasksForWorkspaceKeyset(ctx context.Context, arg ListTasksForWorkspaceKeysetParams) ([]ListTasksForWorkspaceKeysetRow, error) {
 	rows, err := q.db.QueryContext(ctx, listTasksForWorkspaceKeyset,
+		arg.IsElevated,
+		arg.ActorUserID,
+		arg.ActorUserID,
+		arg.ActorUserID,
+		arg.IsElevated,
+		arg.ActorUserID,
+		arg.ActorUserID,
+		arg.ActorUserID,
 		arg.WorkspaceID,
 		arg.StateFilter,
 		arg.StateFilter,
@@ -2658,6 +2987,7 @@ func (q *Queries) ListTasksForWorkspaceKeyset(ctx context.Context, arg ListTasks
 			&i.ProjectName,
 			&i.ParentTaskPublicID,
 			&i.ParentTaskTitle,
+			&i.ParentVisible,
 			&i.Title,
 			&i.Visibility,
 			&i.DerivedState,
