@@ -35,7 +35,7 @@ func BuildCORS(allowed []string, devLocalhost bool) func(http.Handler) http.Hand
 		AllowedOrigins:   allowed,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "Idempotency-Key", "X-Requested-With"},
-		ExposedHeaders:   []string{"X-Request-Id"},
+		ExposedHeaders:   []string{"X-Request-Id", "Retry-After"},
 		AllowCredentials: allowCreds,
 		MaxAge:           3600,
 	}

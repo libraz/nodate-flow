@@ -365,3 +365,45 @@ func requireProblemEnvelope(t *testing.T, rec *httptest.ResponseRecorder, code, 
 	require.NotContains(t, body, "code", "the pre-unification member must be gone, not merely unread")
 	require.NotContains(t, body, "message", "the pre-unification member must be gone, not merely unread")
 }
+
+func TestAPIRateLimiter_UsersBehindOneIPDoNotShareBucket(t *testing.T) {
+	t.Parallel()
+
+	rl := NewAPIRateLimiter(APIRateLimitConfig{AuthedMaxRequests: 2, Window: time.Minute})
+	t.Cleanup(rl.Stop)
+	handler := rl.Middleware()(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	serve := func(user uint32) int {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		ctx := WithClientIP(req.Context(), "203.0.113.7")
+		ctx = authn.WithActor(ctx, user)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req.WithContext(ctx))
+		return rec.Code
+	}
+
+	require.Equal(t, http.StatusOK, serve(1))
+	require.Equal(t, http.StatusOK, serve(1))
+	require.Equal(t, http.StatusTooManyRequests, serve(1), "user 1 exhausts only their own bucket")
+	require.Equal(t, http.StatusOK, serve(2), "user 2 on the same IP is unaffected")
+}
+
+func TestSkipStreamReauth_BypassesLimiterOnReplay(t *testing.T) {
+	t.Parallel()
+
+	rl := NewAPIRateLimiter(APIRateLimitConfig{AuthedMaxRequests: 1, Window: time.Minute})
+	t.Cleanup(rl.Stop)
+	gate := SkipStreamReauth(rl.Middleware())
+	reauth := StreamReauthorizer(gate)
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req = req.WithContext(authn.WithActor(req.Context(), 1))
+	for i := 0; i < 5; i++ {
+		require.NoError(t, reauth(req), "replay %d must not touch the bucket", i+1)
+	}
+	rec := httptest.NewRecorder()
+	gate(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {})).ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code, "the first real request still has its full budget")
+}

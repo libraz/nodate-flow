@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -28,6 +29,24 @@ func (e *ErrStreamUnauthorized) Error() string {
 	return fmt.Sprintf("stream: no longer authorized (%s)", e.Code)
 }
 
+type streamReauthKey struct{}
+
+// SkipStreamReauth wraps mw so it is bypassed when the request is a
+// [StreamReauthorizer] replay. A timer-driven re-check is not client
+// traffic and must not consume (or be refused by) a rate-limit bucket.
+func SkipStreamReauth(mw func(http.Handler) http.Handler) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		limited := mw(next)
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if v, _ := r.Context().Value(streamReauthKey{}).(bool); v {
+				next.ServeHTTP(w, r)
+				return
+			}
+			limited.ServeHTTP(w, r)
+		})
+	}
+}
+
 // StreamReauthorizer turns the middleware chain guarding a route into a
 // check that can be re-run on a connection that is already open.
 //
@@ -52,6 +71,7 @@ func (e *ErrStreamUnauthorized) Error() string {
 // chain produced.
 func StreamReauthorizer(chain ...func(http.Handler) http.Handler) func(*http.Request) error {
 	return func(r *http.Request) error {
+		r = r.WithContext(context.WithValue(r.Context(), streamReauthKey{}, true))
 		// The terminal handler is built per call so two connections
 		// re-checking at the same time cannot see each other's result.
 		passed := false

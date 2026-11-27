@@ -303,6 +303,15 @@ func Build(deps Deps) http.Handler {
 	return BuildResult(deps).Handler
 }
 
+const (
+	// ipRateLimitPerMinute is flood defence only: sized so a whole office
+	// behind one NAT address stays well clear of it in normal use.
+	ipRateLimitPerMinute = 1200
+	// userRateLimitPerMinute covers one heavy SPA user with several tabs,
+	// each refetching a batch of queries per realtime event.
+	userRateLimitPerMinute = 600
+)
+
 // BuildResult mounts every nodate-flow API route onto a fresh chi router
 // and returns the handler together with the list of huma.API instances
 // used. It mirrors cmd/api/main.go so that the integration test harness
@@ -322,14 +331,14 @@ func BuildResult(deps Deps) Result {
 	r.Use(middleware.ClientIP(deps.TrustedProxyHops))
 	// Security response headers: CSP, HSTS, X-Content-Type-Options, etc.
 	r.Use(middleware.SecurityHeaders())
-	// Global per-IP rate limiter: defence-in-depth against floods
-	// from a single source. The limit is generous (200 req/min)
-	// because authenticated routes additionally enforce per-user
-	// limits inside their groups. Disabled in integration tests
-	// where many parallel tenants hit the same loopback address.
+	// Global per-IP rate limiter: flood defence against a single source.
+	// It is deliberately loose because many users can share one NAT
+	// address; fairness between them is the per-user limiter inside the
+	// authenticated chain below. Disabled in integration tests where
+	// many parallel tenants hit the same loopback address.
 	if !deps.DisableRateLimit {
 		globalRL := middleware.NewIPRateLimiter(middleware.RateLimitConfig{
-			MaxRequests: 200,
+			MaxRequests: ipRateLimitPerMinute,
 			Window:      time.Minute,
 		})
 		r.Use(globalRL.Middleware())
@@ -366,8 +375,18 @@ func BuildResult(deps Deps) Result {
 	// middleware.RequireTokenWorkspaceBinding.
 	loggerCtx := middleware.LoggerContext()
 	tokenWorkspaceMW := middleware.RequireTokenWorkspaceBinding(shared.aclDB)
+	// Per-user limiter: runs once auth has resolved the actor, so each
+	// user behind a shared IP has an independent bucket.
+	userRateLimit := func(next http.Handler) http.Handler { return next }
+	if !deps.DisableRateLimit {
+		userRL := middleware.NewAPIRateLimiter(middleware.APIRateLimitConfig{
+			AuthedMaxRequests: userRateLimitPerMinute,
+			Window:            time.Minute,
+		})
+		userRateLimit = middleware.SkipStreamReauth(userRL.Middleware())
+	}
 	authMW := func(next http.Handler) http.Handler {
-		return rawAuthMW(middleware.RequireBearerTokenScope(tokenWorkspaceMW(loggerCtx(next))))
+		return rawAuthMW(userRateLimit(middleware.RequireBearerTokenScope(tokenWorkspaceMW(loggerCtx(next)))))
 	}
 
 	authedGroups := buildAuthenticatedAPI(r, deps, shared, authMW)
