@@ -832,7 +832,9 @@
     },
     "hierarchy": {
       "parent_fallback": "Parent task",
-      "subtasks": "{count, plural, one {# subtask} other {# subtasks}}"
+      "subtasks": "{count, plural, one {# subtask} other {# subtasks}}",
+      "show_subtasks": "Show subtasks of \"{title}\"",
+      "hide_subtasks": "Hide subtasks of \"{title}\""
     },
     "form": {
       "title": "Title",

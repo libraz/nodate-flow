@@ -832,7 +832,9 @@
     },
     "hierarchy": {
       "parent_fallback": "父任务",
-      "subtasks": "{count} 个子任务"
+      "subtasks": "{count} 个子任务",
+      "show_subtasks": "显示“{title}”的子任务",
+      "hide_subtasks": "隐藏“{title}”的子任务"
     },
     "form": {
       "title": "标题",

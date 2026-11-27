@@ -832,7 +832,9 @@
     },
     "hierarchy": {
       "parent_fallback": "親タスク",
-      "subtasks": "サブタスク {count} 件"
+      "subtasks": "サブタスク {count} 件",
+      "show_subtasks": "「{title}」のサブタスクを表示",
+      "hide_subtasks": "「{title}」のサブタスクを隠す"
     },
     "form": {
       "title": "タイトル",

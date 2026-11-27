@@ -35,7 +35,10 @@ import AssigneeSummary from './assignee-summary';
 import { PRIORITY_KEY, STATE_KEY } from './constants';
 import PriorityMark from './priority-mark';
 import StateDot from './state-dot';
+import { SubtaskLead, SubtaskLoaders } from './subtask-disclosure';
+import { ParentTaskLine } from './task-marks';
 import css from './task-spreadsheet-view.module.css';
+import { type TreeRow, useSubtaskTree } from './use-subtask-tree';
 import { useTaskFilters } from './use-task-filters';
 
 export interface TaskSpreadsheetViewProps {
@@ -192,7 +195,14 @@ export default function TaskSpreadsheetView({ projectId }: TaskSpreadsheetViewPr
     (filters.states?.length ?? 0) > 0 ||
     (filters.priority?.length ?? 0) > 0 ||
     Boolean(filters.assigneeId);
-  const { data: tasks } = useTasksQuery(projectId, filters);
+  // Unfiltered, subtasks nest under their parent, so only top-level tasks load;
+  // a filter or search lists every match flat, each subtask naming its parent.
+  const treeMode = !hasActiveFilter;
+  const { data: rootTasks } = useTasksQuery(projectId, filters, { topLevel: treeMode });
+  const subtree = useSubtaskTree(rootTasks, treeMode);
+  // Every visible row in display order, children included: row indices, keyboard
+  // navigation and select-all all follow it.
+  const tasks = subtree.rows.map((row) => row.task);
   const locale = i18n.resolvedLanguage ?? 'en';
   const weekdayLabels = t('common.date.weekdays', { returnObjects: true }) as string[];
   const formatMonthYear = (year: number, month: number): string =>
@@ -253,7 +263,7 @@ export default function TaskSpreadsheetView({ projectId }: TaskSpreadsheetViewPr
   };
 
   const selectedIds = [...selectedRows];
-  const mayBeTruncated = tasks.length >= TASKS_QUERY_LIMIT;
+  const mayBeTruncated = rootTasks.length >= TASKS_QUERY_LIMIT;
 
   /* ── Edit lifecycle ────────────────────────────────────────── */
 
@@ -412,7 +422,8 @@ export default function TaskSpreadsheetView({ projectId }: TaskSpreadsheetViewPr
     return parts.filter(Boolean).join(' ');
   };
 
-  const renderTitleCell = (task: TaskListItem, rowIdx: number): ReactElement => {
+  const renderTitleCell = (row: TreeRow, rowIdx: number): ReactElement => {
+    const { task } = row;
     if (isEditing(rowIdx, 'title')) {
       return (
         <input
@@ -430,13 +441,21 @@ export default function TaskSpreadsheetView({ projectId }: TaskSpreadsheetViewPr
       );
     }
     return (
-      <span
-        className={css.titleText}
-        title={task.title}
-        data-closed={task.derivedState === 'done' || task.derivedState === 'cancelled'}
-      >
-        {task.title}
-      </span>
+      <>
+        {row.tree ? <SubtaskLead row={row} onToggle={subtree.toggle} /> : null}
+        {task.parentTaskId && !row.tree ? (
+          <span className={css.parentPrefix}>
+            <ParentTaskLine task={task} />
+          </span>
+        ) : null}
+        <span
+          className={css.titleText}
+          title={task.title}
+          data-closed={task.derivedState === 'done' || task.derivedState === 'cancelled'}
+        >
+          {task.title}
+        </span>
+      </>
     );
   };
 
@@ -632,8 +651,9 @@ export default function TaskSpreadsheetView({ projectId }: TaskSpreadsheetViewPr
             }}
           >
             {virtualItems.map((virtualRow) => {
-              const task = tasks[virtualRow.index];
-              if (!task) return null;
+              const treeRow = subtree.rows[virtualRow.index];
+              if (!treeRow) return null;
+              const task = treeRow.task;
               const rowIdx = virtualRow.index;
               const isSelected = selectedRows.has(task.id);
 
@@ -669,7 +689,7 @@ export default function TaskSpreadsheetView({ projectId }: TaskSpreadsheetViewPr
                     }}
                     tabIndex={isActive(rowIdx, 'title') ? 0 : -1}
                   >
-                    {renderTitleCell(task, rowIdx)}
+                    {renderTitleCell(treeRow, rowIdx)}
                   </div>
 
                   {/* Status */}
@@ -737,6 +757,8 @@ export default function TaskSpreadsheetView({ projectId }: TaskSpreadsheetViewPr
             })}
           </div>
         </div>
+
+        <SubtaskLoaders projectId={projectId} parentIds={subtree.visibleExpandedIds} />
 
         {/* Empty state */}
         {tasks.length === 0 && (

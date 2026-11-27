@@ -52,9 +52,11 @@ import AssigneeSummary from './assignee-summary';
 import { PRIORITY_KEY, STATE_KEY, STATE_TONE } from './constants';
 import PriorityMark from './priority-mark';
 import StateDot from './state-dot';
+import { SubtaskLead, SubtaskLoaders } from './subtask-disclosure';
 import css from './task-list-view.module.css';
 import { CommentCountBadge, ParentTaskLine, SubtaskCountBadge } from './task-marks';
 import { useInlineEdit } from './use-inline-edit';
+import { type TreeRow, useSubtaskTree } from './use-subtask-tree';
 import { resetTaskFilters, useTaskFilters } from './use-task-filters';
 
 export interface TaskListViewProps {
@@ -216,12 +218,15 @@ function BulkBarSlot({
 
 function InlineTitleCell({
   task,
+  lead,
   editing,
   onStartEdit,
   onStopEdit,
   onSave,
 }: {
   task: TaskListItem;
+  /** Indent and disclosure of a nested row; absent in the flat mode. */
+  lead?: ReactElement;
   editing: boolean;
   onStartEdit: () => void;
   onStopEdit: () => void;
@@ -274,7 +279,8 @@ function InlineTitleCell({
 
   return (
     <span className={css.titleCell}>
-      {task.parentTaskId ? (
+      {lead}
+      {task.parentTaskId && !lead ? (
         <span className={css.parentPrefix}>
           <ParentTaskLine task={task} />
         </span>
@@ -473,6 +479,7 @@ interface ListCellState {
   stopEdit: () => void;
   save: (taskId: string, patch: InlinePatch) => void;
   reorderKeyDown: (e: KeyboardEvent, index: number) => void;
+  toggleSubtasks: (taskId: string) => void;
 }
 
 const ListCellContext = createContext<ListCellState | null>(null);
@@ -483,11 +490,13 @@ function useListCell(): ListCellState {
   return state;
 }
 
-function TitleCell({ task }: { task: TaskListItem }): ReactElement {
+function TitleCell({ row }: { row: TreeRow }): ReactElement {
   const cell = useListCell();
+  const { task } = row;
   return (
     <InlineTitleCell
       task={task}
+      {...(row.tree ? { lead: <SubtaskLead row={row} onToggle={cell.toggleSubtasks} /> } : {})}
       editing={cell.isEditing(task.id, 'title')}
       onStartEdit={() => cell.startEdit(task.id, 'title')}
       onStopEdit={cell.stopEdit}
@@ -574,14 +583,19 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
     (filters.states?.length ?? 0) > 0 ||
     (filters.priority?.length ?? 0) > 0 ||
     Boolean(filters.assigneeId);
+  // Unfiltered, subtasks nest under their parent, so only top-level tasks load;
+  // a filter or search lists every match flat, each subtask naming its parent.
+  const treeMode = !hasActiveFilter;
   // OFFSET-paginated infinite list. We flat-map pages here; the project list
   // intentionally stays on the backend sort_weight order so DnD reorder works
   // beyond the first fetched page.
   const { data, hasNextPage, isFetchingNextPage, fetchNextPage } = useTasksInfiniteQuery(
     projectId,
     filters,
+    { topLevel: treeMode },
   );
   const tasks = data.pages.flatMap((p) => p.tasks);
+  const subtree = useSubtaskTree(tasks, treeMode);
   const { data: edges } = useProjectDependenciesQuery(projectId);
   // Memoised for the stable column model below; `edges` is the query's own reference.
   const blockedByOpen = useMemo(() => computeBlockedByOpen(edges), [edges]);
@@ -779,7 +793,7 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
    */
   // Each minSize fits the column's header label (ja and en) or its widest cell value,
   // plus cell padding and the sort indicator where the column is sortable.
-  const columns: ColumnDef<TaskListItem, unknown>[] = useMemo(
+  const columns: ColumnDef<TreeRow, unknown>[] = useMemo(
     () => [
       {
         id: 'drag',
@@ -788,26 +802,35 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
         maxSize: 40,
         enableSorting: false,
         header: () => null,
-        cell: ({ row }) => (
-          <DragHandle index={row.index} onDragStart={handleDragStart} onDragEnd={handleDragEnd} />
-        ),
+        // Reordering moves top-level tasks only; nested rows carry no handle.
+        cell: ({ row }) =>
+          row.original.depth === 0 ? (
+            <DragHandle
+              index={row.original.rootIndex}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+            />
+          ) : null,
       },
       {
         id: 'title',
-        accessorKey: 'title',
+        accessorFn: (r) => r.task.title,
+        // Sorting a nested list would pull children away from their parents.
+        enableSorting: !treeMode,
         size: 320,
         minSize: 160,
         header: () => t('tasks.columns.title'),
-        cell: ({ row }) => <TitleCell task={row.original} />,
+        cell: ({ row }) => <TitleCell row={row.original} />,
       },
       {
         id: 'status',
-        accessorKey: 'derivedState',
+        accessorFn: (r) => r.task.derivedState,
+        enableSorting: !treeMode,
         size: 120,
         minSize: 120,
         header: () => t('tasks.columns.status'),
         cell: ({ row }) => {
-          const state = row.original.derivedState as TaskDerivedState;
+          const state = row.original.task.derivedState as TaskDerivedState;
           return (
             <Badge tone={STATE_TONE[state] ?? STATE_TONE.open}>
               <StateDot state={state} />
@@ -823,7 +846,7 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
         enableSorting: false,
         header: () => t('tasks.columns.deps'),
         cell: ({ row }) => {
-          const count = blockedByOpen.get(row.original.id) ?? 0;
+          const count = blockedByOpen.get(row.original.task.id) ?? 0;
           if (count === 0) return <span className={css.muted}>—</span>;
           return (
             <span
@@ -844,37 +867,42 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
         minSize: 96,
         enableSorting: false,
         header: () => t('tasks.columns.assignee'),
-        cell: ({ row }) => <AssigneeSummary task={row.original} emptyClassName={css.muted} />,
+        cell: ({ row }) => <AssigneeSummary task={row.original.task} emptyClassName={css.muted} />,
       },
       {
         id: 'due',
-        accessorKey: 'dueOn',
+        accessorFn: (r) => r.task.dueOn,
+        enableSorting: !treeMode,
         // Fits a bold overdue date with its weekday, e.g. "2026/11/10(Tue)".
         size: 124,
         minSize: 116,
         header: () => t('tasks.columns.due'),
-        cell: ({ row }) => <DueCell task={row.original} locale={locale} />,
+        cell: ({ row }) => <DueCell task={row.original.task} locale={locale} />,
       },
       {
         id: 'priority',
-        accessorKey: 'priority',
+        accessorFn: (r) => r.task.priority,
+        enableSorting: !treeMode,
         size: 104,
         minSize: 104,
         header: () => t('tasks.columns.priority'),
-        cell: ({ row }) => <PriorityCell task={row.original} />,
+        cell: ({ row }) => <PriorityCell task={row.original.task} />,
       },
       {
         id: 'updated',
-        accessorKey: 'updatedAt',
+        accessorFn: (r) => r.task.updatedAt,
+        enableSorting: !treeMode,
         size: 120,
         minSize: 120,
         header: () => t('tasks.columns.updated'),
         cell: ({ row }) => (
-          <span className={css.updated}>{formatEpoch(row.original.updatedAt, locale) ?? '—'}</span>
+          <span className={css.updated}>
+            {formatEpoch(row.original.task.updatedAt, locale) ?? '—'}
+          </span>
         ),
       },
     ],
-    [t, locale, blockedByOpen, handleDragEnd, handleDragStart],
+    [t, locale, blockedByOpen, handleDragEnd, handleDragStart, treeMode],
   );
 
   const cellState: ListCellState = {
@@ -883,18 +911,19 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
     stopEdit: inlineEdit.stopEdit,
     save: handleInlineSave,
     reorderKeyDown: handleReorderKeyDown,
+    toggleSubtasks: subtree.toggle,
   };
 
   return (
     <>
       <BulkBarSlot selectedIds={selectedIds} onClear={handleClearSelection} />
       <ListCellContext value={cellState}>
-        <DataGrid<TaskListItem>
+        <DataGrid<TreeRow>
           ref={gridRef}
           aria-label={t('tasks.title')}
           columns={columns}
-          data={tasks}
-          getRowId={(row) => row.id}
+          data={subtree.rows}
+          getRowId={(row) => row.task.id}
           emptyContent={
             hasActiveFilter ? (
               <EmptyState
@@ -925,16 +954,24 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
           selectRowLabel={(index) => t('tasks.list.select_row', { index })}
           className={css.grid ?? ''}
           // The whole row is the drop target; dragging starts only from the handle.
-          getRowProps={(row) => ({
-            'data-dragging': dragIdx === row.index || undefined,
-            'data-drop-target': (dropIdx === row.index && dragIdx !== row.index) || undefined,
-            onDragOver: (e) => handleDragOver(e, row.index),
-            onDragLeave: handleDragLeave,
-            onDrop: (e) => handleDrop(e, row.index),
-            onKeyDown: (e) => handleRowKeyDown(e, row.original.id),
-          })}
+          getRowProps={(row) => {
+            const { rootIndex, task } = row.original;
+            const onKeyDown = (e: KeyboardEvent<HTMLDivElement>): void =>
+              handleRowKeyDown(e, task.id);
+            // Nested rows are not drop targets: reordering is among top-level tasks.
+            if (rootIndex < 0) return { onKeyDown };
+            return {
+              'data-dragging': dragIdx === rootIndex || undefined,
+              'data-drop-target': (dropIdx === rootIndex && dragIdx !== rootIndex) || undefined,
+              onDragOver: (e) => handleDragOver(e, rootIndex),
+              onDragLeave: handleDragLeave,
+              onDrop: (e) => handleDrop(e, rootIndex),
+              onKeyDown,
+            };
+          }}
         />
       </ListCellContext>
+      <SubtaskLoaders projectId={projectId} parentIds={subtree.visibleExpandedIds} />
       {/*
         Sentinel + manual fallback. The observer above loads the next page
         when this div comes within LOAD_AHEAD_PX of its scroll container's

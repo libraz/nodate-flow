@@ -127,7 +127,18 @@
   box-shadow: inset 0 0 0 var(--nf-space-0-5) var(--nf-color-focus-ring);
 }
 
+/* A subtask names its parent ahead of its own title, capped so the title keeps the room. */
+.parentPrefix {
+  display: flex;
+  flex: 0 1 auto;
+  /* nf-token-override: keeps a few characters of the parent legible */
+  min-inline-size: 4em;
+  max-inline-size: 40%;
+  margin-inline-end: var(--nf-space-2);
+}
+
 .titleText {
+  min-inline-size: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   text-decoration-line: line-through;

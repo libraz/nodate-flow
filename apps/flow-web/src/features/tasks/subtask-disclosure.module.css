@@ -1,0 +1,43 @@
+/* One indent step per level of nesting; the chevron and the gap share one footprint so titles align. */
+.lead {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  padding-inline-start: calc(var(--subtask-depth, 0) * var(--nf-space-5));
+}
+
+.toggle,
+.gap {
+  inline-size: var(--nf-space-6);
+  block-size: var(--nf-space-6);
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--nf-radius-sm);
+  background: transparent;
+  color: var(--nf-color-fg-muted);
+  cursor: pointer;
+}
+
+.toggle:hover {
+  color: var(--nf-color-fg);
+  background: var(--nf-color-surface-hover);
+}
+
+.toggle:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.chevron {
+  transition: transform var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.toggle[aria-expanded="true"] .chevron {
+  transform: rotate(90deg);
+}
