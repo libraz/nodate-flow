@@ -30,6 +30,12 @@ import (
 	"github.com/libraz/nodate-flow/packages/go-shared/sessionstore"
 )
 
+const (
+	// userRateLimitPerMinute covers one heavy SPA user with several tabs.
+	// It matches flow-api's per-user limiter.
+	userRateLimitPerMinute = 600
+)
+
 // Deps is the dependency bundle Build needs.
 type Deps struct {
 	AppName                   string
@@ -162,9 +168,11 @@ func BuildResult(deps Deps) Result {
 	r := chi.NewRouter()
 	r.Use(middleware.ClientIP(deps.TrustedProxyHops))
 	r.Use(middleware.SecurityHeaders())
-	// Global per-IP rate limiter: defence-in-depth against floods
-	// from a single source. Auth-specific endpoints (login, register)
-	// have their own stricter per-group limiters below. Disabled in
+	// Global per-IP rate limiter: flood defence against a single source.
+	// It is deliberately loose because many users can share one NAT
+	// address; fairness between them is the per-user limiter on the
+	// bearer-authenticated chain below. Credential endpoints (login,
+	// register) have their own stricter per-group limiters. Disabled in
 	// integration tests where many parallel tenants hit the same
 	// loopback address.
 	if !deps.DisableRateLimit {
@@ -404,8 +412,19 @@ func BuildResult(deps Deps) Result {
 	// request_id once auth resolves. Workspace-scoped attrs are added
 	// by RequireWorkspaceMember which calls enrichLoggerWithWorkspace.
 	loggerCtx := middleware.LoggerContext()
+	// Per-user limiter: runs once auth has resolved the actor, so each
+	// user behind a shared IP has an independent bucket. Every bearer
+	// route goes through authMW, so one instance covers them all.
+	userRateLimit := func(next http.Handler) http.Handler { return next }
+	if !deps.DisableRateLimit {
+		userRL := middleware.NewAPIRateLimiter(middleware.APIRateLimitConfig{
+			AuthedMaxRequests: userRateLimitPerMinute,
+			Window:            time.Minute,
+		})
+		userRateLimit = userRL.Middleware()
+	}
 	authMW := func(next http.Handler) http.Handler {
-		return rawAuthMW(loggerCtx(next))
+		return rawAuthMW(userRateLimit(loggerCtx(next)))
 	}
 	adminACL := middleware.RequireInstanceAdmin(deps.Queries)
 	adminDeps := adminhandlers.Deps{

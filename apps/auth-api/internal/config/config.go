@@ -108,7 +108,9 @@ type Config struct {
 	DisableRateLimit bool `env:"NF_AUTH_DISABLE_RATE_LIMIT" envDefault:"false"`
 
 	// RateLimitGlobalMax is the global per-IP request cap (all endpoints).
-	RateLimitGlobalMax int `env:"NF_AUTH_RATE_LIMIT_GLOBAL_MAX" envDefault:"200"`
+	// Flood defence only, sized so an office behind one NAT address stays
+	// clear of it; per-user fairness is a fixed limiter on bearer routes.
+	RateLimitGlobalMax int `env:"NF_AUTH_RATE_LIMIT_GLOBAL_MAX" envDefault:"1200"`
 	// RateLimitGlobalWindowSec is the global rate-limit window in seconds.
 	RateLimitGlobalWindowSec int `env:"NF_AUTH_RATE_LIMIT_GLOBAL_WINDOW" envDefault:"60"`
 
@@ -119,8 +121,10 @@ type Config struct {
 	RateLimitAuthWindowSec int `env:"NF_AUTH_RATE_LIMIT_AUTH_WINDOW" envDefault:"900"`
 
 	// RateLimitSessionMax is the per-IP cap for cookie-auth endpoints
-	// (refresh, logout, TOTP).
-	RateLimitSessionMax int `env:"NF_AUTH_RATE_LIMIT_SESSION_MAX" envDefault:"60"`
+	// (refresh, logout, TOTP) and public invite info. Every page load
+	// refreshes once, so shared-NAT offices need headroom; refresh tokens
+	// are high-entropy, so this is abuse defence, not brute-force defence.
+	RateLimitSessionMax int `env:"NF_AUTH_RATE_LIMIT_SESSION_MAX" envDefault:"600"`
 	// RateLimitSessionWindowSec is the session rate-limit window in seconds.
 	RateLimitSessionWindowSec int `env:"NF_AUTH_RATE_LIMIT_SESSION_WINDOW" envDefault:"900"`
 
