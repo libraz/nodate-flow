@@ -67,6 +67,7 @@
         "empty": "尚未分配代理",
         "add": "分配代理",
         "none_available": "此工作区没有代理",
+        "create_link": "创建代理",
         "paused_option": "{name}（已暂停）",
         "remove": "取消分配 {name}",
         "failed": "分配代理失败",

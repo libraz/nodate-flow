@@ -67,6 +67,7 @@
         "empty": "No agent assigned",
         "add": "Assign an agent",
         "none_available": "No agents in this workspace",
+        "create_link": "Create an agent",
         "paused_option": "{name} (paused)",
         "remove": "Unassign {name}",
         "failed": "Failed to assign the agent",

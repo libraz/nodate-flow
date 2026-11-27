@@ -5,6 +5,11 @@
   color: var(--nf-color-fg-muted);
 }
 
+.link {
+  color: var(--nf-color-accent-fg);
+  text-underline-offset: 0.2em;
+}
+
 .list {
   --presence-gap: var(--nf-space-1);
   list-style: none;

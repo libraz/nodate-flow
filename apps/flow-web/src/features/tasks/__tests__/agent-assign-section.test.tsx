@@ -39,6 +39,12 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
+vi.mock('@tanstack/react-router', () => ({
+  Link: ({ children, to, params }: { children: ReactNode; to: string; params: { id: string } }) => (
+    <a href={to.replace('$id', params.id)}>{children}</a>
+  ),
+}));
+
 import AgentAssignSection from '../agent-panel/agent-assign-section';
 
 /* ── fixtures ─────────────────────────────────────────────────── */
@@ -49,7 +55,10 @@ const AGENTS = [
 ];
 
 /** Route each mocked GET by path so both suspense queries resolve. */
-function serveAssigned(assigned: Array<{ id: string; agentId: string; agentName: string }>): void {
+function serveAssigned(
+  assigned: Array<{ id: string; agentId: string; agentName: string }>,
+  agents: typeof AGENTS = AGENTS,
+): void {
   mocks.get.mockImplementation(async (path: string): Promise<unknown> => {
     if (path === '/tasks/{id}/agents') {
       return {
@@ -60,7 +69,7 @@ function serveAssigned(assigned: Array<{ id: string; agentId: string; agentName:
     }
     if (path === '/workspaces/{wsId}/ai/agents') {
       return {
-        data: { agents: AGENTS, total: AGENTS.length },
+        data: { agents, total: agents.length },
         error: null,
         response: new Response(null, { status: 200 }),
       };
@@ -133,6 +142,30 @@ describe('AgentAssignSection', () => {
 
     expect(await screen.findByText('task_detail.agent.assign.empty')).toBeDefined();
     expect(screen.getByRole('button', { name: 'task_detail.agent.assign.add' })).toBeDefined();
+  });
+
+  it('links to agent settings instead of offering an add button when the workspace has no agents', async () => {
+    serveAssigned([], []);
+    renderSection();
+
+    const link = await screen.findByRole('link', { name: 'task_detail.agent.assign.create_link' });
+    expect(link.getAttribute('href')).toBe('/workspaces/ws-1/settings/ai-agents');
+    expect(screen.getByText(/task_detail\.agent\.assign\.none_available/)).toBeDefined();
+    expect(screen.queryByText('task_detail.agent.assign.empty')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'task_detail.agent.assign.add' })).toBeNull();
+  });
+
+  it('hides the add button once every agent is already assigned', async () => {
+    serveAssigned([
+      { id: 'actor-1', agentId: 'agent-1', agentName: 'Planner' },
+      { id: 'actor-2', agentId: 'agent-2', agentName: 'Reviewer' },
+    ]);
+    renderSection();
+
+    expect(await screen.findByText('Planner')).toBeDefined();
+    expect(screen.getByText('Reviewer')).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'task_detail.agent.assign.add' })).toBeNull();
+    expect(screen.queryByRole('link')).toBeNull();
   });
 
   it('posts the chosen agent to the task', async () => {

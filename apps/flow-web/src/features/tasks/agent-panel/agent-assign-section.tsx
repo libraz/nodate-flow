@@ -11,6 +11,9 @@
  * it the task, which is the same thing the human picker above expresses.
  * Removal goes through the shared actor endpoint, since agent rows are
  * actor rows and `TaskAgentActor.id` is that row's id.
+ *
+ * A workspace with no agents gets a link to the agent settings instead of
+ * an add button; the button only shows while an unassigned agent exists.
  */
 
 import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
@@ -19,6 +22,7 @@ import Combobox from '@nodate-flow/ui/primitives/combobox';
 import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import motion from '@nodate-flow/ui/styles/list-motion.module.css';
+import { Link } from '@tanstack/react-router';
 import { Plus } from 'lucide-react';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -54,6 +58,7 @@ export default function AgentAssignSection({
 
   const assignedAgentIds = new Set(assigned.map((a) => a.agentId));
   const available = agentList.agents.filter((a) => !assignedAgentIds.has(a.id));
+  const noAgentsYet = agentList.agents.length === 0 && entries.length === 0;
 
   const handleAssign = async (agentId: string): Promise<void> => {
     if (!agentId) return;
@@ -101,7 +106,18 @@ export default function AgentAssignSection({
 
   return (
     <>
-      {entries.length === 0 ? (
+      {noAgentsYet ? (
+        <p className={css.muted}>
+          {t('task_detail.agent.assign.none_available')}{' '}
+          <Link
+            to="/workspaces/$id/settings/ai-agents"
+            params={{ id: workspaceId }}
+            className={css.link}
+          >
+            {t('task_detail.agent.assign.create_link')}
+          </Link>
+        </p>
+      ) : entries.length === 0 ? (
         <p className={css.muted}>{t('task_detail.agent.assign.empty')}</p>
       ) : (
         <ul className={css.list}>
@@ -133,27 +149,23 @@ export default function AgentAssignSection({
           ))}
         </ul>
       )}
-      {picking ? (
-        available.length === 0 ? (
-          <p className={css.muted}>{t('task_detail.agent.assign.none_available')}</p>
-        ) : (
-          <Combobox
-            aria-label={t('task_detail.agent.assign.add')}
-            placeholder={t('task_detail.agent.assign.add')}
-            options={available.map((agent) => ({
-              value: agent.id,
-              // A paused agent can still be attached — the assignment is
-              // what the runtime reads when it resumes — but saying so up
-              // front avoids "I assigned it and nothing happened".
-              label: agent.paused
-                ? t('task_detail.agent.assign.paused_option', { name: agent.name })
-                : agent.name,
-            }))}
-            onChange={(v) => {
-              void handleAssign(v);
-            }}
-          />
-        )
+      {available.length === 0 ? null : picking ? (
+        <Combobox
+          aria-label={t('task_detail.agent.assign.add')}
+          placeholder={t('task_detail.agent.assign.add')}
+          options={available.map((agent) => ({
+            value: agent.id,
+            // A paused agent can still be attached — the assignment is
+            // what the runtime reads when it resumes — but saying so up
+            // front avoids "I assigned it and nothing happened".
+            label: agent.paused
+              ? t('task_detail.agent.assign.paused_option', { name: agent.name })
+              : agent.name,
+          }))}
+          onChange={(v) => {
+            void handleAssign(v);
+          }}
+        />
       ) : (
         <TaskActionButton
           icon={<Plus size={14} aria-hidden />}
