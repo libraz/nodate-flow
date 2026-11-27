@@ -24,7 +24,7 @@ import (
 //
 // The handler under test is calendars.ListMyCalendarEvents
 // (apps/flow-api/internal/http/handlers/calendars/me.go) which delegates
-// parsing to parseFlexibleTime in events.go.
+// parsing to parseFlexibleTime in events_list.go.
 
 // seedEventForMe creates a personal calendar (which auto-subscribes the
 // owner) and posts a single event into it. Returns the event start as

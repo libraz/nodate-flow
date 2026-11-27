@@ -2,46 +2,19 @@ package calendars
 
 import "testing"
 
-// TestParseFlexibleTime_RFC3339 covers the datetime parse path the
-// per-calendar list endpoint hits when the client passes a full
-// timestamp. ListEventsInput.Start/End are a flexible string rather
-// than time.Time so the handler can route both shapes through this
-// helper.
-func TestParseFlexibleTime_RFC3339(t *testing.T) {
-	got, err := parseFlexibleTime("2026-04-01T10:00:00Z")
-	if err != nil {
-		t.Fatalf("parseFlexibleTime err: %v", err)
-	}
-	if got.Year() != 2026 || got.Month() != 4 || got.Day() != 1 || got.Hour() != 10 {
-		t.Fatalf("unexpected time: %v", got)
-	}
-}
+func TestRequireNotificationOffset(t *testing.T) {
+	t.Parallel()
 
-// TestParseFlexibleTime_DateOnly covers the YYYY-MM-DD path used by
-// the day-grid view, where the URL only carries a calendar date.
-func TestParseFlexibleTime_DateOnly(t *testing.T) {
-	got, err := parseFlexibleTime("2026-04-30")
-	if err != nil {
-		t.Fatalf("parseFlexibleTime err: %v", err)
+	in := func(v int32) *int32 { return &v }
+	for _, ok := range []*int32{nil, in(0), in(10080)} {
+		if err := requireNotificationOffset(ok); err != nil {
+			t.Errorf("%v must pass: %v", ok, err)
+		}
 	}
-	if got.Year() != 2026 || got.Month() != 4 || got.Day() != 30 {
-		t.Fatalf("unexpected time: %v", got)
-	}
-}
-
-// TestParseFlexibleTime_Garbage asserts a nonsense string surfaces
-// the internal sentinel so the handler can translate it to the public
-// CALENDAR.EVENT.DATE_RANGE_UNPARSEABLE error code.
-func TestParseFlexibleTime_Garbage(t *testing.T) {
-	if _, err := parseFlexibleTime("not-a-date"); err == nil {
-		t.Fatal("expected error for invalid input")
-	}
-}
-
-// TestParseFlexibleTime_Empty mirrors the garbage case for the empty
-// string. Without this we would silently accept an unset query param.
-func TestParseFlexibleTime_Empty(t *testing.T) {
-	if _, err := parseFlexibleTime(""); err == nil {
-		t.Fatal("expected error for empty input")
+	for _, bad := range []int32{-1, 10081} {
+		err := requireNotificationOffset(in(bad))
+		if got := problemCode(t, err); got != "CALENDAR.EVENT.NOTIFICATION_OFFSET_OUT_OF_RANGE" {
+			t.Errorf("%d: got %s", bad, got)
+		}
 	}
 }
