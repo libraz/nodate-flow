@@ -13,7 +13,8 @@
 /* Complete control in the first column; the link fills the rest of the row. */
 .item {
   display: grid;
-  grid-template-columns: var(--nf-space-8) 1fr;
+  /* minmax(0, …): a long title must ellipsize, not widen the track past the card. */
+  grid-template-columns: var(--nf-space-8) minmax(0, 1fr);
   align-items: center;
   border-radius: var(--nf-radius-md);
   border: var(--nf-space-px) solid transparent;
