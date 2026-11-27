@@ -1,4 +1,4 @@
-import Badge, { type BadgeTone } from '@nodate-flow/ui/primitives/badge';
+import Badge from '@nodate-flow/ui/primitives/badge';
 import Button from '@nodate-flow/ui/primitives/button';
 import Checkbox from '@nodate-flow/ui/primitives/checkbox';
 import Combobox from '@nodate-flow/ui/primitives/combobox';
@@ -17,7 +17,7 @@ import FormActions from '../../../components/form-actions';
 import { formatApiError } from '../../../lib/api-error';
 import { confirmAction } from '../../../lib/confirm-action';
 import { endOfDayUnix } from '../../../lib/date-utils';
-import { formatDateOnly, formatEpoch, formatEpochDateTime } from '../../../lib/format';
+import { formatDateOnly } from '../../../lib/format';
 import { onSubmitShortcut } from '../../../lib/submit-shortcut';
 import { useEffectiveZone } from '../../../lib/use-effective-timezone';
 import { useWeekStart } from '../../../lib/use-week-start';
@@ -28,6 +28,7 @@ import { useWorkspaceMembersQuery } from '../../workspaces/api';
 import { type TaskActor, useListAttachments, useTaskActorsQuery, useTaskQuery } from '../api';
 import TaskActionButton from '../task-action-button';
 import TaskSectionHeading from '../task-section-heading';
+import { useActionError } from './action-error';
 import {
   useCreateHandoff,
   useCreateSubmission,
@@ -38,52 +39,10 @@ import {
   type WorkflowHandoff,
   workflowKeys,
 } from './api';
+import HandoffHistory from './handoff-history';
+import { HANDOFF_ROLE_KEY, type HandoffRole, isHandoffRole } from './handoff-roles';
+import SubmissionHistory from './submission-history';
 import css from './task-workflow-panel.module.css';
-
-const HANDOFF_ROLES = ['assignee', 'reviewer', 'approver'] as const;
-type HandoffRole = (typeof HANDOFF_ROLES)[number];
-
-const HANDOFF_ROLE_KEY: Record<HandoffRole, string> = {
-  assignee: 'taskWorkflow.roles.assignee',
-  reviewer: 'taskWorkflow.roles.reviewer',
-  approver: 'taskWorkflow.roles.approver',
-};
-
-type HandoffStatus = 'pending' | 'accepted' | 'declined' | 'expired' | 'cancelled';
-
-const HANDOFF_STATUS_KEY: Record<HandoffStatus, string> = {
-  pending: 'taskWorkflow.handoffStatus.pending',
-  accepted: 'taskWorkflow.handoffStatus.accepted',
-  declined: 'taskWorkflow.handoffStatus.declined',
-  expired: 'taskWorkflow.handoffStatus.expired',
-  cancelled: 'taskWorkflow.handoffStatus.cancelled',
-};
-
-const HANDOFF_STATUS_TONE: Record<HandoffStatus, BadgeTone> = {
-  pending: 'info',
-  accepted: 'success',
-  declined: 'neutral',
-  expired: 'neutral',
-  cancelled: 'neutral',
-};
-
-function isHandoffRole(value: string): value is HandoffRole {
-  return value in HANDOFF_ROLE_KEY;
-}
-
-function isHandoffStatus(value: string): value is HandoffStatus {
-  return value in HANDOFF_STATUS_KEY;
-}
-
-/** The control an action error belongs to; the message renders beside it. */
-type ActionScope =
-  | 'policy'
-  | 'checks'
-  | 'submit'
-  | 'reason'
-  | 'decision'
-  | 'handoff'
-  | 'handoffDecision';
 
 export interface TaskWorkflowPanelProps {
   taskId: string;
@@ -241,21 +200,8 @@ function TaskWorkflowPanelContent({
   const [handoffRole, setHandoffRole] = useState<HandoffRole>('assignee');
   const [handoffRecipientId, setHandoffRecipientId] = useState('');
   const [handoffDueOn, setHandoffDueOn] = useState('');
-  // `targetId` pins a row-level error (one handoff) to that row.
-  const [actionError, setActionError] = useState<{
-    scope: ActionScope;
-    message: string;
-    targetId?: string;
-  } | null>(null);
-  const failWith = (scope: ActionScope, message: string, targetId?: string): void => {
-    setActionError({ scope, message, ...(targetId ? { targetId } : {}) });
-  };
-  const errorFor = (scope: ActionScope, targetId?: string): ReactElement | null =>
-    actionError?.scope === scope && actionError.targetId === targetId ? (
-      <p className={targetId ? `${css.error} ${css.rowError}` : css.error} role="alert">
-        {actionError.message}
-      </p>
-    ) : null;
+  const actionErrors = useActionError();
+  const { actionError, setActionError, failWith, errorFor } = actionErrors;
 
   const snapshot = workflowQuery.data;
   const submission = snapshot?.currentSubmission;
@@ -511,8 +457,6 @@ function TaskWorkflowPanelContent({
   const weekdayLabels: unknown = t('common.date.weekdays', { returnObjects: true });
   const formatMonthYear = (year: number, month: number): string =>
     t('common.date.monthYear', { year, month });
-  const handoffRoleLabel = (role: string): string =>
-    isHandoffRole(role) ? t(HANDOFF_ROLE_KEY[role]) : role;
   const displayedPolicy = policyMutation.isPending
     ? policyMutation.variables.input.policy
     : snapshot.completionPolicy;
@@ -864,116 +808,12 @@ function TaskWorkflowPanelContent({
           ) : null}
 
           {recentSubmissions.length > 0 ? (
-            <section className={css.section} aria-label={t('taskWorkflow.submissionHistory')}>
-              <details className={css.history}>
-                <summary className={css.historySummary}>
-                  <span>{t('taskWorkflow.submissionHistory')}</span>
-                  <Badge tone="neutral" className={css.numeric}>
-                    {recentSubmissions.length}
-                  </Badge>
-                </summary>
-                <ol className={css.list}>
-                  {recentSubmissions.map((historySubmission) => {
-                    const decision = historySubmission.decision;
-                    const isStaleApproval =
-                      decision?.decision === 'approved' &&
-                      historySubmission.revision !== currentRevision;
-                    const createdAt = new Date(historySubmission.createdAt * 1000);
-                    const decisionLabel =
-                      decision?.decision === 'approved'
-                        ? t('taskWorkflow.approved')
-                        : decision?.decision === 'rejected'
-                          ? t('taskWorkflow.rejected')
-                          : decision?.decision
-                            ? decision.decision
-                            : t('taskWorkflow.pendingReview');
-                    const decisionTone =
-                      decision?.decision === 'approved'
-                        ? isStaleApproval
-                          ? 'neutral'
-                          : 'success'
-                        : decision?.decision === 'rejected'
-                          ? 'warning'
-                          : 'neutral';
-                    const acceptanceCriteria = historySubmission.acceptanceCriteria ?? [];
-
-                    return (
-                      <li key={historySubmission.id} className={`${css.item} ${css.historyItem}`}>
-                        <div className={css.itemBody}>
-                          <div className={css.summary}>
-                            <strong className={css.numeric}>
-                              {t('taskWorkflow.historyRevision', {
-                                revision: historySubmission.revision,
-                              })}
-                            </strong>
-                            <time
-                              className={`${css.muted} ${css.numeric}`}
-                              dateTime={createdAt.toISOString()}
-                            >
-                              {formatEpochDateTime(historySubmission.createdAt, locale, zone)}
-                            </time>
-                          </div>
-                          <div className={css.summary}>
-                            <Badge tone={decisionTone}>{decisionLabel}</Badge>
-                            {isStaleApproval ? (
-                              <Badge tone="warning">{t('taskWorkflow.staleHistoryApproval')}</Badge>
-                            ) : null}
-                          </div>
-                          {decision?.reason ? (
-                            <p className={css.muted}>
-                              <strong className={css.label}>
-                                {t('taskWorkflow.previousReviewFeedback')}
-                              </strong>
-                              {decision.reason}
-                            </p>
-                          ) : null}
-                          {acceptanceCriteria.length > 0 ? (
-                            <div
-                              className={css.itemBody}
-                              role="group"
-                              aria-label={t('taskWorkflow.acceptanceCriteria')}
-                            >
-                              <strong>{t('taskWorkflow.acceptanceCriteria')}</strong>
-                              <ul className={css.list}>
-                                {acceptanceCriteria.map((criterion) => (
-                                  <li key={`${historySubmission.id}-${criterion}`}>{criterion}</li>
-                                ))}
-                              </ul>
-                            </div>
-                          ) : null}
-                          {(historySubmission.evidenceUrls ?? []).length > 0 ? (
-                            <div className={css.itemBody}>
-                              <strong>{t('taskWorkflow.evidence')}</strong>
-                              <ul className={css.list}>
-                                {(historySubmission.evidenceUrls ?? []).map((value) => {
-                                  const url = safeSourceUrl(value);
-                                  return (
-                                    <li key={value}>
-                                      {url ? (
-                                        <a
-                                          className={css.safeLink}
-                                          href={url}
-                                          target="_blank"
-                                          rel="noreferrer"
-                                        >
-                                          {url}
-                                        </a>
-                                      ) : (
-                                        <span>{value}</span>
-                                      )}
-                                    </li>
-                                  );
-                                })}
-                              </ul>
-                            </div>
-                          ) : null}
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ol>
-              </details>
-            </section>
+            <SubmissionHistory
+              submissions={recentSubmissions}
+              currentRevision={currentRevision}
+              locale={locale}
+              zone={zone}
+            />
           ) : null}
 
           {canCreateSubmission ? (
@@ -1151,96 +991,15 @@ function TaskWorkflowPanelContent({
           ) : null}
 
           {(snapshot.handoffs ?? []).length > 0 ? (
-            <section className={css.section} aria-label={t('taskWorkflow.handoffHistory')}>
-              <h3 className={css.sectionTitle}>{t('taskWorkflow.handoffHistory')}</h3>
-              <ul className={`${css.list} ${css.dividedList}`}>
-                {(snapshot.handoffs ?? []).map((handoff) => {
-                  const status = isHandoffStatus(handoff.status) ? handoff.status : undefined;
-                  const deciding =
-                    pendingHandoffDecision?.handoffId === handoff.id
-                      ? pendingHandoffDecision.input.decision
-                      : undefined;
-                  const canWithdraw = status === 'pending' && handoff.canCancel;
-                  return (
-                    <li key={handoff.id} className={css.handoffItem}>
-                      <div className={css.itemBody}>
-                        <div className={css.itemHeader}>
-                          <strong>
-                            {t('taskWorkflow.handoffSummary', {
-                              role: handoffRoleLabel(handoff.role),
-                              recipient:
-                                memberName(handoff.toUserId) ?? t('taskWorkflow.unknownMember'),
-                            })}
-                          </strong>
-                          <Badge tone={status ? HANDOFF_STATUS_TONE[status] : 'neutral'}>
-                            {status ? t(HANDOFF_STATUS_KEY[status]) : handoff.status}
-                          </Badge>
-                          {handoff.dueAt ? (
-                            <span className={`${css.muted} ${css.numeric}`}>
-                              {t('taskWorkflow.handoffDueSuffix', {
-                                due: formatEpoch(handoff.dueAt, locale, zone) ?? '',
-                              })}
-                            </span>
-                          ) : null}
-                        </div>
-                        {status === 'pending' ? (
-                          <p className={css.muted}>{t('taskWorkflow.handoffPendingHint')}</p>
-                        ) : status === 'expired' ? (
-                          <p className={css.muted}>{t('taskWorkflow.handoffExpiredHint')}</p>
-                        ) : null}
-                      </div>
-                      {status === 'pending' && (handoff.canDecide || canWithdraw) ? (
-                        <div className={css.row}>
-                          {canWithdraw ? (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="danger"
-                              disabled={handoffDecisionMutation.isPending}
-                              aria-busy={deciding === 'cancel' || undefined}
-                              onClick={() => void handleHandoffDecision(handoff, 'cancel')}
-                            >
-                              {deciding === 'cancel'
-                                ? t('taskWorkflow.withdrawingHandoff')
-                                : t('taskWorkflow.withdrawHandoff')}
-                            </Button>
-                          ) : null}
-                          {handoff.canDecide ? (
-                            <>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="ghost"
-                                disabled={handoffDecisionMutation.isPending}
-                                aria-busy={deciding === 'decline' || undefined}
-                                onClick={() => void handleHandoffDecision(handoff, 'decline')}
-                              >
-                                {deciding === 'decline'
-                                  ? t('taskWorkflow.saving')
-                                  : t('taskWorkflow.declineHandoff')}
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="primary"
-                                disabled={handoffDecisionMutation.isPending}
-                                aria-busy={deciding === 'accept' || undefined}
-                                onClick={() => void handleHandoffDecision(handoff, 'accept')}
-                              >
-                                {deciding === 'accept'
-                                  ? t('taskWorkflow.saving')
-                                  : t('taskWorkflow.acceptHandoff')}
-                              </Button>
-                            </>
-                          ) : null}
-                        </div>
-                      ) : null}
-                      {errorFor('handoffDecision', handoff.id)}
-                    </li>
-                  );
-                })}
-              </ul>
-            </section>
+            <HandoffHistory
+              handoffs={snapshot.handoffs ?? []}
+              memberName={memberName}
+              locale={locale}
+              zone={zone}
+              actionErrors={actionErrors}
+              pendingHandoffDecision={pendingHandoffDecision}
+              onDecide={handleHandoffDecision}
+            />
           ) : null}
         </>
       )}
