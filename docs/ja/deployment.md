@@ -56,7 +56,7 @@ services:
 docker compose -f compose.prod.yml -f compose.embedding-secret.yml up -d --build --force-recreate api
 ```
 
-サービスを起動または再作成する Compose コマンドには毎回 `-f compose.embedding-secret.yml` を追加します。後に続く初回起動のコマンドでも同じです。キーの設定元はどちらか一方にしてください。ファイルには空でないキーが必要で、末尾の改行は 1 つまで許容します。キーは起動時に読み込むため、ファイルを更新したら `api` コンテナを再作成します。ワークスペースは既定でサーバー共通の埋め込み設定を引き継ぎ、AI プロバイダー設定から無効にできます。このキーは各ワークスペースに登録する LLM のキーとは別です。`NF_FLOW_EMBED_OPENAI_KEY` で直接渡すと、Docker のコンテナ環境情報からキーの実値を読めます。
+サービスを起動または再作成する Compose コマンドには毎回 `-f compose.embedding-secret.yml` を追加します。後に続く初回起動のコマンドでも同じです。キーの設定元はどちらか一方にしてください。ファイルには空でないキーが必要で、末尾の改行は 1 つまで許容します。キーは起動時に読み込むため、ファイルを更新したら `api` コンテナを再作成します。ワークスペースは既定でサーバー共通の埋め込み設定を引き継ぎ、設定 → AI → 接続から無効にできます。このキーは各ワークスペースに登録する LLM のキーとは別です。`NF_FLOW_EMBED_OPENAI_KEY` で直接渡すと、Docker のコンテナ環境情報からキーの実値を読めます。
 
 既定のモデルは `text-embedding-3-small` です。`NF_FLOW_EMBED_MODEL` と `NF_FLOW_EMBED_BASE_URL` で、モデルと OpenAI 互換の接続先を指定できます。本番では接続先に HTTPS を使ってください。
 

@@ -56,7 +56,7 @@ Create the host file through your secret manager. Set its owner to numeric UID a
 docker compose -f compose.prod.yml -f compose.embedding-secret.yml up -d --build --force-recreate api
 ```
 
-Include `-f compose.embedding-secret.yml` in every Compose command that starts or recreates services, including the first-start commands below. Configure exactly one key source. The file must contain a non-empty key. A single final line ending is accepted. The process reads the key at startup, so recreate `api` after rotating the file. Workspaces inherit this server-wide embedding provider by default and can disable it in AI provider settings. This key is separate from the LLM keys registered for each workspace. When the key is set directly through `NF_FLOW_EMBED_OPENAI_KEY`, Docker exposes its value in container environment metadata.
+Include `-f compose.embedding-secret.yml` in every Compose command that starts or recreates services, including the first-start commands below. Configure exactly one key source. The file must contain a non-empty key. A single final line ending is accepted. The process reads the key at startup, so recreate `api` after rotating the file. Workspaces inherit this server-wide embedding provider by default and can disable it under Settings → AI → Connection. This key is separate from the LLM keys registered for each workspace. When the key is set directly through `NF_FLOW_EMBED_OPENAI_KEY`, Docker exposes its value in container environment metadata.
 
 The default model is `text-embedding-3-small`. Use `NF_FLOW_EMBED_MODEL` and `NF_FLOW_EMBED_BASE_URL` to select a model and an OpenAI-compatible endpoint. The base URL must use HTTPS in production.
 
