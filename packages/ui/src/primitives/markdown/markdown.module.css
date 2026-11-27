@@ -42,6 +42,24 @@
   margin-block: 0.5em;
   padding-inline-start: 1.5em;
 }
+/* The Tailwind preflight resets list-style; restore the markers. */
+.md ul {
+  list-style: disc;
+}
+.md ol {
+  list-style: decimal;
+}
+.md ul ul {
+  list-style: circle;
+}
+.md li::marker {
+  color: var(--nf-color-fg-muted);
+}
+/* GFM task items carry a checkbox instead of a marker (tight or loose). */
+.md li:has(> input[type="checkbox"]),
+.md li:has(> p > input[type="checkbox"]) {
+  list-style: none;
+}
 .md li {
   margin-block: 0.15em;
 }
