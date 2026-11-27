@@ -15,7 +15,7 @@ CREATE TABLE ai_agents (
   system_prompt MEDIUMTEXT NOT NULL COMMENT 'System prompt text',
   temperature SMALLINT UNSIGNED NOT NULL DEFAULT 100 COMMENT 'Sampling temperature x100 (e.g., 100 = 1.00)',
   max_output_tokens INT UNSIGNED NULL COMMENT 'Per-call output cap (null = model default)',
-  tools_json JSON NULL COMMENT 'Allowed tool list as JSON array',
+  tools_json JSON NULL COMMENT 'Per-operation grants as a JSON object {"<tool>":"auto"|"approval"}; tools are add_comment, set_priority, set_due_on, transition_task, create_subtask; an absent key means not permitted; {} grants nothing; NULL for signal_judge',
   allowed_scopes_json JSON NULL COMMENT 'Allowed MCP scope list as JSON array (null = inherit from token)',
   monthly_cost_cap_cents INT UNSIGNED NULL COMMENT 'Monthly spend cap in USD cents (null = no cap)',
   schedule_kind ENUM('disabled','interval','on_event','manual') NOT NULL DEFAULT 'disabled' COMMENT 'Trigger mode: interval = fires every NF_AGENT_TICK_INTERVAL; on_event = fires from eventbus; manual = only via /agents/{id}/trigger',

@@ -12,6 +12,7 @@ CREATE TABLE task_actors (
   kind ENUM('user','agent') NOT NULL DEFAULT 'user' COMMENT 'Actor kind — user or AI agent',
 
   role ENUM('assignee','reviewer','watcher','approver') NOT NULL DEFAULT 'assignee' COMMENT 'Actor role on the task',
+  delegated_by_user_id INT UNSIGNED NULL COMMENT 'Internal FK to users.id: human who assigned this agent (delegator); caps automatic application of the agent''s writes. Null for human actors or when unrecorded',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
@@ -35,6 +36,7 @@ CREATE TABLE task_actors (
   CONSTRAINT fk_task_actors_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
   CONSTRAINT fk_task_actors_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_task_actors_agent FOREIGN KEY (agent_id) REFERENCES ai_agents(id) ON DELETE CASCADE,
+  CONSTRAINT fk_task_actors_delegated_by FOREIGN KEY (delegated_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
   CONSTRAINT chk_task_actors_kind_target CHECK (
     (kind = 'user'  AND user_id  IS NOT NULL AND agent_id IS NULL) OR
     (kind = 'agent' AND agent_id IS NOT NULL AND user_id  IS NULL)

@@ -141,6 +141,10 @@ sql:
             go_struct_tag: 'json:"-"'
           - column: "*.decided_by_user_id"
             go_struct_tag: 'json:"-"'
+          - column: "*.delegated_by_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.trigger_user_id"
+            go_struct_tag: 'json:"-"'
           - column: "*.submitted_by_user_id"
             go_struct_tag: 'json:"-"'
           - column: "*.reviewer_user_id"
@@ -543,6 +547,10 @@ sql:
             go_struct_tag: 'json:"-"'
           - column: "*.decided_by_user_id"
             go_struct_tag: 'json:"-"'
+          - column: "*.delegated_by_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.trigger_user_id"
+            go_struct_tag: 'json:"-"'
           - column: "*.submitted_by_user_id"
             go_struct_tag: 'json:"-"'
           - column: "*.reviewer_user_id"
@@ -833,6 +841,10 @@ sql:
           - column: "*.submission_id"
             go_struct_tag: 'json:"-"'
           - column: "*.decided_by_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.delegated_by_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.trigger_user_id"
             go_struct_tag: 'json:"-"'
           - column: "*.submitted_by_user_id"
             go_struct_tag: 'json:"-"'

@@ -132,7 +132,7 @@ var livenessVocabulary = []livenessGroup{
 		Reason: "records that a step happened to the row, or when; the reads return the row " +
 			"before and after it is set",
 		Columns: []string{
-			"added_at", "completed_at", "delivered_at", "done", "edited_at",
+			"added_at", "completed_at", "decided_at", "delivered_at", "done", "edited_at",
 			"email_verified_at", "failed_at", "finished_at", "invited_at", "joined_at",
 			"last_login_at", "last_refreshed_at", "last_used_at", "mfa_confirmed_at",
 			"resolved_at", "retired_at", "rotated_at", "safety_checked_at", "satisfied_at",

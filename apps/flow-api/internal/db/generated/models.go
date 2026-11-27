@@ -14,6 +14,97 @@ import (
 	types "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 )
 
+type AgentActionProposalsKind string
+
+const (
+	AgentActionProposalsKindAddComment     AgentActionProposalsKind = "add_comment"
+	AgentActionProposalsKindSetPriority    AgentActionProposalsKind = "set_priority"
+	AgentActionProposalsKindSetDueOn       AgentActionProposalsKind = "set_due_on"
+	AgentActionProposalsKindTransitionTask AgentActionProposalsKind = "transition_task"
+	AgentActionProposalsKindCreateSubtask  AgentActionProposalsKind = "create_subtask"
+)
+
+func (e *AgentActionProposalsKind) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = AgentActionProposalsKind(s)
+	case string:
+		*e = AgentActionProposalsKind(s)
+	default:
+		return fmt.Errorf("unsupported scan type for AgentActionProposalsKind: %T", src)
+	}
+	return nil
+}
+
+type NullAgentActionProposalsKind struct {
+	AgentActionProposalsKind AgentActionProposalsKind `json:"agentActionProposalsKind"`
+	Valid                    bool                     `json:"valid"` // Valid is true if AgentActionProposalsKind is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullAgentActionProposalsKind) Scan(value interface{}) error {
+	if value == nil {
+		ns.AgentActionProposalsKind, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.AgentActionProposalsKind.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullAgentActionProposalsKind) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.AgentActionProposalsKind), nil
+}
+
+type AgentActionProposalsStatus string
+
+const (
+	AgentActionProposalsStatusPending  AgentActionProposalsStatus = "pending"
+	AgentActionProposalsStatusApplied  AgentActionProposalsStatus = "applied"
+	AgentActionProposalsStatusRejected AgentActionProposalsStatus = "rejected"
+	AgentActionProposalsStatusStale    AgentActionProposalsStatus = "stale"
+	AgentActionProposalsStatusExpired  AgentActionProposalsStatus = "expired"
+	AgentActionProposalsStatusFailed   AgentActionProposalsStatus = "failed"
+)
+
+func (e *AgentActionProposalsStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = AgentActionProposalsStatus(s)
+	case string:
+		*e = AgentActionProposalsStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for AgentActionProposalsStatus: %T", src)
+	}
+	return nil
+}
+
+type NullAgentActionProposalsStatus struct {
+	AgentActionProposalsStatus AgentActionProposalsStatus `json:"agentActionProposalsStatus"`
+	Valid                      bool                       `json:"valid"` // Valid is true if AgentActionProposalsStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullAgentActionProposalsStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.AgentActionProposalsStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.AgentActionProposalsStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullAgentActionProposalsStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.AgentActionProposalsStatus), nil
+}
+
 type AgentRunsStatus string
 
 const (
@@ -2769,6 +2860,54 @@ func (ns NullWorkspaceMembersRole) Value() (driver.Value, error) {
 	return string(ns.WorkspaceMembersRole), nil
 }
 
+// Agent-proposed task operations awaiting human approval
+type AgentActionProposal struct {
+	// Internal PK, never exposed
+	ID uint32 `json:"-"`
+	// UUID v7, the only externally visible ID
+	PublicID types.PublicID `json:"publicId"`
+	// Internal FK to workspaces.id
+	WorkspaceID uint32 `json:"-"`
+	// Internal FK to tasks.id (the task the operation targets)
+	TaskID uint32 `json:"-"`
+	// Internal FK to ai_agents.id (the agent that proposed the operation)
+	AgentID uint32 `json:"-"`
+	// Internal FK to users.id: delegator of the agent assignment at proposal time (record only; null when none)
+	DelegatedByUserID sql.NullInt32 `json:"-"`
+	// Internal FK to users.id: human whose event started the run (record only)
+	TriggerUserID sql.NullInt32 `json:"-"`
+	// UUID of the agent run that produced the proposal
+	RunKey string `json:"runKey"`
+	// Step number within the run; (run_key, step) is unique
+	Step uint16 `json:"step"`
+	// Proposed operation; same closed set as the keys of ai_agents.tools_json
+	Kind AgentActionProposalsKind `json:"kind"`
+	// Normalized arguments of the operation (only the keys the kind uses)
+	ArgsJson json.RawMessage `json:"argsJson"`
+	// Values compared at approval to detect staleness (priority, due_on, derived_state plus latest transition event id); null when the kind has none
+	PreconditionJson json.RawMessage `json:"preconditionJson"`
+	// pending: awaiting a decision. applied: approved and written. rejected: declined by a human. stale: the target changed since the proposal. expired: not decided before expires_at. failed: approval was attempted but the write was refused
+	Status AgentActionProposalsStatus `json:"status"`
+	// Internal FK to users.id: human who approved or rejected
+	DecidedByUserID sql.NullInt32 `json:"-"`
+	// Time of the decision or of the terminal status change
+	DecidedAt sql.NullTime `json:"decidedAt"`
+	// Reason given when rejecting; shown to the agent on its next run
+	DecisionReason sql.NullString `json:"decisionReason"`
+	// Error code explaining a failed or stale status
+	ErrorCode sql.NullString `json:"errorCode"`
+	// Deadline for a decision (creation plus 7 days); stored in UTC
+	ExpiresAt time.Time `json:"expiresAt"`
+	// Display order
+	SortWeight int32 `json:"sortWeight"`
+	// Admin notes
+	Notes sql.NullString `json:"notes"`
+	// Enabled flag
+	Enabled   bool         `json:"enabled"`
+	UpdatedAt sql.NullTime `json:"updatedAt"`
+	CreatedAt time.Time    `json:"createdAt"`
+}
+
 // Agent execution queue + history
 type AgentRun struct {
 	// Internal PK, never exposed
@@ -2827,7 +2966,7 @@ type AiAgent struct {
 	Temperature uint16 `json:"temperature"`
 	// Per-call output cap (null = model default)
 	MaxOutputTokens sql.NullInt32 `json:"maxOutputTokens"`
-	// Allowed tool list as JSON array
+	// Per-operation grants as a JSON object {"<tool>":"auto"|"approval"}; tools are add_comment, set_priority, set_due_on, transition_task, create_subtask; an absent key means not permitted; {} grants nothing; NULL for signal_judge
 	ToolsJson json.RawMessage `json:"toolsJson"`
 	// Allowed MCP scope list as JSON array (null = inherit from token)
 	AllowedScopesJson json.RawMessage `json:"allowedScopesJson"`
@@ -4631,6 +4770,8 @@ type TaskActor struct {
 	Kind TaskActorsKind `json:"kind"`
 	// Actor role on the task
 	Role TaskActorsRole `json:"role"`
+	// Internal FK to users.id: human who assigned this agent (delegator); caps automatic application of the agent's writes. Null for human actors or when unrecorded
+	DelegatedByUserID sql.NullInt32 `json:"-"`
 	// Display order
 	SortWeight int32 `json:"sortWeight"`
 	// Admin notes
