@@ -100,15 +100,18 @@ func (q *Queries) GetAssigneeDelegator(ctx context.Context, arg GetAssigneeDeleg
 }
 
 const getLatestTaskWorkContextEventID = `-- name: GetLatestTaskWorkContextEventID :one
-SELECT CAST(COALESCE(MAX(CAST(JSON_UNQUOTE(JSON_EXTRACT(e.payload_json, '$.contextEventId')) AS UNSIGNED)), 0) AS UNSIGNED) AS context_event_id
+SELECT CAST(COALESCE(MAX(ctx.id), 0) AS UNSIGNED) AS context_event_id
 FROM events e
+INNER JOIN events ctx
+  ON ctx.workspace_id = e.workspace_id
+  AND ctx.public_id = UUID_TO_BIN(JSON_UNQUOTE(JSON_EXTRACT(e.payload_json, '$.contextEventId')), 0)
 WHERE e.workspace_id = ?
   AND e.task_id = ?
   AND e.actor_agent_id = ?
   AND e.type = ?
   AND e.enabled = TRUE
   AND JSON_UNQUOTE(JSON_EXTRACT(e.payload_json, '$.mode')) = 'task_work'
-  AND JSON_UNQUOTE(JSON_EXTRACT(e.payload_json, '$.endedReason')) IN (/*SLICE:ended_reasons*/?)
+  AND JSON_UNQUOTE(JSON_EXTRACT(e.payload_json, '$.endedReason')) IN ('done', 'max_steps', 'write_cap', 'repeat')
 `
 
 type GetLatestTaskWorkContextEventIDParams struct {
@@ -118,9 +121,11 @@ type GetLatestTaskWorkContextEventIDParams struct {
 	CompletedType string        `json:"completedType"`
 }
 
-// Highest contextEventId among an agent's finished task_work runs on a task
-// whose endedReason is one of the given values; 0 when none. Only the run
-// completed event type is read; failed runs never coalesce later events.
+// Highest internal events.id of the context events (payload contextEventId is
+// the context event's public id) of an agent's finished task_work runs on a
+// task; 0 when none. endedReason is limited to the fixed set of successful
+// endings a later event may coalesce into. Only the run completed event type
+// is read; failed runs never coalesce later events.
 func (q *Queries) GetLatestTaskWorkContextEventID(ctx context.Context, arg GetLatestTaskWorkContextEventIDParams) (int64, error) {
 	row := q.db.QueryRowContext(ctx, getLatestTaskWorkContextEventID,
 		arg.WorkspaceID,
@@ -170,11 +175,15 @@ func (q *Queries) GetLatestTransitionEventID(ctx context.Context, arg GetLatestT
 }
 
 const getMaxTaskEventID = `-- name: GetMaxTaskEventID :one
-SELECT CAST(COALESCE(MAX(e.id), 0) AS UNSIGNED) AS max_event_id
+SELECT
+  e.id AS max_event_id,
+  e.public_id AS max_event_public_id
 FROM events e
 WHERE e.workspace_id = ?
   AND e.task_id = ?
   AND e.enabled = TRUE
+ORDER BY e.id DESC
+LIMIT 1
 `
 
 type GetMaxTaskEventIDParams struct {
@@ -182,12 +191,18 @@ type GetMaxTaskEventIDParams struct {
 	TaskID      sql.NullInt32 `json:"-"`
 }
 
-// Highest events.id recorded on a task; 0 when it has none.
-func (q *Queries) GetMaxTaskEventID(ctx context.Context, arg GetMaxTaskEventIDParams) (int64, error) {
+type GetMaxTaskEventIDRow struct {
+	MaxEventID       uint64         `json:"-"`
+	MaxEventPublicID types.PublicID `json:"maxEventPublicId"`
+}
+
+// Latest enabled event of a task: internal id and public id. No row when the
+// task has none (callers handle sql.ErrNoRows).
+func (q *Queries) GetMaxTaskEventID(ctx context.Context, arg GetMaxTaskEventIDParams) (GetMaxTaskEventIDRow, error) {
 	row := q.db.QueryRowContext(ctx, getMaxTaskEventID, arg.WorkspaceID, arg.TaskID)
-	var max_event_id int64
-	err := row.Scan(&max_event_id)
-	return max_event_id, err
+	var i GetMaxTaskEventIDRow
+	err := row.Scan(&i.MaxEventID, &i.MaxEventPublicID)
+	return i, err
 }
 
 const listAgentContextChildTasks = `-- name: ListAgentContextChildTasks :many

@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/execution"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskservice"
@@ -83,6 +84,12 @@ func TestReadForAgent(t *testing.T) {
 	var maxID int64
 	require.NoError(t, k.db.QueryRowContext(k.ctx, `SELECT MAX(id) FROM events WHERE task_id = ?`, k.f.taskID).Scan(&maxID))
 	require.Equal(t, maxID, c.ContextEventID)
+	var eventPublicID types.PublicID
+	require.NoError(t, k.db.QueryRowContext(k.ctx, `SELECT public_id FROM events WHERE id = ?`, maxID).Scan(&eventPublicID))
+	require.Equal(t, eventPublicID, c.ContextEventPublicID)
+	var policy string
+	require.NoError(t, k.db.QueryRowContext(k.ctx, `SELECT completion_policy FROM tasks WHERE id = ?`, k.f.taskID).Scan(&policy))
+	require.Equal(t, policy, string(c.Task.CompletionPolicy))
 
 	_, err = k.decide(k.owner(), pending.ProposalID, taskservice.VerdictReject, "not now")
 	require.NoError(t, err)

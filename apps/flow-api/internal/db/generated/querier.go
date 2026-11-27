@@ -1205,17 +1205,20 @@ type Querier interface {
 	// while holding the task row lock. The newest event distinguishes blocked
 	// waiting work from legacy waiting work that remains submit-capable.
 	GetLatestTaskTransitionForSubmission(ctx context.Context, arg GetLatestTaskTransitionForSubmissionParams) (string, error)
-	// Highest contextEventId among an agent's finished task_work runs on a task
-	// whose endedReason is one of the given values; 0 when none. Only the run
-	// completed event type is read; failed runs never coalesce later events.
+	// Highest internal events.id of the context events (payload contextEventId is
+	// the context event's public id) of an agent's finished task_work runs on a
+	// task; 0 when none. endedReason is limited to the fixed set of successful
+	// endings a later event may coalesce into. Only the run completed event type
+	// is read; failed runs never coalesce later events.
 	GetLatestTaskWorkContextEventID(ctx context.Context, arg GetLatestTaskWorkContextEventIDParams) (int64, error)
 	// Highest events.id of a task among the given transition event types; 0 when
 	// the task has none. Types are passed in so no event kind is written here.
 	GetLatestTransitionEventID(ctx context.Context, arg GetLatestTransitionEventIDParams) (int64, error)
 	// Fetch a single lens by its public_id.
 	GetLensByPublicID(ctx context.Context, arg GetLensByPublicIDParams) (GetLensByPublicIDRow, error)
-	// Highest events.id recorded on a task; 0 when it has none.
-	GetMaxTaskEventID(ctx context.Context, arg GetMaxTaskEventIDParams) (int64, error)
+	// Latest enabled event of a task: internal id and public id. No row when the
+	// task has none (callers handle sql.ErrNoRows).
+	GetMaxTaskEventID(ctx context.Context, arg GetMaxTaskEventIDParams) (GetMaxTaskEventIDRow, error)
 	// The agent byline a mention snapshots so it survives the agent's deletion.
 	GetMentionActorAgentByline(ctx context.Context, arg GetMentionActorAgentBylineParams) (GetMentionActorAgentBylineRow, error)
 	// Load, for a set of recipients in one workspace, every stored

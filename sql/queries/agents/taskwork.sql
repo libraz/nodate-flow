@@ -47,26 +47,36 @@ WHERE e.workspace_id = sqlc.arg('workspace_id')
   AND e.type IN (sqlc.slice('transition_types'));
 
 -- name: GetMaxTaskEventID :one
--- Highest events.id recorded on a task; 0 when it has none.
-SELECT CAST(COALESCE(MAX(e.id), 0) AS UNSIGNED) AS max_event_id
+-- Latest enabled event of a task: internal id and public id. No row when the
+-- task has none (callers handle sql.ErrNoRows).
+SELECT
+  e.id AS max_event_id,
+  e.public_id AS max_event_public_id
 FROM events e
 WHERE e.workspace_id = sqlc.arg('workspace_id')
   AND e.task_id = sqlc.arg('task_id')
-  AND e.enabled = TRUE;
+  AND e.enabled = TRUE
+ORDER BY e.id DESC
+LIMIT 1;
 
 -- name: GetLatestTaskWorkContextEventID :one
--- Highest contextEventId among an agent's finished task_work runs on a task
--- whose endedReason is one of the given values; 0 when none. Only the run
--- completed event type is read; failed runs never coalesce later events.
-SELECT CAST(COALESCE(MAX(CAST(JSON_UNQUOTE(JSON_EXTRACT(e.payload_json, '$.contextEventId')) AS UNSIGNED)), 0) AS UNSIGNED) AS context_event_id
+-- Highest internal events.id of the context events (payload contextEventId is
+-- the context event's public id) of an agent's finished task_work runs on a
+-- task; 0 when none. endedReason is limited to the fixed set of successful
+-- endings a later event may coalesce into. Only the run completed event type
+-- is read; failed runs never coalesce later events.
+SELECT CAST(COALESCE(MAX(ctx.id), 0) AS UNSIGNED) AS context_event_id
 FROM events e
+INNER JOIN events ctx
+  ON ctx.workspace_id = e.workspace_id
+  AND ctx.public_id = UUID_TO_BIN(JSON_UNQUOTE(JSON_EXTRACT(e.payload_json, '$.contextEventId')), 0)
 WHERE e.workspace_id = sqlc.arg('workspace_id')
   AND e.task_id = sqlc.arg('task_id')
   AND e.actor_agent_id = sqlc.arg('agent_id')
   AND e.type = sqlc.arg('completed_type')
   AND e.enabled = TRUE
   AND JSON_UNQUOTE(JSON_EXTRACT(e.payload_json, '$.mode')) = 'task_work'
-  AND JSON_UNQUOTE(JSON_EXTRACT(e.payload_json, '$.endedReason')) IN (sqlc.slice('ended_reasons'));
+  AND JSON_UNQUOTE(JSON_EXTRACT(e.payload_json, '$.endedReason')) IN ('done', 'max_steps', 'write_cap', 'repeat');
 
 -- name: CountTaskWorkRunsSince :one
 -- task_work runs an agent started on a task at or after a time (the rate

@@ -2,6 +2,8 @@ package taskservice
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"slices"
 	"time"
 
@@ -32,6 +34,8 @@ type AgentTask struct {
 	Priority             int32
 	DueOn                string
 	StartedOn            string
+	// CompletionPolicy is the task's completion policy (manual or review_required).
+	CompletionPolicy generated.TasksCompletionPolicy
 }
 
 // AgentComment is one comment in an agent's context.
@@ -79,7 +83,11 @@ type AgentTaskContext struct {
 	RejectedProposals []AgentRejectedProposal
 	// ContextEventID is the highest task event id the context reflects.
 	ContextEventID int64
-	Grants         execution.ToolGrants
+	// ContextEventPublicID is the public id of that event, the one the run
+	// payload records; the internal id never leaves the server. Zero when
+	// the task has no events.
+	ContextEventPublicID types.PublicID
+	Grants               execution.ToolGrants
 }
 
 // ReadForAgent authorizes the agent and reads its task context in one
@@ -129,6 +137,12 @@ func (s *Service) readForAgentTx(ctx context.Context, tx *dbretry.Tx, agent exec
 		ProjectID: authz.Task.ProjectID,
 	}
 	taskRef := nullInt32(authz.Task.ID)
+
+	settings, err := qtx.GetTaskWorkflowSettings(ctx, generated.GetTaskWorkflowSettingsParams{WorkspaceID: ws, ID: authz.Task.ID})
+	if err != nil {
+		return AgentTaskContext{}, err
+	}
+	out.Task.CompletionPolicy = settings.CompletionPolicy
 
 	agentRow, err := qtx.GetAgentKindByPublicID(ctx, generated.GetAgentKindByPublicIDParams{WorkspaceID: ws, PublicID: authz.Agent.PublicID})
 	if err != nil {
@@ -201,8 +215,14 @@ func (s *Service) readForAgentTx(ctx context.Context, tx *dbretry.Tx, agent exec
 		out.RejectedProposals = append(out.RejectedProposals, r)
 	}
 
-	if out.ContextEventID, err = qtx.GetMaxTaskEventID(ctx, generated.GetMaxTaskEventIDParams{WorkspaceID: ws, TaskID: taskRef}); err != nil {
+	maxEvent, err := qtx.GetMaxTaskEventID(ctx, generated.GetMaxTaskEventIDParams{WorkspaceID: ws, TaskID: taskRef})
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+	case err != nil:
 		return AgentTaskContext{}, err
+	default:
+		out.ContextEventID = int64(maxEvent.MaxEventID) // #nosec G115 -- event ids are BIGINT UNSIGNED far below int64 max
+		out.ContextEventPublicID = maxEvent.MaxEventPublicID
 	}
 	return out, nil
 }
