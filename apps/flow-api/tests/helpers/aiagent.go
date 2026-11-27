@@ -5,12 +5,21 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/agentruntime"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/providers"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/router"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskservice"
 )
 
 // SeededAgent is the bundle of identifiers returned by SeedAgent and
@@ -132,13 +141,19 @@ func SeedAgent(t *testing.T, db *sql.DB, workspacePublicID string, opts SeedAgen
 		eventTriggerExpr = "CAST(? AS JSON)"
 		eventTriggerArgs = append(eventTriggerArgs, opts.EventTriggerTypes)
 	}
+	// A task agent stores its grants as an object, empty when nothing is
+	// granted; only a signal judge has none to store.
+	toolsExpr := "JSON_OBJECT()"
+	if agentKind == "signal_judge" {
+		toolsExpr = "NULL"
+	}
 	insertSQL := `
 		INSERT INTO ai_agents (
 			public_id, workspace_id, model_id, kind, name, description,
 			system_prompt, temperature, monthly_cost_cap_cents,
-			event_trigger_types,
+			event_trigger_types, tools_json,
 			schedule_kind, paused, enabled
-		) VALUES (?, ?, ?, ?, ?, ?, ?, 100, ?, ` + eventTriggerExpr + `, 'manual', FALSE, TRUE)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, 100, ?, ` + eventTriggerExpr + `, ` + toolsExpr + `, 'manual', FALSE, TRUE)
 	`
 	args := append([]interface{}{
 		agentPub, wsID, modelInternalID, agentKind, agentName,
@@ -274,4 +289,424 @@ func lastInsertID(t *testing.T, res sql.Result) int64 {
 	id, err := res.LastInsertId()
 	require.NoError(t, err)
 	return id
+}
+
+// ---- Scripted provider -----------------------------------------------------
+
+// ScriptedProvider is the only fake in the agent task-work tests: an LLM
+// provider that answers from a fixed list instead of a network call. Every
+// other dependency (database, taskservice, runner, REST handlers) is real.
+type ScriptedProvider struct {
+	mu         sync.Mutex
+	texts      []string
+	next       int
+	costMicros int64
+	route      func(req providers.Request) (string, bool)
+	requests   []providers.Request
+}
+
+// NewScriptedProvider answers the n-th call with texts[n]. Once the list is
+// exhausted every further call answers with a finish move, so an
+// unexpected extra call shows up in Calls rather than as a failure here.
+func NewScriptedProvider(texts ...string) *ScriptedProvider {
+	return &ScriptedProvider{texts: texts}
+}
+
+// WithCost makes every response report this cost in millionths of a USD.
+func (p *ScriptedProvider) WithCost(micros int64) *ScriptedProvider {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.costMicros = micros
+	return p
+}
+
+// Route lets a test answer by request (for example by the agent's system
+// prompt) before the sequential list is consulted; ok=false falls through.
+func (p *ScriptedProvider) Route(fn func(req providers.Request) (string, bool)) *ScriptedProvider {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.route = fn
+	return p
+}
+
+// Push appends answers to the sequential list.
+func (p *ScriptedProvider) Push(texts ...string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.texts = append(p.texts, texts...)
+}
+
+// Calls reports how many completions were requested.
+func (p *ScriptedProvider) Calls() int {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return len(p.requests)
+}
+
+// Requests returns a copy of every request received, oldest first.
+func (p *ScriptedProvider) Requests() []providers.Request {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return append([]providers.Request(nil), p.requests...)
+}
+
+// Name implements providers.Provider.
+func (p *ScriptedProvider) Name() string { return "scripted" }
+
+// Kind implements providers.Provider.
+func (p *ScriptedProvider) Kind() providers.Kind { return providers.KindOpenAICompat }
+
+// Model implements providers.Provider.
+func (p *ScriptedProvider) Model() string { return "scripted-model" }
+
+// Complete implements providers.Provider.
+func (p *ScriptedProvider) Complete(_ context.Context, req providers.Request) (*providers.Response, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.requests = append(p.requests, req)
+	text, ok := "", false
+	if p.route != nil {
+		text, ok = p.route(req)
+	}
+	if !ok {
+		if p.next < len(p.texts) {
+			text, p.next = p.texts[p.next], p.next+1
+		} else {
+			text = Finish("script exhausted")
+		}
+	}
+	mode := providers.OutputModeNone
+	if req.Output != nil {
+		mode = providers.OutputModeValidatedText
+	}
+	return &providers.Response{
+		Model:       "scripted-model",
+		Text:        text,
+		Termination: providers.TerminationComplete,
+		OutputMode:  mode,
+		CostMicros:  p.costMicros,
+	}, nil
+}
+
+// Move renders the model answer for one task-work step: the tool and its
+// arguments in the shape the output contract requires, every unused
+// argument null.
+func Move(tool string, args map[string]any) string {
+	full := map[string]any{
+		"body": nil, "priority": nil, "due_on": nil,
+		"transition": nil, "title": nil, "summary": nil,
+	}
+	for k, v := range args {
+		full[k] = v
+	}
+	raw, err := json.Marshal(map[string]any{"thought": "scripted " + tool, "tool": tool, "args": full})
+	if err != nil {
+		panic(err)
+	}
+	return string(raw)
+}
+
+// Finish is the move that ends a run with a summary.
+func Finish(summary string) string {
+	return Move("finish", map[string]any{"summary": summary})
+}
+
+// ---- Agent runtime -----------------------------------------------------------
+
+// AgentEnv is a real orchestrator runner over a real executor, taskservice and
+// database, wired to a ScriptedProvider. It stands in for the worker and the
+// event hook that cmd/api starts, which the HTTP test server does not run.
+type AgentEnv struct {
+	DB       *sql.DB
+	Provider *ScriptedProvider
+	Runner   *agentruntime.OrchestratorRunner
+	matcher  agentruntime.OnEventAgentsQuerier
+}
+
+// NewAgentEnv builds the runner the way cmd/api does for task work.
+func NewAgentEnv(t *testing.T, db *sql.DB, provider *ScriptedProvider) *AgentEnv {
+	t.Helper()
+	require.NotNil(t, db)
+	q := generated.New(db)
+	budget := ai.BudgetReaderFunc(func(ctx context.Context, wsID uint32) (int64, error) {
+		return q.SumAiCostTodayForWorkspace(ctx, ai.DailyCostParams(ctx, q, wsID))
+	})
+	exec := &ai.AgentExecutor{
+		Queries: q,
+		Resolver: ai.AgentProviderResolverFunc(func(context.Context, uint32, types.PublicID) (providers.Provider, error) {
+			return provider, nil
+		}),
+		Guard:       ai.NewCostGuard(budget, 0),
+		Log:         router.NewDBInvocationLogger(db, nil),
+		TaskService: taskservice.New(db, q, mutationlog.New(db, q)),
+		TaskWork:    q,
+	}
+	return &AgentEnv{
+		DB:       db,
+		Provider: provider,
+		Runner:   &agentruntime.OrchestratorRunner{DB: db, Queries: q, Executor: exec},
+		matcher:  agentruntime.NewSqlcOnEventQuerier(db),
+	}
+}
+
+// TriggeredRun is one run RunTriggered started: the agent, the event that
+// woke it, and the error the runner returned (the queue would nack on it).
+type TriggeredRun struct {
+	AgentID uint32
+	EventID uint64
+	Err     error
+}
+
+// maxTriggerRounds bounds RunTriggered's follow-up passes over events the
+// runs themselves wrote.
+const maxTriggerRounds = 10
+
+// RunTriggered reproduces the on-event path synchronously: for every event of
+// the workspace after sinceEventID it asks the real candidate query which
+// agents the event wakes and runs each one through the real runner, then does
+// the same for the events those runs wrote, until a pass finds none. An
+// (agent, event) pair runs once, as the queue's dedupe key guarantees.
+func (e *AgentEnv) RunTriggered(t *testing.T, workspacePublicID string, sinceEventID uint64) []TriggeredRun {
+	t.Helper()
+	wsID := ResolveWorkspaceInternalID(t, e.DB, workspacePublicID)
+	ctx := context.Background()
+	type pair struct {
+		agent uint32
+		event uint64
+	}
+	seen := map[pair]bool{}
+	var runs []TriggeredRun
+	cursor := sinceEventID
+	for round := 0; round < maxTriggerRounds; round++ {
+		ids := eventIDsAfter(t, e.DB, wsID, cursor)
+		if len(ids) == 0 {
+			return runs
+		}
+		cursor = ids[len(ids)-1]
+		for _, id := range ids {
+			matches, err := e.matcher.ListOnEventAgentsForEvent(ctx, wsID, id)
+			require.NoError(t, err, "candidate query for event %d", id)
+			for _, m := range matches {
+				if seen[pair{m.ID, id}] {
+					continue
+				}
+				seen[pair{m.ID, id}] = true
+				job := agentruntime.Job{
+					AgentID:       m.ID,
+					WsID:          m.WorkspaceID,
+					SourceEventID: id,
+					DedupeKey:     fmt.Sprintf("%d:event:%d", m.ID, id),
+				}
+				runs = append(runs, TriggeredRun{AgentID: m.ID, EventID: id, Err: e.Runner.Run(ctx, job, time.Now())})
+			}
+		}
+	}
+	require.FailNow(t, "agent trigger path did not settle", "events were still being produced after %d passes", maxTriggerRounds)
+	return nil
+}
+
+// RunJob runs one job through the real runner, as the queue worker would.
+func (e *AgentEnv) RunJob(t *testing.T, job agentruntime.Job) error {
+	t.Helper()
+	return e.Runner.Run(context.Background(), job, time.Now())
+}
+
+// CandidateAgents returns the internal ids of the agents the event wakes,
+// from the same query the event hook uses.
+func (e *AgentEnv) CandidateAgents(t *testing.T, workspaceID uint32, eventID uint64) []uint32 {
+	t.Helper()
+	matches, err := e.matcher.ListOnEventAgentsForEvent(context.Background(), workspaceID, eventID)
+	require.NoError(t, err)
+	ids := make([]uint32, 0, len(matches))
+	for _, m := range matches {
+		ids = append(ids, m.ID)
+	}
+	return ids
+}
+
+func eventIDsAfter(t *testing.T, db *sql.DB, wsID uint32, after uint64) []uint64 {
+	t.Helper()
+	rows, err := db.Query(`SELECT id FROM events WHERE workspace_id = ? AND id > ? ORDER BY id ASC`, wsID, after)
+	require.NoError(t, err)
+	defer rows.Close()
+	var ids []uint64
+	for rows.Next() {
+		var id uint64
+		require.NoError(t, rows.Scan(&id))
+		ids = append(ids, id)
+	}
+	require.NoError(t, rows.Err())
+	return ids
+}
+
+// ---- Fixtures through the API ------------------------------------------------
+
+// CreateAIModel registers a provider in the tenant's workspace through the
+// API and returns the public id of its default model. The provider is never
+// called: the runner under test resolves its own ScriptedProvider.
+func CreateAIModel(t *testing.T, baseURL string, tt *TestTenant) string {
+	t.Helper()
+	ws := baseURL + "/workspaces/" + tt.WorkspacePublicID + "/ai"
+	var provider struct {
+		ID string `json:"id"`
+	}
+	DoJSON(t, http.MethodPost, ws+"/providers", tt.AccessToken, map[string]any{
+		"kind":         "openai_compat",
+		"name":         "Scripted " + randomHex(4),
+		"baseUrl":      "http://127.0.0.1:1/v1",
+		"defaultModel": "scripted-model",
+		"apiKey":       "sk-test-agent-fixture-0123456789", //#nosec G101 -- synthetic test fixture, never a real key
+	}, &provider)
+	require.NotEmpty(t, provider.ID)
+	var models struct {
+		Models []struct {
+			ID        string `json:"id"`
+			IsDefault bool   `json:"isDefault"`
+		} `json:"models"`
+	}
+	DoJSON(t, http.MethodGet, ws+"/providers/"+provider.ID+"/models", tt.AccessToken, nil, &models)
+	for _, m := range models.Models {
+		if m.IsDefault {
+			return m.ID
+		}
+	}
+	require.FailNow(t, "provider has no default model", "models=%+v", models.Models)
+	return ""
+}
+
+// TaskAgentOptions describes an agent created through POST /ai/agents.
+type TaskAgentOptions struct {
+	Name         string
+	SystemPrompt string
+	// ScheduleKind defaults to disabled; task work does not need a schedule.
+	ScheduleKind      string
+	EventTriggerTypes []string
+	// Tools replaces the default grants (every operation on approval) through
+	// PATCH .../tools when non-nil; an empty map grants nothing.
+	Tools map[string]string
+	// MonthlyCostCapCents has no API surface; it is written to the row.
+	MonthlyCostCapCents int
+}
+
+// TaskAgent is an agent created by CreateTaskAgent.
+type TaskAgent struct {
+	ID       uint32
+	PublicID string
+	Name     string
+}
+
+// CreateTaskAgent creates an agent through the API with a collision-free name.
+func CreateTaskAgent(t *testing.T, db *sql.DB, baseURL string, tt *TestTenant, modelID string, o TaskAgentOptions) *TaskAgent {
+	t.Helper()
+	if o.Name == "" {
+		o.Name = "Agent " + randomHex(5)
+	}
+	if o.SystemPrompt == "" {
+		o.SystemPrompt = "You work on assigned tasks. Marker " + randomHex(5)
+	}
+	body := map[string]any{"modelId": modelID, "name": o.Name, "systemPrompt": o.SystemPrompt}
+	if o.ScheduleKind != "" {
+		body["scheduleKind"] = o.ScheduleKind
+	}
+	if len(o.EventTriggerTypes) > 0 {
+		body["eventTriggerTypes"] = o.EventTriggerTypes
+	}
+	ws := baseURL + "/workspaces/" + tt.WorkspacePublicID + "/ai/agents"
+	var created struct {
+		ID    string            `json:"id"`
+		Tools map[string]string `json:"tools"`
+	}
+	DoJSON(t, http.MethodPost, ws, tt.AccessToken, body, &created)
+	require.NotEmpty(t, created.ID)
+	if o.Tools != nil {
+		DoJSON(t, http.MethodPatch, ws+"/"+created.ID+"/tools", tt.AccessToken, map[string]any{"tools": o.Tools}, nil)
+	}
+	var id uint32
+	require.NoError(t, db.QueryRow(
+		`SELECT id FROM ai_agents WHERE public_id = UUID_TO_BIN(?, 0)`, created.ID).Scan(&id))
+	if o.MonthlyCostCapCents > 0 {
+		_, err := db.Exec(`UPDATE ai_agents SET monthly_cost_cap_cents = ? WHERE id = ?`, o.MonthlyCostCapCents, id)
+		require.NoError(t, err)
+	}
+	return &TaskAgent{ID: id, PublicID: created.ID, Name: o.Name}
+}
+
+// GrantAll returns grants for every task operation in one mode.
+func GrantAll(mode string) map[string]string {
+	return map[string]string{
+		"add_comment": mode, "set_priority": mode, "set_due_on": mode,
+		"transition_task": mode, "create_subtask": mode,
+	}
+}
+
+// ---- Event, invocation and audit reads ---------------------------------------
+
+// EventRecord is one row of the events table as the tests read it.
+type EventRecord struct {
+	ID           uint64
+	PublicID     string
+	Type         string
+	TaskID       uint32
+	ActorUserID  uint32
+	ActorAgentID uint32
+	Payload      map[string]any
+}
+
+// LatestEventID returns the highest events.id of the workspace, 0 when none.
+func LatestEventID(t *testing.T, db *sql.DB, workspaceID uint32) uint64 {
+	t.Helper()
+	var id sql.NullInt64
+	require.NoError(t, db.QueryRow(`SELECT MAX(id) FROM events WHERE workspace_id = ?`, workspaceID).Scan(&id))
+	if !id.Valid {
+		return 0
+	}
+	return uint64(id.Int64) //#nosec G115 -- MAX(id) is non-negative
+}
+
+// EventsOfType returns the workspace's events of one type after afterID, in
+// id order. taskID 0 matches every task.
+func EventsOfType(t *testing.T, db *sql.DB, workspaceID, taskID uint32, eventType string, afterID uint64) []EventRecord {
+	t.Helper()
+	rows, err := db.Query(`
+		SELECT id, BIN_TO_UUID(public_id, 0), type, COALESCE(task_id, 0),
+		       COALESCE(actor_user_id, 0), COALESCE(actor_agent_id, 0), CAST(payload_json AS CHAR)
+		FROM events
+		WHERE workspace_id = ? AND type = ? AND id > ? AND (? = 0 OR task_id = ?)
+		ORDER BY id ASC`, workspaceID, eventType, afterID, taskID, taskID)
+	require.NoError(t, err)
+	defer rows.Close()
+	var out []EventRecord
+	for rows.Next() {
+		var r EventRecord
+		var payload string
+		require.NoError(t, rows.Scan(&r.ID, &r.PublicID, &r.Type, &r.TaskID, &r.ActorUserID, &r.ActorAgentID, &payload))
+		require.NoError(t, json.Unmarshal([]byte(payload), &r.Payload))
+		out = append(out, r)
+	}
+	require.NoError(t, rows.Err())
+	return out
+}
+
+// InsertEvent writes one event row directly. It exists for the cases no API
+// can produce: an event with no actor, or a payload shape no handler emits.
+func InsertEvent(t *testing.T, db *sql.DB, workspaceID, taskID, actorUserID, actorAgentID uint32, eventType string, payload map[string]any) uint64 {
+	t.Helper()
+	raw, err := json.Marshal(payload)
+	require.NoError(t, err)
+	nullable := func(v uint32) sql.NullInt64 { return sql.NullInt64{Int64: int64(v), Valid: v != 0} }
+	res, err := db.Exec(`
+		INSERT INTO events (public_id, workspace_id, task_id, actor_user_id, actor_agent_id, type, payload_json, occurred_at)
+		VALUES (UUID_TO_BIN(UUID(), 0), ?, ?, ?, ?, ?, CAST(? AS JSON), NOW(3))`,
+		workspaceID, nullable(taskID), nullable(actorUserID), nullable(actorAgentID), eventType, string(raw))
+	require.NoError(t, err)
+	return uint64(lastInsertID(t, res)) //#nosec G115 -- AUTO_INCREMENT ids are non-negative
+}
+
+// CountInvocations counts the workspace's ai_invocations rows of one purpose.
+func CountInvocations(t *testing.T, db *sql.DB, workspaceID uint32, purpose string) int {
+	t.Helper()
+	var n int
+	require.NoError(t, db.QueryRow(
+		`SELECT COUNT(*) FROM ai_invocations WHERE workspace_id = ? AND purpose = ?`, workspaceID, purpose).Scan(&n))
+	return n
 }

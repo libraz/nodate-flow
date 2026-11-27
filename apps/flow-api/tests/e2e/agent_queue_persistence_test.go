@@ -105,8 +105,10 @@ func TestMySQLAgentQueuePreservesSourceEvent(t *testing.T) {
 	}
 	require.NoError(t, runner.Run(context.Background(), claimed.Job, time.Now().UTC()))
 	require.Equal(t, agentruntime.Trigger{
-		EventType:    "test.synthetic.source",
-		TaskPublicID: taskPublicID,
+		EventType:     "test.synthetic.source",
+		TaskPublicID:  taskPublicID,
+		TaskID:        taskID,
+		SourceEventID: int64(sourceEventID), //#nosec G115 -- events.id fits int64 in tests
 	}, executor.trigger, "source event context must reach prompt construction")
 
 	started := selectEventsForTask(t, testDB, workspaceID, taskID, "ai.agent.run.started")
