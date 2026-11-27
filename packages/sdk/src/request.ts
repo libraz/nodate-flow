@@ -142,6 +142,12 @@ export interface ApiRequester {
   settle<T>(send: SdkCall<T>, fallback: string): Promise<ApiOutcome<T>>;
 }
 
+/** Reads a delta-seconds `Retry-After` value; HTTP-date forms are ignored. */
+function parseRetryAfter(value: string | null | undefined): number | undefined {
+  if (!value || !/^\d+$/.test(value.trim())) return undefined;
+  return Number(value);
+}
+
 /** Builds the requester bound to one client. */
 export function createApiRequester(client: NodateFlowClient): ApiRequester {
   /**
@@ -170,11 +176,11 @@ export function createApiRequester(client: NodateFlowClient): ApiRequester {
       return { ok: false, error: cause, response: undefined };
     }
     if (requestFailed(result) || result.response === undefined) {
-      return {
-        ok: false,
-        error: toApiError(result.error, fallback, result.response?.status),
-        response: result.response,
-      };
+      const error = toApiError(result.error, fallback, result.response?.status);
+      if (error.httpStatus === 429) {
+        error.retryAfterSeconds = parseRetryAfter(result.response?.headers.get('Retry-After'));
+      }
+      return { ok: false, error, response: result.response };
     }
     return { ok: true, data: result.data as T, response: result.response };
   }

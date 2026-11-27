@@ -58,6 +58,30 @@ export function resetAuthErrorHandler(): void {
   authErrorFired = false;
 }
 
+const RATE_LIMIT_MAX_RETRIES = 3;
+const RETRY_MAX_DELAY_MS = 30_000;
+
+function retryAfterOf(err: unknown): number | undefined {
+  if (typeof err !== 'object' || err === null) return undefined;
+  const v = (err as { retryAfterSeconds?: unknown }).retryAfterSeconds;
+  return typeof v === 'number' ? v : undefined;
+}
+
+/** Retry policy: never 401, up to 3 on 429, one retry for everything else. */
+export function shouldRetryQuery(failureCount: number, error: unknown): boolean {
+  const status = httpStatusOf(error);
+  if (status === 401) return false;
+  if (status === 429) return failureCount < RATE_LIMIT_MAX_RETRIES;
+  return failureCount < 1;
+}
+
+/** Honours `Retry-After` on a 429; otherwise exponential backoff. Capped at 30s. */
+export function queryRetryDelay(failureCount: number, error: unknown): number {
+  const retryAfter = httpStatusOf(error) === 429 ? retryAfterOf(error) : undefined;
+  if (retryAfter !== undefined) return Math.min(retryAfter * 1000, RETRY_MAX_DELAY_MS);
+  return Math.min(1000 * 2 ** failureCount, RETRY_MAX_DELAY_MS);
+}
+
 function handleQueryError(error: unknown): void {
   if (!onAuthError || authErrorFired) return;
   if (httpStatusOf(error) !== 401) return;
@@ -90,11 +114,10 @@ export function createQueryClient(): QueryClient {
         staleTime: 30_000,
         gcTime: 5 * 60_000,
         refetchOnWindowFocus: false,
-        throwOnError: true,
-        retry: (failureCount, error) => {
-          if (httpStatusOf(error) === 401) return false;
-          return failureCount < 1;
-        },
+        // A failed background refetch keeps showing the data it already has.
+        throwOnError: (_error, query) => query.state.data === undefined,
+        retry: shouldRetryQuery,
+        retryDelay: queryRetryDelay,
       },
       mutations: {
         throwOnError: false,

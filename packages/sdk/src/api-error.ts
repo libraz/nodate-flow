@@ -29,6 +29,8 @@ export class ApiError extends Error {
   readonly extensions: Record<string, unknown> | undefined;
   /** The per-field entries of the envelope's `errors` list, when it had one. */
   readonly details: ApiErrorDetail[] | undefined;
+  /** Seconds from a `Retry-After` header on a 429, when the server sent one and CORS exposed it. */
+  retryAfterSeconds: number | undefined;
 
   constructor(
     code: string | undefined,

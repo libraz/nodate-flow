@@ -63,13 +63,49 @@ describe('useWorkspaceStream polling fallback', () => {
       controller.enqueue(resync);
       await vi.advanceTimersByTimeAsync(0);
     });
-    expect(invalidate).toHaveBeenCalled();
     expect(toast).not.toHaveBeenCalled();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(750);
+    });
+    expect(invalidate).toHaveBeenCalled();
     await act(async () => {
       controller.enqueue(resync);
       await vi.advanceTimersByTimeAsync(0);
     });
     expect(toast).toHaveBeenCalledTimes(1);
+    controller.close();
+    unmount();
+  });
+
+  it('marks stale while hidden and refetches active stale queries once on show', async () => {
+    const client = new QueryClient();
+    const invalidate = vi.spyOn(client, 'invalidateQueries');
+    const refetch = vi.spyOn(client, 'refetchQueries').mockResolvedValue();
+    const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
+    let controller!: ReadableStreamDefaultController<Uint8Array>;
+    const stream = new ReadableStream<Uint8Array>({
+      start(value) {
+        controller = value;
+      },
+    });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(stream)));
+    const testWrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    );
+    const { unmount } = renderHook(() => useWorkspaceStream('ws-1'), { wrapper: testWrapper });
+    await act(async () => {
+      controller.enqueue(
+        new TextEncoder().encode('data: {"kind":"resync","workspaceId":"ws-1","at":1}\n\n'),
+      );
+      await vi.advanceTimersByTimeAsync(750);
+    });
+    expect(invalidate).toHaveBeenCalledWith(expect.objectContaining({ refetchType: 'none' }));
+    expect(refetch).not.toHaveBeenCalled();
+    hidden.mockReturnValue(false);
+    document.dispatchEvent(new Event('visibilitychange'));
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect(refetch).toHaveBeenCalledTimes(1);
+    expect(refetch).toHaveBeenCalledWith({ type: 'active', stale: true });
     controller.close();
     unmount();
   });

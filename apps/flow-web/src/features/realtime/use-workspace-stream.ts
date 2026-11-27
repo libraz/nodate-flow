@@ -5,8 +5,8 @@
  * Mounts once per active workspace near the authenticated tree root.
  * Opens a long-lived fetch-based SSE connection to
  * `GET /workspaces/{wsId}/stream`, parses the event stream line by
- * line, and calls `queryClient.invalidateQueries` for every key
- * prefix listed in `event-to-keys.ts`.
+ * line, and coalesces the key prefixes listed in
+ * `event-to-keys.ts` and invalidates them in one batch.
  *
  * No feature hook needs to know SSE exists: `useAutoActionsQuery`,
  * `useRemindersQuery`, `useStateSuggestionsQuery`,
@@ -25,6 +25,7 @@ import { i18n } from '../../i18n';
 import { apiBaseUrl } from '../../lib/sdk';
 import { authStore } from '../auth/auth-store';
 import { keysForEvent, type StreamEvent } from './event-to-keys';
+import { createInvalidationCoalescer } from './invalidation-coalescer';
 import { setStreamHealthy } from './stream-health';
 
 const RECONNECT_BASE_MS = 1_000;
@@ -66,10 +67,29 @@ export function useWorkspaceStream(workspaceId: string | undefined): void {
       setStreamHealthy(true);
     };
 
+    // A hidden tab only marks queries stale. refetchOnWindowFocus is off
+    // app-wide, so the stale ones are refetched here when the tab is shown again.
+    let flushedWhileHidden = false;
+    const coalescer = createInvalidationCoalescer({
+      flush: (keys) => {
+        const hidden = document.hidden;
+        if (hidden) flushedWhileHidden = true;
+        const refetchType = hidden ? 'none' : 'active';
+        for (const key of keys) {
+          void queryClient.invalidateQueries({ queryKey: key, refetchType });
+        }
+      },
+    });
+
+    const handleVisibilityChange = (): void => {
+      if (document.hidden || !flushedWhileHidden) return;
+      flushedWhileHidden = false;
+      void queryClient.refetchQueries({ type: 'active', stale: true });
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     const handleEvent = (evt: StreamEvent): void => {
-      for (const key of keysForEvent(evt)) {
-        void queryClient.invalidateQueries({ queryKey: key });
-      }
+      coalescer.add(keysForEvent(evt));
 
       switch (evt.kind) {
         case 'ai.suggestion.changed':
@@ -175,6 +195,8 @@ export function useWorkspaceStream(workspaceId: string | undefined): void {
     return () => {
       cancelled = true;
       controller.abort();
+      coalescer.dispose();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       if (fallbackTimer !== null) clearTimeout(fallbackTimer);
       // Do not set streamHealthy to true — the stream is disconnecting,
       // not healthy. Let the next mount's connect() manage the state.
