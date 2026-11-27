@@ -1,0 +1,94 @@
+/*
+ * TaskSearchPicker — inline task search shell shared by the dependency and
+ * subtask pickers. Tokens only.
+ */
+
+.picker {
+  animation: global(nf-slide-in-from-block-start) var(--nf-duration-fast) var(--nf-ease-out);
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+  padding: var(--nf-space-3);
+  border-radius: var(--nf-radius-sm);
+  border: 1px solid var(--nf-color-border);
+}
+
+.pickerControls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nf-space-2);
+  align-items: center;
+}
+
+.pickerSearch {
+  /* nf-token-override: wrap below this width instead of squeezing the search box */
+  flex: 1 1 12rem;
+}
+
+.pickerHint {
+  margin: 0;
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-sm);
+}
+
+.pickerBody {
+  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
+}
+
+.pickerLoadingRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
+.pickerSkeletonRow {
+  block-size: var(--nf-space-8);
+}
+
+.pickerResults {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+  /* nf-token-override: component dimension, not a spacing step */
+  max-block-size: 16rem;
+  overflow-y: auto;
+}
+
+.pickerResultButton {
+  inline-size: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  padding-block: var(--nf-space-2);
+  padding-inline: var(--nf-space-3);
+  border-radius: var(--nf-radius-xs);
+  background: transparent;
+  border: 1px solid transparent;
+  text-align: start;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  transition:
+    background-color var(--nf-duration-instant) var(--nf-ease-standard),
+    border-color var(--nf-duration-instant) var(--nf-ease-standard);
+}
+
+.pickerResultButton:hover,
+.pickerResultButton:focus-visible {
+  background: var(--nf-color-surface-hover);
+}
+
+.pickerResultButton:focus-visible {
+  outline: none;
+  border-color: var(--nf-color-border-strong);
+}
+
+.pickerResultTitle {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

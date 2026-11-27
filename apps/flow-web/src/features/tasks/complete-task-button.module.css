@@ -48,6 +48,19 @@
   background: var(--state-tone, var(--nf-color-fg-muted));
 }
 
+.button[data-done] {
+  cursor: default;
+}
+
+.button[data-done] .circle {
+  background: var(--state-tone, var(--nf-color-fg-muted));
+}
+
+.button[data-done] .check {
+  opacity: 1;
+  color: var(--nf-color-fg-on-accent);
+}
+
 .button[data-pending] .check {
   opacity: 0;
 }

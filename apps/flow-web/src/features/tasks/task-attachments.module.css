@@ -6,17 +6,6 @@
   gap: var(--nf-space-3);
 }
 
-.header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.title {
-  margin: 0;
-  font-size: var(--nf-text-lg);
-}
-
 .empty {
   margin: 0;
   color: var(--nf-color-fg-muted);

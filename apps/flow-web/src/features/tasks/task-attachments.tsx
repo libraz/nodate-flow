@@ -20,6 +20,7 @@ import {
   usePresignUpload,
 } from './api';
 import css from './task-attachments.module.css';
+import TaskSectionHeading from './task-section-heading';
 
 interface TaskAttachmentsProps {
   taskId: string;
@@ -138,30 +139,32 @@ export default function TaskAttachments({ taskId }: TaskAttachmentsProps): React
 
   return (
     <section className={css.section}>
-      <div className={css.header}>
-        <h2 className={css.title}>{t('tasks.attachments.title')}</h2>
-        <div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            hidden
-            onChange={(e) => {
-              void handleFileChange(e);
-            }}
-          />
-          <Button
-            type="button"
-            variant="default"
-            size="sm"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={presignUpload.isPending}
-          >
-            {presignUpload.isPending
-              ? t('tasks.attachments.uploading')
-              : t('tasks.attachments.upload')}
-          </Button>
-        </div>
-      </div>
+      <TaskSectionHeading
+        title={t('tasks.attachments.title')}
+        trailing={
+          <div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              hidden
+              onChange={(e) => {
+                void handleFileChange(e);
+              }}
+            />
+            <Button
+              type="button"
+              variant="default"
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={presignUpload.isPending}
+            >
+              {presignUpload.isPending
+                ? t('tasks.attachments.uploading')
+                : t('tasks.attachments.upload')}
+            </Button>
+          </div>
+        }
+      />
       {entries.length === 0 ? (
         <p className={css.empty}>{t('tasks.attachments.empty')}</p>
       ) : (

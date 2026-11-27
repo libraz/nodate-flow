@@ -164,10 +164,26 @@ export interface TaskFilters {
  */
 export const tasksKeys = {
   all: ['tasks'] as const,
-  list: (projectId: string, filters?: TaskFilters) =>
-    [...tasksKeys.all, 'list', projectId, filters ?? {}] as const,
-  infinite: (projectId: string, filters?: TaskFilters) =>
-    [...tasksKeys.all, 'list', projectId, 'infinite', filters ?? {}] as const,
+  // `topLevel` is appended only when set, so flat and top-level results cache
+  // apart while the keys of existing callers stay as they were.
+  list: (projectId: string, filters?: TaskFilters, topLevel?: boolean) =>
+    [
+      ...tasksKeys.all,
+      'list',
+      projectId,
+      filters ?? {},
+      ...(topLevel ? (['top-level'] as const) : []),
+    ] as const,
+  infinite: (projectId: string, filters?: TaskFilters, topLevel?: boolean) =>
+    [
+      ...tasksKeys.all,
+      'list',
+      projectId,
+      'infinite',
+      filters ?? {},
+      ...(topLevel ? (['top-level'] as const) : []),
+    ] as const,
+  children: (parentId: string) => [...tasksKeys.all, 'children', parentId] as const,
   myInfinite: () => [...tasksKeys.all, 'list', 'me', 'infinite'] as const,
   detail: (id: string) => [...tasksKeys.all, 'detail', id] as const,
   workflow: (id: string) => [...tasksKeys.detail(id), 'workflow'] as const,
@@ -184,7 +200,7 @@ export const tasksKeys = {
 };
 
 export type TaskDependencyEdge = components['schemas']['TaskDependencyEdge'];
-export type TaskDependencyKind = 'blocks' | 'relates' | 'duplicates' | 'subtask_of';
+export type TaskDependencyKind = 'blocks' | 'relates' | 'duplicates';
 export interface TaskDependenciesResult {
   outgoing: TaskDependencyEdge[];
   incoming: TaskDependencyEdge[];
@@ -349,12 +365,20 @@ export function transitionForDrop(
 
 export const TASKS_QUERY_LIMIT = 200;
 
+/** View options for the project task lists; not user filters, so not part of `TaskFilters`. */
+export interface TaskListOptions {
+  /** Only tasks without a parent. */
+  topLevel?: boolean;
+}
+
 export function useTasksQuery(
   projectId: string,
   filters?: TaskFilters,
+  options?: TaskListOptions,
 ): UseSuspenseQueryResult<TaskListItem[]> {
+  const topLevel = options?.topLevel === true;
   return useSuspenseQuery({
-    queryKey: tasksKeys.list(projectId, filters),
+    queryKey: tasksKeys.list(projectId, filters, topLevel),
     queryFn: async (): Promise<TaskListItem[]> => {
       const search = filters?.search?.trim() ?? '';
       const states = filters?.states ?? [];
@@ -368,11 +392,13 @@ export function useTasksQuery(
         state?: string[];
         assignee?: string;
         priority?: number[];
+        topLevel?: boolean;
       } = {
         projectId,
         limit: TASKS_QUERY_LIMIT,
         offset: 0,
       };
+      if (topLevel) query.topLevel = true;
       if (search.length > 0) query.q = search;
       if (states.length > 0) query.state = [...states];
       if (assignee.length > 0) query.assignee = assignee;
@@ -425,9 +451,11 @@ export interface TasksPage {
 export function useTasksInfiniteQuery(
   projectId: string,
   filters?: TaskFilters,
+  options?: TaskListOptions,
 ): UseSuspenseInfiniteQueryResult<{ pages: TasksPage[]; pageParams: readonly number[] }, ApiError> {
+  const topLevel = options?.topLevel === true;
   return useSuspenseInfiniteQuery({
-    queryKey: tasksKeys.infinite(projectId, filters),
+    queryKey: tasksKeys.infinite(projectId, filters, topLevel),
     initialPageParam: 0,
     queryFn: async ({ pageParam }): Promise<TasksPage> => {
       const search = filters?.search?.trim() ?? '';
@@ -444,11 +472,13 @@ export function useTasksInfiniteQuery(
         state?: string[];
         assignee?: string;
         priority?: number[];
+        topLevel?: boolean;
       } = {
         projectId,
         limit: TASKS_PAGE_SIZE,
         offset,
       };
+      if (topLevel) query.topLevel = true;
       if (search.length > 0) query.q = search;
       if (states.length > 0) query.state = [...states];
       if (assignee.length > 0) query.assignee = assignee;
@@ -815,6 +845,121 @@ export function useCreateTask(): UseMutationResult<Task, ApiError, CreateTaskInp
   });
 }
 
+/** Subtasks fetched for one parent: the rows plus the server-side total. */
+export interface SubtasksResult {
+  tasks: TaskListItem[];
+  total: number;
+}
+
+/** Upper bound of subtasks shown for one parent. */
+export const SUBTASKS_QUERY_LIMIT = 200;
+
+/**
+ * GET /tasks?parentTaskId= — direct children of a task. Sits under
+ * `tasksKeys.all`, so the `task.changed` stream refreshes it.
+ */
+export function useSubtasksQuery(
+  parentId: string,
+  workspaceId: string,
+): UseSuspenseQueryResult<SubtasksResult> {
+  return useSuspenseQuery({
+    queryKey: tasksKeys.children(parentId),
+    queryFn: async (): Promise<SubtasksResult> => {
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/tasks', {
+            params: {
+              query: {
+                workspaceId,
+                parentTaskId: parentId,
+                limit: SUBTASKS_QUERY_LIMIT,
+                offset: 0,
+              },
+            },
+          }),
+        'Failed to load subtasks',
+      );
+      const tasks = data.tasks ?? [];
+      return { tasks, total: data.total ?? tasks.length };
+    },
+  });
+}
+
+export interface CreateSubtaskArgs {
+  parentTaskId: string;
+  projectId: string;
+  title: string;
+  /** The parent's visibility, so a subtask is never more open than its parent. */
+  visibility: Task['visibility'];
+}
+
+/** POST /tasks with a parent: adds a subtask in the parent's project. */
+export function useCreateSubtask(): UseMutationResult<Task, ApiError, CreateSubtaskArgs> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      parentTaskId,
+      projectId,
+      title,
+      visibility,
+    }: CreateSubtaskArgs): Promise<Task> => {
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/tasks', {
+            body: {
+              parentTaskId,
+              projectId,
+              title,
+              visibility: visibility as CreateTaskInput['visibility'],
+            },
+          }),
+        'Failed to create subtask',
+      );
+      return data;
+    },
+    onSuccess: (_task, vars) => {
+      void qc.invalidateQueries({ queryKey: tasksKeys.children(vars.parentTaskId) });
+      void qc.invalidateQueries({ queryKey: tasksKeys.detail(vars.parentTaskId) });
+      void qc.invalidateQueries({ queryKey: [...tasksKeys.all, 'list'] });
+    },
+  });
+}
+
+export interface SetTaskParentArgs {
+  /** The task whose parent changes. */
+  id: string;
+  /** New parent, or `null` to make the task top-level. */
+  parentTaskId: string | null;
+}
+
+/**
+ * PATCH /tasks/{id} with only the parent. Child lists of both the old and the
+ * new parent live under the `children` prefix, so one invalidation covers them.
+ */
+export function useSetTaskParent(): UseMutationResult<Task, ApiError, SetTaskParentArgs> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, parentTaskId }: SetTaskParentArgs): Promise<Task> => {
+      const data = await apiRequest(
+        (client) =>
+          client.PATCH('/tasks/{id}', {
+            params: { path: { id } },
+            body: { parentTaskId: parentTaskId ?? '' },
+          }),
+        'Failed to change the parent task',
+      );
+      return data;
+    },
+    onSuccess: async (task, vars) => {
+      qc.setQueryData(tasksKeys.detail(vars.id), task);
+      void qc.invalidateQueries({ queryKey: tasksKeys.detail(vars.id) });
+      void qc.invalidateQueries({ queryKey: [...tasksKeys.all, 'list'] });
+      void qc.invalidateQueries({ queryKey: [...timelineKeys.all, 'task', vars.id] });
+      await qc.invalidateQueries({ queryKey: [...tasksKeys.all, 'children'] });
+    },
+  });
+}
+
 export interface UpdateTaskArgs {
   id: string;
   patch: PatchTaskInput;
@@ -1085,6 +1230,8 @@ export function useTransitionTask(): UseMutationResult<Task, ApiError, Transitio
       // after every transition; without this, it stays on the pre-transition
       // result until the user manually clicks Refresh.
       void qc.invalidateQueries({ queryKey: replayKeys.task(vars.id) });
+      // A subtask's state feeds its parent's progress, so child lists refresh too.
+      void qc.invalidateQueries({ queryKey: [...tasksKeys.all, 'children'] });
       if (vars.projectId) {
         void qc.invalidateQueries({
           queryKey: [...tasksKeys.all, 'list', vars.projectId],

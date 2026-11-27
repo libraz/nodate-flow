@@ -8,7 +8,7 @@
 
 import type { BadgeTone } from '@nodate-flow/ui/primitives/badge';
 
-import type { TaskDerivedState, TaskPriority } from './api';
+import type { TaskDerivedState, TaskPriority, TransitionName } from './api';
 
 /* ── Priority ────────────────────────────────────────────────── */
 
@@ -77,4 +77,17 @@ export const STATE_TONE: Record<TaskDerivedState, BadgeTone> = {
   review: 'accent',
   done: 'success',
   cancelled: 'neutral',
+};
+
+/* ── Transitions ─────────────────────────────────────────────── */
+
+/** i18n key for each state-machine transition verb. */
+export const TRANSITION_KEY: Record<TransitionName, string> = {
+  start: 'tasks.detail.transitions.start',
+  block: 'tasks.detail.transitions.block',
+  unblock: 'tasks.detail.transitions.unblock',
+  submit: 'tasks.detail.transitions.submit',
+  complete: 'tasks.detail.transitions.complete',
+  reopen: 'tasks.detail.transitions.reopen',
+  cancel: 'tasks.detail.transitions.cancel',
 };

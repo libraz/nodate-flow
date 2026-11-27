@@ -31,6 +31,7 @@ export default function CompleteTaskButton({ task }: CompleteTaskButtonProps): R
   const transition = useTransitionTask();
   const completable = landingStateFor(task.derivedState, 'complete') === 'done';
   const pending = transition.isPending;
+  const done = task.derivedState === 'done';
 
   const stepArgs = (from: TaskDerivedState, name: TransitionName) => {
     const landing = landingStateFor(from, name);
@@ -86,6 +87,9 @@ export default function CompleteTaskButton({ task }: CompleteTaskButtonProps): R
         className={cx(styles.button, 'nf-focus-ring')}
         aria-label={t('today.complete_task', { title: task.title })}
         aria-disabled={pending ? true : undefined}
+        // A finished task reads as a pressed toggle: filled, with the check showing.
+        aria-pressed={done ? true : undefined}
+        data-done={done ? '' : undefined}
         data-pending={pending ? '' : undefined}
         onClick={handleComplete}
       >

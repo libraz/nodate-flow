@@ -1,0 +1,175 @@
+/*
+ * SubtasksSection — heading, progress and rows share the rhythm of the
+ * sibling sections in the task main column. Tokens only.
+ */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+}
+
+.count {
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.track {
+  /* nf-token-override: hairline bar thickness, not a spacing step */
+  block-size: 0.25rem;
+  border-radius: var(--nf-radius-pill);
+  background: var(--nf-color-bg-sunken);
+  overflow: hidden;
+}
+
+.fill {
+  block-size: 100%;
+  inline-size: calc(var(--progress) * 1%);
+  border-radius: inherit;
+  background: var(--nf-color-success);
+  transition: inline-size var(--nf-duration-base) var(--nf-ease-standard);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  /* nf-token-override: row height floor, between the 32px control and a 40px field */
+  min-block-size: 2.25rem;
+  padding-inline: var(--nf-space-1);
+  border-radius: var(--nf-radius-sm);
+  transition: background-color var(--nf-duration-instant) var(--nf-ease-standard);
+}
+
+.row:hover {
+  background: var(--nf-color-surface-hover);
+}
+
+.title {
+  flex: 1;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--nf-color-fg);
+  text-decoration-line: line-through;
+  text-decoration-color: transparent;
+  border-radius: var(--nf-radius-xs);
+  transition:
+    color var(--nf-duration-base) var(--nf-ease-standard),
+    text-decoration-color var(--nf-duration-base) var(--nf-ease-standard);
+}
+
+a.title {
+  cursor: pointer;
+}
+
+a.title:hover {
+  color: var(--nf-color-accent-fg);
+}
+
+.row[data-closed="true"] .title {
+  color: var(--nf-color-fg-muted);
+  text-decoration-color: currentColor;
+}
+
+.assignees {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.avatar + .avatar {
+  margin-inline-start: calc(var(--nf-space-1) * -1);
+}
+
+.more {
+  margin-inline-start: var(--nf-space-1);
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  white-space: nowrap;
+}
+
+.pendingRow {
+  color: var(--nf-color-fg-muted);
+}
+
+.pendingRow:hover {
+  background: transparent;
+}
+
+.pendingTitle {
+  flex: 1;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Matches the footprint of the complete toggle so titles stay aligned. */
+.pendingMark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--nf-space-8);
+  flex-shrink: 0;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nf-space-1);
+}
+
+.addButton {
+  justify-content: flex-start;
+  color: var(--nf-color-fg-muted);
+}
+
+/* Revealed on row hover or focus; always shown where there is no hover. */
+.detach {
+  flex-shrink: 0;
+  color: var(--nf-color-fg-muted);
+  opacity: 0;
+  transition: opacity var(--nf-duration-instant) var(--nf-ease-standard);
+}
+
+.row:hover .detach,
+.row:focus-within .detach,
+.detach[aria-busy="true"] {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .detach {
+    opacity: 1;
+  }
+}
+
+.adder {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
+.hint {
+  margin: 0;
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fill,
+  .title {
+    transition: none;
+  }
+}

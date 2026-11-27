@@ -1,0 +1,38 @@
+.line {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+  min-inline-size: 0;
+  margin: 0;
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-xs);
+  line-height: var(--nf-leading-tight);
+}
+
+.icon {
+  flex-shrink: 0;
+}
+
+.label {
+  flex-shrink: 0;
+}
+
+.link {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: inherit;
+  text-decoration: none;
+  border-radius: var(--nf-radius-xs);
+}
+
+.link:hover {
+  color: var(--nf-color-fg);
+  text-decoration: underline;
+}
+
+.link:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}

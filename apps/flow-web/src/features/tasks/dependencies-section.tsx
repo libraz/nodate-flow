@@ -1,8 +1,8 @@
 /**
  * DependenciesSection — task detail "Dependencies" panel.
  *
- * Renders groups for every TaskDependencyKind (Parent / Subtasks /
- * Blocked by / Blocks / Relates to / Duplicate of / Duplicated by)
+ * Renders groups for every TaskDependencyKind (Blocked by / Blocks /
+ * Relates to / Duplicate of / Duplicated by)
  * backed by `GET /tasks/{id}/dependencies`. The picker uses
  * `GET /tasks?q=...` scoped to the current workspace; results are
  * debounced client-side.
@@ -11,16 +11,14 @@
 import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
 import Badge, { type BadgeTone } from '@nodate-flow/ui/primitives/badge';
 import Button from '@nodate-flow/ui/primitives/button';
-import Input from '@nodate-flow/ui/primitives/input';
 import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import Select from '@nodate-flow/ui/primitives/select';
-import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { Plus, X } from 'lucide-react';
-import { type ReactElement, useEffect, useId, useMemo, useState } from 'react';
+import { type ReactElement, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatApiError } from '../../lib/api-error';
 import {
@@ -31,17 +29,17 @@ import {
   useAddTaskDependency,
   useRemoveTaskDependency,
   useTaskDependenciesQuery,
-  useTaskSearch,
 } from './api';
 import { STATE_KEY, STATE_TONE } from './constants';
 import styles from './dependencies-section.module.css';
+import TaskSearchPicker from './task-search-picker';
+import searchStyles from './task-search-picker.module.css';
+import TaskSectionHeading from './task-section-heading';
 
 interface DependenciesSectionProps {
   taskId: string;
   workspaceId: string;
 }
-
-type AddableKind = Extract<TaskDependencyKind, 'blocks' | 'relates' | 'subtask_of' | 'duplicates'>;
 
 /**
  * DependenciesSection renders incoming/outgoing dependency edges and
@@ -71,14 +69,6 @@ export default function DependenciesSection({
     ],
     [data.outgoing, data.incoming],
   );
-  const parent = useMemo(
-    () => data.outgoing.filter((e) => e.kind === 'subtask_of'),
-    [data.outgoing],
-  );
-  const subtasks = useMemo(
-    () => data.incoming.filter((e) => e.kind === 'subtask_of'),
-    [data.incoming],
-  );
   const duplicateOf = useMemo(
     () => data.outgoing.filter((e) => e.kind === 'duplicates'),
     [data.outgoing],
@@ -92,8 +82,6 @@ export default function DependenciesSection({
     blocks.length === 0 &&
     blockedBy.length === 0 &&
     relates.length === 0 &&
-    parent.length === 0 &&
-    subtasks.length === 0 &&
     duplicateOf.length === 0 &&
     duplicatedBy.length === 0;
 
@@ -137,21 +125,23 @@ export default function DependenciesSection({
 
   return (
     <section aria-label={t('tasks.detail.dependencies.title')} className={styles.section}>
-      <header className={styles.header}>
-        <h2 className={styles.headerTitle}>{t('tasks.detail.dependencies.title')}</h2>
-        {!picking ? (
-          <Button
-            type="button"
-            size="sm"
-            onClick={() => {
-              setPicking(true);
-            }}
-          >
-            <Plus size={14} aria-hidden />
-            {t('tasks.detail.dependencies.add')}
-          </Button>
-        ) : null}
-      </header>
+      <TaskSectionHeading
+        title={t('tasks.detail.dependencies.title')}
+        trailing={
+          !picking ? (
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => {
+                setPicking(true);
+              }}
+            >
+              <Plus size={14} aria-hidden />
+              {t('tasks.detail.dependencies.add')}
+            </Button>
+          ) : null
+        }
+      />
 
       {picking ? (
         <DependencyPicker
@@ -174,20 +164,6 @@ export default function DependenciesSection({
         <p className={styles.empty}>{t('tasks.detail.dependencies.empty')}</p>
       ) : null}
 
-      <DependencyGroup
-        label={t('tasks.detail.dependencies.parent')}
-        items={parent}
-        tone="info"
-        onRemove={handleRemove}
-        removingId={removingId}
-      />
-      <DependencyGroup
-        label={t('tasks.detail.dependencies.subtasks')}
-        items={subtasks}
-        tone="info"
-        onRemove={handleRemove}
-        removingId={removingId}
-      />
       <DependencyGroup
         label={t('tasks.detail.dependencies.blockedBy')}
         items={blockedBy}
@@ -308,31 +284,9 @@ function DependencyPicker({
   onClose: () => void;
 }): ReactElement {
   const { t } = useTranslation('common');
-  const [kind, setKind] = useState<AddableKind>('blocks');
+  const [kind, setKind] = useState<TaskDependencyKind>('blocks');
   const kindHintId = useId();
-  const [input, setInput] = useState('');
-  const [debounced, setDebounced] = useState('');
   const add = useAddTaskDependency();
-
-  useEffect(() => {
-    const id = window.setTimeout(() => {
-      setDebounced(input.trim());
-    }, 200);
-    return () => {
-      window.clearTimeout(id);
-    };
-  }, [input]);
-
-  const search = useTaskSearch(workspaceId, debounced, debounced.length > 0);
-  const results = (search.data ?? []).filter((task) => !excludeIds.has(task.id));
-  const stage =
-    debounced.length === 0
-      ? 'hint'
-      : search.isFetching
-        ? 'loading'
-        : results.length === 0
-          ? 'empty'
-          : 'results';
 
   const handlePick = async (toTaskId: string): Promise<void> => {
     try {
@@ -347,73 +301,35 @@ function DependencyPicker({
   };
 
   return (
-    <div className={styles.picker}>
-      <div className={styles.pickerControls}>
+    <TaskSearchPicker
+      workspaceId={workspaceId}
+      excludeIds={excludeIds}
+      placeholder={t('tasks.detail.dependencies.search')}
+      hint={t('tasks.detail.dependencies.searchHint')}
+      emptyText={t('tasks.detail.dependencies.searchEmpty')}
+      cancelText={t('tasks.detail.dependencies.addCancel')}
+      leading={
         <Select
           aria-label={t('tasks.detail.dependencies.kindLabel')}
           aria-describedby={kindHintId}
           value={kind}
           onChange={(e) => {
-            setKind(e.target.value as AddableKind);
+            setKind(e.target.value as TaskDependencyKind);
           }}
-          className={styles.pickerKindSelect}
+          className={styles.kindSelect}
         >
           <option value="blocks">{t('tasks.detail.dependencies.kind.blocks')}</option>
           <option value="relates">{t('tasks.detail.dependencies.kind.relates')}</option>
-          <option value="subtask_of">{t('tasks.detail.dependencies.kind.subtask_of')}</option>
           <option value="duplicates">{t('tasks.detail.dependencies.kind.duplicates')}</option>
         </Select>
-        <Input
-          value={input}
-          onChange={(e) => {
-            setInput(e.target.value);
-          }}
-          placeholder={t('tasks.detail.dependencies.search')}
-          autoFocus
-          aria-label={t('tasks.detail.dependencies.search')}
-          className={styles.pickerSearch}
-        />
-        <Button type="button" variant="ghost" size="sm" onClick={onClose}>
-          {t('tasks.detail.dependencies.addCancel')}
-        </Button>
-      </div>
-      <p id={kindHintId} className={styles.pickerHint}>
-        {t('tasks.detail.dependencies.kindHint')}
-      </p>
-      <div key={stage} className={styles.pickerBody}>
-        {debounced.length === 0 ? (
-          <p className={styles.pickerHint}>{t('tasks.detail.dependencies.searchHint')}</p>
-        ) : search.isFetching ? (
-          <div className={styles.pickerLoadingRow} role="status" aria-label={t('common.loading')}>
-            <Skeleton className={styles.pickerSkeletonRow} />
-            <Skeleton className={styles.pickerSkeletonRow} />
-            <Skeleton className={styles.pickerSkeletonRow} />
-          </div>
-        ) : results.length === 0 ? (
-          <p className={styles.pickerHint}>{t('tasks.detail.dependencies.searchEmpty')}</p>
-        ) : (
-          <ul className={styles.pickerResults}>
-            {results.map((task) => (
-              <li key={task.id}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    void handlePick(task.id);
-                  }}
-                  className={styles.pickerResultButton}
-                >
-                  <Badge tone={STATE_TONE[task.derivedState as TaskDerivedState] ?? 'neutral'}>
-                    {t(STATE_KEY[task.derivedState as TaskDerivedState] ?? 'tasks.status.open')}
-                  </Badge>
-                  <span className={styles.pickerResultTitle} title={task.title}>
-                    {task.title}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </div>
+      }
+      description={
+        <p id={kindHintId} className={searchStyles.pickerHint}>
+          {t('tasks.detail.dependencies.kindHint')}
+        </p>
+      }
+      onPick={handlePick}
+      onClose={onClose}
+    />
   );
 }

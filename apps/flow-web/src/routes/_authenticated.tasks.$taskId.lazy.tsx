@@ -30,13 +30,13 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { BP } from '@nodate-flow/ui/tokens/breakpoints';
 import { createLazyFileRoute, getRouteApi, Link } from '@tanstack/react-router';
-import { ArrowRight, Check, History, type LucideIcon, Pencil, Play, Plus, X } from 'lucide-react';
+import { History, Pencil, Plus, X } from 'lucide-react';
 import { type ReactElement, Suspense, useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import FormActions from '../components/form-actions';
 import PageFrame from '../components/page-frame';
 import frameStyles from '../components/page-frame.module.css';
 import PageHelp from '../components/page-help';
-import SubmitHint from '../components/submit-hint';
 import AiConsequence from '../features/ai-suggestions/ai-consequence';
 import { selectUser, useAuth } from '../features/auth/auth-store';
 import ConstraintEditor from '../features/constraints/constraint-editor';
@@ -45,7 +45,7 @@ import { useFavoritesQuery } from '../features/favorites/api';
 import FavoriteButton from '../features/favorites/favorite-button';
 import { useTaskLabelsQuery } from '../features/labels/api';
 import LabelBadge from '../features/labels/label-badge';
-import TaskLabelsField from '../features/labels/task-labels-field';
+import TaskLabelsField, { TaskLabelsFieldSkeleton } from '../features/labels/task-labels-field';
 import { useProjectQuery } from '../features/projects/api';
 import { useTaskReactionsQuery } from '../features/reactions/api';
 import ReactionBar from '../features/reactions/reaction-bar';
@@ -54,10 +54,8 @@ import AgentPanel from '../features/tasks/agent-panel/agent-panel';
 import AIAgentsSection from '../features/tasks/ai-agents/section';
 import AIAgentsSkeleton from '../features/tasks/ai-agents/skeleton';
 import {
-  landingStateFor,
   type TaskDerivedState,
   type TaskPriority,
-  TRANSITIONS_BY_STATE,
   type TransitionName,
   useAddTaskActor,
   useRemoveTaskActor,
@@ -66,12 +64,11 @@ import {
   useTaskDuplicatesQuery,
   useTaskInferStateQuery,
   useTaskQuery,
-  useTransitionTask,
   useUpdateTask,
 } from '../features/tasks/api';
 import CommentForm from '../features/tasks/comment-form';
 import CommentRow from '../features/tasks/comment-row';
-import { PRIORITY_KEY, STATE_COLOR, STATE_KEY, STATE_TONE } from '../features/tasks/constants';
+import { PRIORITY_KEY, TRANSITION_KEY } from '../features/tasks/constants';
 import DependenciesSection from '../features/tasks/dependencies-section';
 import DescriptionHistoryDrawer from '../features/tasks/description-history/description-history-drawer';
 import EventFromTaskDialog from '../features/tasks/event-from-task/event-from-task-dialog';
@@ -79,9 +76,14 @@ import LinkedEventsSection from '../features/tasks/links/linked-events-section';
 import MarkdownEditor from '../features/tasks/markdown-editor';
 import PriorityControl from '../features/tasks/priority-control';
 import PriorityMark from '../features/tasks/priority-mark';
+import SubtasksSection from '../features/tasks/subtasks-section';
 import TaskAttachments from '../features/tasks/task-attachments';
+import TaskParentLink from '../features/tasks/task-parent-link';
+import { TaskSideCard, TaskSideCardHeading } from '../features/tasks/task-side-card';
 import TaskSourceLinks from '../features/tasks/task-source-links';
+import TaskStateBadge from '../features/tasks/task-state-badge';
 import TaskStepsPanel from '../features/tasks/task-steps-panel';
+import TaskTransitionCard from '../features/tasks/task-transition-card';
 import TaskRoleAssignments from '../features/tasks/workflow/task-role-assignments';
 import TaskWorkflowPanel from '../features/tasks/workflow/task-workflow-panel';
 import { useTaskTimelineQuery } from '../features/timeline/api';
@@ -97,46 +99,6 @@ import css from './_authenticated.tasks.$taskId.module.css';
 
 const routeApi = getRouteApi('/_authenticated/tasks/$taskId');
 
-const TRANSITION_KEY: Record<TransitionName, string> = {
-  start: 'tasks.detail.transitions.start',
-  block: 'tasks.detail.transitions.block',
-  unblock: 'tasks.detail.transitions.unblock',
-  submit: 'tasks.detail.transitions.submit',
-  complete: 'tasks.detail.transitions.complete',
-  reopen: 'tasks.detail.transitions.reopen',
-  cancel: 'tasks.detail.transitions.cancel',
-};
-
-// The forward action worth nudging toward: first of these that is legal from the current state.
-const RECOMMENDED_PRIORITY: readonly TransitionName[] = ['complete', 'submit', 'start'];
-
-const RECOMMENDED_ICON: Partial<Record<TransitionName, LucideIcon>> = {
-  complete: Check,
-  submit: ArrowRight,
-  start: Play,
-};
-
-/** Sidebar card heading with an optional one-paragraph explanation under it. */
-function CardHeading({
-  title,
-  hint,
-  marker,
-}: {
-  title: string;
-  hint?: string;
-  marker?: ReactElement;
-}): ReactElement {
-  return (
-    <div className={css.cardHead}>
-      <div className={css.cardTitleRow}>
-        <h2 className={css.cardTitle}>{title}</h2>
-        {marker}
-      </div>
-      {hint ? <p className={css.cardHint}>{hint}</p> : null}
-    </div>
-  );
-}
-
 interface TaskDetailPanelProps {
   id: string;
 }
@@ -151,20 +113,6 @@ function SectionSkeleton(): ReactElement {
       {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
       <Skeleton style={{ blockSize: '1rem', inlineSize: '45%' }} />
     </div>
-  );
-}
-
-/**
- * The state badge settles each time the state changes after mount, so a
- * transition reads as the result of the click; the first paint is still.
- */
-function StateBadge({ state }: { state: TaskDerivedState }): ReactElement {
-  const { t } = useTranslation('common');
-  const [initial] = useState(state);
-  return (
-    <span key={state} className={cx(css.stateBadge, state !== initial && motion.settle)}>
-      <Badge tone={STATE_TONE[state]}>{t(STATE_KEY[state])}</Badge>
-    </span>
   );
 }
 
@@ -422,15 +370,7 @@ function DescriptionEditor({
         workspaceId={workspaceId}
         aria-label={t('tasks.detail.description_edit')}
       />
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--nf-space-2)',
-          justifyContent: 'flex-end',
-        }}
-      >
-        <SubmitHint />
+      <FormActions hint>
         <Button
           type="button"
           variant="ghost"
@@ -441,7 +381,7 @@ function DescriptionEditor({
           {t('tasks.detail.cancel')}
         </Button>
         <Button type="submit">{t('tasks.detail.save')}</Button>
-      </div>
+      </FormActions>
     </form>
   );
 }
@@ -514,8 +454,8 @@ function TaskActionsCard({
   const { t } = useTranslation('common');
   const [eventDialogOpen, setEventDialogOpen] = useState(false);
   return (
-    <Card className={css.sideCard}>
-      <CardHeading title={t('tasks.actions.title')} />
+    <TaskSideCard>
+      <TaskSideCardHeading title={t('tasks.actions.title')} />
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--nf-space-2)' }}>
         <Button type="button" variant="default" onClick={() => setEventDialogOpen(true)}>
           {t('tasks.actions.create_event.trigger')}
@@ -529,7 +469,7 @@ function TaskActionsCard({
           onClose={() => setEventDialogOpen(false)}
         />
       ) : null}
-    </Card>
+    </TaskSideCard>
   );
 }
 
@@ -718,12 +658,12 @@ function Sidebar({
   const weekStart = useWeekStart();
   const { t: tAgents } = useTranslation('aiAgents');
   const { t: tLabels } = useTranslation('labels');
+  const labelsLabelId = useId();
   const locale = i18n.resolvedLanguage ?? 'en';
   const weekdayLabels = t('common.date.weekdays', { returnObjects: true }) as string[];
   const formatMonthYear = (year: number, month: number): string =>
     t('common.date.monthYear', { year, month });
   const update = useUpdateTask();
-  const transition = useTransitionTask();
 
   const handlePriorityChange = async (next: TaskPriority): Promise<void> => {
     try {
@@ -770,32 +710,12 @@ function Sidebar({
     }
   };
 
-  const handleTransition = (name: TransitionName): void => {
-    transition.mutate(
-      { id, transition: name, projectId },
-      {
-        onError: (err) => {
-          toaster.show({
-            tone: 'warning',
-            message: formatApiError(err, t, 'tasks.errors.illegal_transition'),
-          });
-        },
-      },
-    );
-  };
-
-  const legal = (TRANSITIONS_BY_STATE[state] ?? []).flatMap((name) => {
-    const landing = landingStateFor(state, name);
-    return landing ? [{ name, landing }] : [];
-  });
-  const recommended = RECOMMENDED_PRIORITY.find((name) => legal.some((l) => l.name === name));
-
   return (
     <aside className={css.aside}>
-      <Card className={css.sideCard}>
+      <TaskSideCard>
         <div className={css.stateRow}>
           <span className={css.mutedLabel}>{t('tasks.detail.state_label')}</span>
-          <StateBadge state={state} />
+          <TaskStateBadge state={state} />
         </div>
         <Separator />
         {/*
@@ -851,115 +771,66 @@ function Sidebar({
           )}
         </FormField>
         <div className={css.fieldStack}>
-          <span className={css.fieldLabel}>{tLabels('title')}</span>
-          <Suspense fallback={<SectionSkeleton />}>
-            <TaskLabelsField taskId={id} workspaceId={workspaceId} />
+          <span id={labelsLabelId} className={css.fieldLabel}>
+            {tLabels('title')}
+          </span>
+          <Suspense fallback={<TaskLabelsFieldSkeleton />}>
+            <TaskLabelsField taskId={id} workspaceId={workspaceId} labelledBy={labelsLabelId} />
           </Suspense>
         </div>
-      </Card>
+      </TaskSideCard>
 
-      <Card className={css.sideCard}>
-        <CardHeading
-          title={t('tasks.detail.transitions.title')}
-          hint={t('tasks.detail.transitions.hint')}
-        />
-        <div className={css.currentState}>
-          <span className={css.currentStateLabel}>{t('tasks.detail.transitions.current')}</span>
-          <span className={css.currentStatePill}>
-            <span
-              aria-hidden="true"
-              className={css.transitionDot}
-              style={{ background: STATE_COLOR[state] }}
-            />
-            {t(STATE_KEY[state])}
-          </span>
-        </div>
-        <div className={css.transitionList}>
-          {legal.map(({ name, landing }) => {
-            const RecommendedIcon = name === recommended ? RECOMMENDED_ICON[name] : undefined;
-            return (
-              <Button
-                key={name}
-                type="button"
-                className={cx(
-                  css.transitionButton,
-                  name === recommended && css.transitionRecommended,
-                  name === 'cancel' && css.transitionCancel,
-                )}
-                onClick={() => {
-                  handleTransition(name);
-                }}
-              >
-                <span className={css.transitionVerb}>
-                  {RecommendedIcon ? (
-                    <RecommendedIcon aria-hidden="true" className={css.transitionIcon} />
-                  ) : null}
-                  {t(TRANSITION_KEY[name])}
-                </span>
-                <span className={css.transitionLanding}>
-                  <span aria-hidden="true">→</span>
-                  <span
-                    aria-hidden="true"
-                    className={css.transitionDot}
-                    style={{ background: STATE_COLOR[landing] }}
-                  />
-                  {t(STATE_KEY[landing])}
-                </span>
-              </Button>
-            );
-          })}
-        </div>
-      </Card>
+      <TaskTransitionCard taskId={id} projectId={projectId} state={state} />
 
       <TaskActionsCard taskId={id} workspaceId={workspaceId} />
 
-      <Card className={css.sideCard}>
-        <CardHeading title={t('tasks.detail.assignees.title')} />
+      <TaskSideCard>
+        <TaskSideCardHeading title={t('tasks.detail.assignees.title')} />
         <Suspense fallback={<SectionSkeleton />}>
           <AssigneesSection taskId={id} workspaceId={workspaceId} />
         </Suspense>
-      </Card>
+      </TaskSideCard>
 
-      <Card className={css.sideCard}>
-        <CardHeading
+      <TaskSideCard>
+        <TaskSideCardHeading
           title={t('taskWorkflow.rolesHeading')}
           hint={t('taskWorkflow.rolesDescription')}
         />
         <Suspense fallback={<SectionSkeleton />}>
           <TaskRoleAssignments key={id} taskId={id} workspaceId={workspaceId} />
         </Suspense>
-      </Card>
+      </TaskSideCard>
 
-      <Card className={css.sideCard}>
-        <CardHeading
+      <TaskSideCard>
+        <TaskSideCardHeading
           title={tAgents('task_detail.agent.assign.title')}
           hint={tAgents('task_detail.agent.assign.description')}
         />
         <Suspense fallback={<SectionSkeleton />}>
           <AgentAssignSection taskId={id} workspaceId={workspaceId} />
         </Suspense>
-      </Card>
+      </TaskSideCard>
 
-      <Card className={css.sideCard}>
+      <TaskSideCard>
         <Suspense fallback={<SectionSkeleton />}>
           <StateGraphSection taskId={id} current={state} />
         </Suspense>
-      </Card>
+      </TaskSideCard>
 
-      <Card className={css.sideCard}>
+      <TaskSideCard>
         <Suspense fallback={<SectionSkeleton />}>
           <ConstraintEditor taskId={id} />
         </Suspense>
-      </Card>
+      </TaskSideCard>
 
-      <Card className={css.sideCard}>
+      <TaskSideCard>
         <Suspense fallback={<SectionSkeleton />}>
           <ReplayPanel taskId={id} />
         </Suspense>
-      </Card>
+      </TaskSideCard>
 
-      <Card className={css.sideCard}>
-        <CardHeading
+      <TaskSideCard>
+        <TaskSideCardHeading
           title={t('tasks.detail.infer_state.title')}
           hint={t('tasks.detail.infer_state.hint')}
           marker={<AiConsequence kind="suggests" />}
@@ -967,28 +838,28 @@ function Sidebar({
         <Suspense fallback={<SectionSkeleton />}>
           <InferStateSection taskId={id} />
         </Suspense>
-      </Card>
+      </TaskSideCard>
 
       <Suspense fallback={<SectionSkeleton />}>
         <TaskStepsPanel taskId={id} workspaceId={workspaceId} />
       </Suspense>
 
-      <Card className={css.sideCard}>
-        <CardHeading
+      <TaskSideCard>
+        <TaskSideCardHeading
           title={t('tasks.detail.duplicates.title')}
           hint={t('tasks.detail.duplicates.hint')}
         />
         <Suspense fallback={<SectionSkeleton />}>
           <RelatedTasksSection taskId={id} />
         </Suspense>
-      </Card>
+      </TaskSideCard>
 
-      <Card className={css.sideCard}>
-        <CardHeading title={t('tasks.detail.activity.title')} />
+      <TaskSideCard>
+        <TaskSideCardHeading title={t('tasks.detail.activity.title')} />
         <Suspense fallback={<SectionSkeleton />}>
           <TaskMiniTimeline taskId={id} />
         </Suspense>
-      </Card>
+      </TaskSideCard>
     </aside>
   );
 }
@@ -1016,7 +887,7 @@ function TaskMetaStrip({
       <div className={css.metaItem}>
         <dt className={css.metaLabel}>{t('tasks.detail.state_label')}</dt>
         <dd className={css.metaValue}>
-          <StateBadge state={state} />
+          <TaskStateBadge state={state} />
         </dd>
       </div>
       <div className={css.metaItem}>
@@ -1045,9 +916,9 @@ function MetaLabels({ taskId }: { taskId: string }): ReactElement {
   return (
     <div className={css.metaItem}>
       <dt className={css.metaLabel}>{t('title')}</dt>
-      <dd className={css.metaValue} style={{ flexWrap: 'wrap' }}>
+      <dd className={cx(css.metaValue, css.metaValueWrap)}>
         {labels.length === 0 ? (
-          <span style={{ color: 'var(--nf-color-fg-muted)' }}>{t('task.none')}</span>
+          <span className={css.metaNone}>{t('task.none')}</span>
         ) : (
           labels.map((label) => <LabelBadge key={label.id} name={label.name} color={label.color} />)
         )}
@@ -1250,6 +1121,7 @@ function TaskDetailPanel({ id }: TaskDetailPanelProps): ReactElement {
         <Suspense fallback={<Skeleton className={css.breadcrumbSkeleton} />}>
           <TaskBreadcrumb workspaceId={task.workspaceId} projectId={task.projectId} />
         </Suspense>
+        {task.parentTaskId ? <TaskParentLink parentId={task.parentTaskId} /> : null}
         <TitleEditor id={id} initial={task.title} workspaceId={task.workspaceId} />
         {isNarrow ? (
           <TaskMetaStrip
@@ -1291,6 +1163,17 @@ function TaskDetailPanel({ id }: TaskDetailPanelProps): ReactElement {
           workspaceId={task.workspaceId}
           projectId={task.projectId}
         />
+        {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
+        <Suspense fallback={<Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />}>
+          <SubtasksSection
+            taskId={id}
+            projectId={task.projectId}
+            workspaceId={task.workspaceId}
+            visibility={task.visibility}
+            parentTaskId={task.parentTaskId}
+          />
+        </Suspense>
+        <Separator />
         {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
         <Suspense fallback={<Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />}>
           <DependenciesSection taskId={id} workspaceId={task.workspaceId} />
