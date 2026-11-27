@@ -62,7 +62,8 @@ SELECT
   a.name      AS agent_name,
   a.paused,
   a.kind,
-  a.tools_json,
+  -- NULL for signal_judge agents; json.RawMessage cannot scan SQL NULL.
+  COALESCE(a.tools_json, CAST('null' AS JSON)) AS tools_json,
   ta.role,
   ta.updated_at,
   ta.created_at,

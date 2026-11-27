@@ -25,7 +25,8 @@ SELECT
   a.temperature,
   a.max_output_tokens,
   a.kind,
-  a.tools_json,
+  -- NULL for signal_judge agents; json.RawMessage cannot scan SQL NULL.
+  COALESCE(a.tools_json, CAST('null' AS JSON)) AS tools_json,
   a.schedule_kind,
   a.paused,
   a.updated_at,
@@ -118,7 +119,8 @@ SELECT
   kind,
   paused,
   enabled,
-  tools_json
+  -- NULL for signal_judge agents; json.RawMessage cannot scan SQL NULL.
+  COALESCE(tools_json, CAST('null' AS JSON)) AS tools_json
 FROM ai_agents
 WHERE workspace_id = ?
   AND public_id = ?
