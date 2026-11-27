@@ -1,7 +1,7 @@
 /**
  * Calendar month-grid drag E2E.
  *
- * Source under test: apps/flow-web/src/routes/_authenticated.calendar.tsx
+ * Source under test: apps/flow-web/src/features/calendar-events/calendar-page.tsx
  * and apps/flow-web/src/features/calendar-events/lib/pointer-drag.ts.
  *
  * The grid moves a pill with pointer events rather than HTML5

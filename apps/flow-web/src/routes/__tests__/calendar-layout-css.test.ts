@@ -8,7 +8,10 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-const css = readFileSync(resolve(__dirname, '../_authenticated.calendar.module.css'), 'utf8');
+const css = readFileSync(
+  resolve(__dirname, '../../features/calendar-events/calendar-page.module.css'),
+  'utf8',
+);
 
 describe('/calendar two-column layout', () => {
   it('pins the grid column to a track wherever it spans rows', () => {

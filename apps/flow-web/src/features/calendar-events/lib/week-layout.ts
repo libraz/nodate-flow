@@ -5,7 +5,7 @@
  * data model: calendar events carry `startAt` / `endAt` as unix-second
  * integers (not luxon ISO strings), and the geometry works in plain
  * `Date` objects built from local components — matching the desktop
- * month grid in `_authenticated.calendar.tsx`, which also keys cells on
+ * month grid in `calendar-page.tsx`, which also keys cells on
  * local-time `YYYY-MM-DD`. Which calendar day an event lands on is a
  * separate question and is answered in the effective {@link Zone} the
  * caller passes, never in the browser's.

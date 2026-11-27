@@ -14,17 +14,9 @@
  */
 
 import type { components } from '@nodate-flow/sdk';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-// The route module calls `createFileRoute` at import time. Nothing here
-// renders, so the returned value only has to be an object.
-vi.mock('@tanstack/react-router', () => ({
-  createFileRoute: () => (options: unknown) => ({ options }),
-  useNavigate: () => vi.fn(),
-  Link: () => null,
-}));
-
-import { expandCalendarEvents } from '../_authenticated.calendar';
+import { expandCalendarEvents } from '../expand-calendar-events';
 
 type CalendarEvent = components['schemas']['MyCalendarEventResponse'];
 

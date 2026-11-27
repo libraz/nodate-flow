@@ -16,18 +16,10 @@
  */
 
 import { Zone } from '@nodate-flow/ui/time';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-// The route module calls `createFileRoute` at import time. Nothing here
-// renders, so the returned value only has to be an object.
-vi.mock('@tanstack/react-router', () => ({
-  createFileRoute: () => (options: unknown) => ({ options }),
-  useNavigate: () => vi.fn(),
-  Link: () => null,
-}));
-
-import { dateKey, endOfDayIso, startOfDayIso } from '../../lib/date-utils';
-import { buildCalendarRange } from '../_authenticated.calendar';
+import { dateKey, endOfDayIso, startOfDayIso } from '../../../../lib/date-utils';
+import { buildCalendarRange } from '../month-geometry';
 
 /** September 2026, as the route's cursor holds it (month is 0-based). */
 const CURSOR = { year: 2026, month: 8 };
