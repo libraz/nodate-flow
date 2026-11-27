@@ -2,10 +2,14 @@ package ai
 
 import (
 	"context"
+	"database/sql"
+	"errors"
+	"fmt"
 	"log/slog"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/providers"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
@@ -116,6 +120,15 @@ func CreateProvider(deps Deps) func(context.Context, *CreateProviderInput) (*Cre
 		if in.Body.Kind != string(providers.KindOllama) && in.Body.APIKey == "" {
 			return nil, httpErr(apierrors.ValidationBodyFieldMissing)
 		}
+		// Empty means the kind's official default (or none), so only a
+		// supplied value is checked.
+		if in.Body.DefaultModel != "" {
+			name, ok := validModelName(in.Body.DefaultModel)
+			if !ok {
+				return nil, httpErr(apierrors.ValidationBodyFieldInvalid)
+			}
+			in.Body.DefaultModel = name
+		}
 		defaultModel := resolveDefaultModel(in.Body.Kind, in.Body.DefaultModel)
 		if err := providers.Validate(providers.Config{
 			Kind:         providers.Kind(in.Body.Kind),
@@ -175,58 +188,53 @@ func CreateProvider(deps Deps) func(context.Context, *CreateProviderInput) (*Cre
 		pub := types.New()
 		var baseURL = nullableString(in.Body.BaseURL)
 		defaultModelValue := nullableString(defaultModel)
-		providerInternalID, err := deps.Queries.CreateProvider(ctx, generated.CreateProviderParams{
-			PublicID:         pub,
-			WorkspaceID:      ws.ID,
-			Kind:             generated.AiProvidersKind(in.Body.Kind),
-			Name:             in.Body.Name,
-			BaseUrl:          baseURL,
-			ApiKeyCiphertext: sealed,
-			ApiKeyPrefix:     prefix,
-			ApiKeySuffix:     suffix,
-			DefaultModel:     defaultModelValue,
+		// The provider and its default model row land together, so a
+		// provider never exists without the model its default names.
+		var answered error
+		txErr := dbretry.InTx(ctx, deps.DB, "ai.CreateProvider", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			answered = nil
+			q := deps.Queries.WithTx(tx.RawTx())
+			if defaultModel != "" {
+				full, err := enabledModelLimitReached(ctx, q, ws.ID)
+				if err != nil {
+					return err
+				}
+				if full {
+					answered = httpErr(apierrors.AiModelLimitReached)
+					return errAnswered
+				}
+			}
+			providerInternalID, err := q.CreateProvider(ctx, generated.CreateProviderParams{
+				PublicID:         pub,
+				WorkspaceID:      ws.ID,
+				Kind:             generated.AiProvidersKind(in.Body.Kind),
+				Name:             in.Body.Name,
+				BaseUrl:          baseURL,
+				ApiKeyCiphertext: sealed,
+				ApiKeyPrefix:     prefix,
+				ApiKeySuffix:     suffix,
+				DefaultModel:     defaultModelValue,
+			})
+			if err != nil {
+				return err
+			}
+			if defaultModel == "" {
+				return nil
+			}
+			_, err = q.InsertAIModel(ctx, insertModelParams(types.New(), ws.ID,
+				uint32(providerInternalID), //#nosec G115 -- LastInsertId for ai_providers.id (INT UNSIGNED)
+				in.Body.Kind, defaultModel, defaultModel))
+			return err
 		})
-		if err != nil {
+		if answered != nil {
+			return nil, answered
+		}
+		if txErr != nil {
 			slog.ErrorContext(ctx, "ai provider create failed",
 				slog.String("workspaceId", ws.PublicID.String()),
 				slog.String("apiKeyPrefix", prefix),
 			)
 			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-
-		// Short-term bridge for the AI-agents create flow: if the operator
-		// supplied a default model, also register a matching ai_models row
-		// with per-kind sensible defaults. Without this row, the agents
-		// create dialog is stuck at the empty state because there is no
-		// standalone model-registration UI yet. See
-		// docs/bugs/2026-04-23-web-ai-agents-cannot-be-created-no-model-registration-path.md
-		if defaultModel != "" && providerInternalID > 0 {
-			d := defaultsForModel(in.Body.Kind, defaultModel)
-			modelPub := types.New()
-			const insertModel = `INSERT INTO ai_models (
-				public_id, workspace_id, provider_id, name, display_name,
-				context_window, max_output_tokens,
-				input_price_micro_usd_per_mtok, output_price_micro_usd_per_mtok,
-				supports_tools, supports_vision, enabled
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)`
-			if _, err := deps.DB.ExecContext(ctx, insertModel,
-				modelPub, ws.ID, uint32(providerInternalID), //#nosec G115 -- LastInsertId for ai_providers.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
-				defaultModel, defaultModel,
-				d.contextWindow, d.maxOutputTokens,
-				d.inputPriceMicroUSDPerMTok, d.outputPriceMicroUSDPerMTok,
-				d.supportsTools, d.supportsVision,
-			); err != nil {
-				// Log but do not fail the provider create; operators can
-				// retry registering a model once a standalone model API
-				// lands. Duplicate-key errors on re-create are expected if
-				// the same (provider_id, model name) already exists.
-				slog.ErrorContext(ctx, "ai model auto-register failed",
-					slog.String("workspaceId", ws.PublicID.String()),
-					slog.String("providerId", pub.String()),
-					slog.String("modelName", defaultModel),
-					slog.Any("error", err),
-				)
-			}
 		}
 
 		if actorID, ok := middleware.ActorFromContext(ctx); ok {
@@ -358,15 +366,47 @@ func DeleteProvider(deps Deps) func(context.Context, *DeleteProviderInput) (*Del
 		if err != nil {
 			return nil, httpErr(apierrors.ValidationPathParamInvalid)
 		}
-		rows, err := deps.Queries.DeleteProvider(ctx, generated.DeleteProviderParams{
-			WorkspaceID: ws.ID,
-			PublicID:    pub,
+		var answered error
+		txErr := dbretry.InTx(ctx, deps.DB, "ai.DeleteProvider", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			answered = nil
+			q := deps.Queries.WithTx(tx.RawTx())
+			providerID, err := q.LockEnabledProviderForUpdate(ctx, generated.LockEnabledProviderForUpdateParams{
+				WorkspaceID: ws.ID,
+				PublicID:    pub,
+			})
+			if errors.Is(err, sql.ErrNoRows) {
+				answered = httpErr(apierrors.AiProviderNotFound)
+				return errAnswered
+			}
+			if err != nil {
+				return err
+			}
+			agents, err := q.CountEnabledAgentsForProvider(ctx, providerID)
+			if err != nil {
+				return err
+			}
+			if agents > 0 {
+				answered = httpErr(apierrors.AiProviderInUse)
+				return errAnswered
+			}
+			// The row is locked and enabled, so exactly one row changes.
+			rows, err := q.DeleteProvider(ctx, generated.DeleteProviderParams{
+				WorkspaceID: ws.ID,
+				PublicID:    pub,
+			})
+			if err != nil {
+				return err
+			}
+			if rows != 1 {
+				return fmt.Errorf("ai: provider delete affected %d rows", rows)
+			}
+			return nil
 		})
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
+		if answered != nil {
+			return nil, answered
 		}
-		if rows == 0 {
-			return nil, httpErr(apierrors.AiProviderNotFound)
+		if txErr != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		if actorID, ok := middleware.ActorFromContext(ctx); ok {
 			deps.Audit.Record(ctx, audit.Entry{

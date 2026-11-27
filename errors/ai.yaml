@@ -64,6 +64,15 @@ resources:
         description: "Returned when an update or delete targets an ai_providers row that does not exist in the workspace, matching zero rows."
         userAction: "Verify the provider id and that it belongs to this workspace."
 
+      in_use:
+        code: AI.PROVIDER.IN_USE
+        status: 409
+        message: "Agents still use models from this provider"
+        message_ja: "このプロバイダのモデルを使用中のエージェントがあります"
+        message_zh: "仍有智能体在使用此服务提供商的模型"
+        description: "Returned when an AI provider delete targets a provider whose models are referenced by one or more enabled agents. The provider is left unchanged."
+        userAction: "Change those agents to a model from another provider, or delete them."
+
       base_url_not_allowed:
         code: AI.PROVIDER.BASE_URL_NOT_ALLOWED
         status: 412
@@ -262,6 +271,42 @@ resources:
         message_zh: "未找到 AI 模型"
         description: "Returned when an operation references an ai_models row that does not exist in the workspace or has been disabled."
         userAction: "Pick a model from the workspace's registered providers."
+
+      already_exists:
+        code: AI.MODEL.ALREADY_EXISTS
+        status: 409
+        message: "A model with this name is already registered for the provider"
+        message_ja: "このプロバイダには同じ名前のモデルが既に登録されています"
+        message_zh: "该服务提供商下已注册同名模型"
+        description: "Returned when a model is added under a name (compared case-insensitively) that an enabled ai_models row of the same provider already uses. A disabled row with that name is re-enabled instead."
+        userAction: "Use the existing model, or enable it if it is disabled."
+
+      in_use:
+        code: AI.MODEL.IN_USE
+        status: 409
+        message: "The model is used by one or more agents"
+        message_ja: "このモデルは 1 つ以上のエージェントで使用されています"
+        message_zh: "该模型正被一个或多个智能体使用"
+        description: "Returned when an enabled ai_models row is disabled while one or more enabled agents still reference it."
+        userAction: "Change those agents to another model first."
+
+      is_provider_default:
+        code: AI.MODEL.IS_PROVIDER_DEFAULT
+        status: 409
+        message: "The model is the provider's default"
+        message_ja: "このモデルはプロバイダの既定モデルです"
+        message_zh: "该模型是服务提供商的默认模型"
+        description: "Returned when the default model of a provider is disabled. The default check runs before the agent-usage check, so the default is never silently unset."
+        userAction: "Set another model as the default first."
+
+      limit_reached:
+        code: AI.MODEL.LIMIT_REACHED
+        status: 409
+        message: "The workspace has reached the limit of 200 enabled models"
+        message_ja: "ワークスペースの有効なモデル数が上限の 200 件に達しています"
+        message_zh: "工作区已启用的模型数已达到上限 200 个"
+        description: "Returned when adding, re-enabling, or enabling a model, or creating a provider with a model, would exceed the workspace cap of 200 enabled models."
+        userAction: "Disable models you no longer use."
 
   reverse:
     breadcrumb: "AI > Reverse"

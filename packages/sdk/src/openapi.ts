@@ -2642,6 +2642,26 @@ export interface paths {
         patch: operations["ai-agent-event-triggers-update"];
         trace?: never;
     };
+    "/workspaces/{wsId}/ai/agents/{agentId}/model": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change the model an AI agent runs on
+         * @description Re-points the agent at another enabled model, including an agent whose current model or provider was disabled. A temperature above what the new model's provider accepts is lowered to its ceiling.
+         */
+        patch: operations["ai-agents-update-model"];
+        trace?: never;
+    };
     "/workspaces/{wsId}/ai/agents/{agentId}/pause": {
         parameters: {
             query?: never;
@@ -2960,6 +2980,90 @@ export interface paths {
          * @description Encrypts and stores a new API key for the provider. The old key is overwritten in place; nothing else about the provider changes.
          */
         patch: operations["ai-providers-patch"];
+        trace?: never;
+    };
+    "/workspaces/{wsId}/ai/providers/{providerId}/available-models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the model identifiers the provider key can see
+         * @description Asks the provider for the models its API key can use, as candidates for registration. Returns an empty list when the provider kind cannot enumerate models. Workspace admin only.
+         */
+        get: operations["ai-provider-available-models-list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/ai/providers/{providerId}/default-model": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set an LLM provider's default model
+         * @description Points the provider's default model at one of its enabled models. AI features that run without an agent use the default model of the workspace's default provider. Workspace admin only.
+         */
+        put: operations["ai-provider-default-model-set"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/ai/providers/{providerId}/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the models registered under an LLM provider
+         * @description Lists every model registered under the provider, enabled and disabled, newest first, with its default flag and the number of enabled agents using it. Workspace admin only.
+         */
+        get: operations["ai-provider-models-list"];
+        put?: never;
+        /**
+         * Register a model under an LLM provider
+         * @description Registers a model identifier under the provider. A disabled model with the same name is re-enabled instead. The first model added to a provider without a default becomes its default. Workspace admin only.
+         */
+        post: operations["ai-provider-models-create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/ai/providers/{providerId}/models/{modelId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Enable, disable or rename a provider model
+         * @description Changes a model's enabled flag or display name. Disabling the provider's default model or a model used by enabled agents is refused, and a refused request applies nothing. Workspace admin only.
+         */
+        patch: operations["ai-provider-models-patch"];
         trace?: never;
     };
     "/workspaces/{wsId}/ai/reminders": {
@@ -5520,6 +5624,15 @@ export interface components {
             /** Format: int64 */
             updatedAt?: number;
         };
+        AgentModelUpdateResult: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AgentModelUpdateResult.json
+             */
+            readonly $schema?: string;
+            ok: boolean;
+        };
         AgentRef: {
             id: string;
             name?: string;
@@ -5822,6 +5935,16 @@ export interface components {
             intervalMinutes: number;
             /** Format: double */
             threshold: number;
+        };
+        AvailableModelList: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AvailableModelList.json
+             */
+            readonly $schema?: string;
+            /** @description Model identifiers the provider key can see */
+            models: string[] | null;
         };
         Body: {
             /**
@@ -6588,6 +6711,18 @@ export interface components {
             defaultModel?: string;
             /** @enum {string} */
             kind: "anthropic" | "openai" | "google" | "ollama" | "openai_compat";
+            name: string;
+        };
+        CreateProviderModelInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CreateProviderModelInputBody.json
+             */
+            readonly $schema?: string;
+            /** @description Display name; defaults to name */
+            displayName?: string;
+            /** @description Model identifier; printable ASCII, no spaces */
             name: string;
         };
         CreatePublicShareInputBody: {
@@ -8821,6 +8956,7 @@ export interface components {
             name: string;
             providerId: string;
             providerKind: string;
+            providerName: string;
         };
         MyCalendarEventResponse: {
             allDay: boolean;
@@ -9292,6 +9428,16 @@ export interface components {
             /** @description New plaintext provider API key (write-only). Printable ASCII, no spaces. */
             apiKey: string;
         };
+        PatchProviderModelInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/PatchProviderModelInputBody.json
+             */
+            readonly $schema?: string;
+            displayName?: string;
+            enabled?: boolean;
+        };
         PatchProviderOutputBody: {
             /**
              * Format: uri
@@ -9627,6 +9773,54 @@ export interface components {
             name: string;
             /** Format: int64 */
             updatedAt?: number;
+        };
+        ProviderDefaultModelResult: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ProviderDefaultModelResult.json
+             */
+            readonly $schema?: string;
+            ok: boolean;
+        };
+        ProviderModel: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ProviderModel.json
+             */
+            readonly $schema?: string;
+            /**
+             * Format: int64
+             * @description Number of enabled agents bound to this model
+             */
+            agentCount: number;
+            displayName: string;
+            enabled: boolean;
+            /** @description Model public id (UUID v7) */
+            id: string;
+            /** @description True when this model is the provider's default model */
+            isDefault: boolean;
+            /** @description Model identifier sent to the provider */
+            name: string;
+        };
+        ProviderModelList: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ProviderModelList.json
+             */
+            readonly $schema?: string;
+            models: components["schemas"]["ProviderModel"][] | null;
+        };
+        ProviderModelPatchResult: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ProviderModelPatchResult.json
+             */
+            readonly $schema?: string;
+            ok: boolean;
         };
         ProviderStatus: {
             /** @description True when the server has credentials for this provider */
@@ -10239,6 +10433,16 @@ export interface components {
              */
             lastUsedAt?: number;
             userAgent: string;
+        };
+        SetProviderDefaultModelInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/SetProviderDefaultModelInputBody.json
+             */
+            readonly $schema?: string;
+            /** @description Model public id (UUID v7) */
+            modelId: string;
         };
         SetupOutputBody: {
             /**
@@ -11190,6 +11394,16 @@ export interface components {
              */
             readonly $schema?: string;
             ok: boolean;
+        };
+        UpdateAgentModelInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/UpdateAgentModelInputBody.json
+             */
+            readonly $schema?: string;
+            /** @description Model public id (UUID v7) */
+            modelId: string;
         };
         UpdateAgentScheduleInputBody: {
             /**
@@ -17000,6 +17214,42 @@ export interface operations {
             };
         };
     };
+    "ai-agents-update-model": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+                agentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAgentModelInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentModelUpdateResult"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "ai-agent-pause": {
         parameters: {
             query?: never;
@@ -17659,6 +17909,179 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PatchProviderOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "ai-provider-available-models-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+                providerId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AvailableModelList"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "ai-provider-default-model-set": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+                providerId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetProviderDefaultModelInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderDefaultModelResult"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "ai-provider-models-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+                providerId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderModelList"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "ai-provider-models-create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+                providerId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateProviderModelInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderModel"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "ai-provider-models-patch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+                providerId: string;
+                modelId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatchProviderModelInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderModelPatchResult"];
                 };
             };
             /** @description Error */

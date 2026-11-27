@@ -15,6 +15,7 @@ package ai
 import (
 	"database/sql"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/nlcommand"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/nlquery"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
@@ -36,7 +37,9 @@ type Deps struct {
 	// Audit records audit log entries. Nil-safe.
 	Audit *audit.Recorder
 	// Mutations records a change on both the timeline and the audit log.
-	Mutations       *mutationlog.Recorder
+	Mutations *mutationlog.Recorder
+	// Resolver builds a provider client for a stored provider row. Nil when no AI backend is configured.
+	Resolver        ai.AgentProviderResolver
 	EmbedConfigured bool
 	EmbedModel      string
 	EmbedEndpoint   string
@@ -79,10 +82,10 @@ type CreateProviderInput struct {
 		Kind    string `json:"kind" enum:"anthropic,openai,google,ollama,openai_compat"`
 		Name    string `json:"name" minLength:"1" maxLength:"100"`
 		BaseURL string `json:"baseUrl,omitempty" maxLength:"255"`
-		// DefaultModel is a provider model identifier. The empty
-		// alternative in the pattern keeps an explicit "" equivalent to
-		// omitting the field.
-		DefaultModel string `json:"defaultModel,omitempty" maxLength:"100" pattern:"^$|^[\\x21-\\x7E]+$"`
+		// DefaultModel is a provider model identifier. The character set is
+		// checked by the handler (validModelName); an explicit "" is
+		// equivalent to omitting the field.
+		DefaultModel string `json:"defaultModel,omitempty" maxLength:"128"`
 		// APIKey is the plaintext provider API key. It is write-only and
 		// is dropped from memory as soon as it is sealed by the cipher.
 		//
@@ -158,6 +161,128 @@ type DeleteProviderOutput struct {
 	Body struct {
 		Ok bool `json:"ok"`
 	}
+}
+
+// ProviderModel is the public DTO for an ai_models row under a provider.
+type ProviderModel struct {
+	ID          string `json:"id" doc:"Model public id (UUID v7)"`
+	Name        string `json:"name" doc:"Model identifier sent to the provider"`
+	DisplayName string `json:"displayName"`
+	Enabled     bool   `json:"enabled"`
+	IsDefault   bool   `json:"isDefault" doc:"True when this model is the provider's default model"`
+	AgentCount  int    `json:"agentCount" doc:"Number of enabled agents bound to this model"`
+}
+
+// ProviderModelList is the response body for the provider model listing.
+type ProviderModelList struct {
+	Models []ProviderModel `json:"models"`
+}
+
+// AvailableModelList is the response body for the upstream model listing.
+type AvailableModelList struct {
+	Models []string `json:"models" doc:"Model identifiers the provider key can see"`
+}
+
+// ListProviderModelsInput is the path for
+// GET /workspaces/{wsId}/ai/providers/{providerId}/models.
+type ListProviderModelsInput struct {
+	WsID       string `path:"wsId"`
+	ProviderID string `path:"providerId"`
+}
+
+// ListProviderModelsOutput is the response for the provider model listing.
+type ListProviderModelsOutput struct {
+	Body ProviderModelList
+}
+
+// CreateProviderModelInput is the body for
+// POST /workspaces/{wsId}/ai/providers/{providerId}/models.
+type CreateProviderModelInput struct {
+	WsID       string `path:"wsId"`
+	ProviderID string `path:"providerId"`
+	Body       struct {
+		Name        string  `json:"name" maxLength:"128" doc:"Model identifier; printable ASCII, no spaces"`
+		DisplayName *string `json:"displayName,omitempty" maxLength:"255" doc:"Display name; defaults to name"`
+	}
+}
+
+// CreateProviderModelOutput returns the created or re-enabled model.
+type CreateProviderModelOutput struct {
+	Body ProviderModel
+}
+
+// PatchProviderModelInput is the body for
+// PATCH /workspaces/{wsId}/ai/providers/{providerId}/models/{modelId}.
+type PatchProviderModelInput struct {
+	WsID       string `path:"wsId"`
+	ProviderID string `path:"providerId"`
+	ModelID    string `path:"modelId"`
+	Body       struct {
+		Enabled     *bool   `json:"enabled,omitempty"`
+		DisplayName *string `json:"displayName,omitempty" maxLength:"255"`
+	}
+}
+
+// ProviderModelPatchResult is the ack body for the model patch.
+type ProviderModelPatchResult struct {
+	Ok bool `json:"ok"`
+}
+
+// PatchProviderModelOutput is the ack envelope.
+type PatchProviderModelOutput struct {
+	Body ProviderModelPatchResult
+}
+
+// SetProviderDefaultModelInput is the body for
+// PUT /workspaces/{wsId}/ai/providers/{providerId}/default-model.
+type SetProviderDefaultModelInput struct {
+	WsID       string `path:"wsId"`
+	ProviderID string `path:"providerId"`
+	Body       struct {
+		ModelID string `json:"modelId" doc:"Model public id (UUID v7)"`
+	}
+}
+
+// ProviderDefaultModelResult is the ack body for setting the default model.
+type ProviderDefaultModelResult struct {
+	Ok bool `json:"ok"`
+}
+
+// SetProviderDefaultModelOutput is the ack envelope.
+type SetProviderDefaultModelOutput struct {
+	Body ProviderDefaultModelResult
+}
+
+// ListAvailableModelsInput is the path for
+// GET /workspaces/{wsId}/ai/providers/{providerId}/available-models.
+type ListAvailableModelsInput struct {
+	WsID       string `path:"wsId"`
+	ProviderID string `path:"providerId"`
+}
+
+// ListAvailableModelsOutput is the response for the upstream model listing.
+type ListAvailableModelsOutput struct {
+	Body AvailableModelList
+}
+
+// UpdateAgentModelInput is the body for
+// PATCH /workspaces/{wsId}/ai/agents/{agentId}/model.
+type UpdateAgentModelInput struct {
+	WsID    string `path:"wsId"`
+	AgentID string `path:"agentId"`
+	Body    struct {
+		ModelID string `json:"modelId" doc:"Model public id (UUID v7)"`
+	}
+}
+
+// AgentModelUpdateResult is the ack body for the agent model change.
+type AgentModelUpdateResult struct {
+	Ok bool `json:"ok"`
+}
+
+// UpdateAgentModelOutput is the ack envelope.
+type UpdateAgentModelOutput struct {
+	Body AgentModelUpdateResult
 }
 
 // McpTokenSummary is the masked DTO for an mcp_tokens row. It NEVER

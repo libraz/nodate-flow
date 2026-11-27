@@ -31,6 +31,26 @@ export const AiErrors = {
     status: 412,
     message: "The instance embedding provider is not configured",
   },
+  AI_MODEL_ALREADY_EXISTS: {
+    code: "AI.MODEL.ALREADY_EXISTS",
+    status: 409,
+    message: "A model with this name is already registered for the provider",
+  },
+  AI_MODEL_IN_USE: {
+    code: "AI.MODEL.IN_USE",
+    status: 409,
+    message: "The model is used by one or more agents",
+  },
+  AI_MODEL_IS_PROVIDER_DEFAULT: {
+    code: "AI.MODEL.IS_PROVIDER_DEFAULT",
+    status: 409,
+    message: "The model is the provider's default",
+  },
+  AI_MODEL_LIMIT_REACHED: {
+    code: "AI.MODEL.LIMIT_REACHED",
+    status: 409,
+    message: "The workspace has reached the limit of 200 enabled models",
+  },
   AI_MODEL_NOT_FOUND: {
     code: "AI.MODEL.NOT_FOUND",
     status: 404,
@@ -60,6 +80,11 @@ export const AiErrors = {
     code: "AI.PROVIDER.BASE_URL_NOT_ALLOWED",
     status: 412,
     message: "AI provider endpoint is not an allowed destination",
+  },
+  AI_PROVIDER_IN_USE: {
+    code: "AI.PROVIDER.IN_USE",
+    status: 409,
+    message: "Agents still use models from this provider",
   },
   AI_PROVIDER_KEY_DECRYPT_FAILED: {
     code: "AI.PROVIDER.KEY_DECRYPT_FAILED",

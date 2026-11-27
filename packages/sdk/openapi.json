@@ -536,6 +536,23 @@
         "required": ["id", "slug", "name", "enabled", "memberCount", "createdAt"],
         "type": "object"
       },
+      "AgentModelUpdateResult": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/AgentModelUpdateResult.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
+        "type": "object"
+      },
       "AgentRef": {
         "additionalProperties": false,
         "properties": {
@@ -1269,6 +1286,27 @@
           }
         },
         "required": ["enabled", "intervalMinutes", "threshold"],
+        "type": "object"
+      },
+      "AvailableModelList": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/AvailableModelList.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "models": {
+            "description": "Model identifiers the provider key can see",
+            "items": {
+              "type": "string"
+            },
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["models"],
         "type": "object"
       },
       "Body": {
@@ -2832,8 +2870,7 @@
             "type": "string"
           },
           "defaultModel": {
-            "maxLength": 100,
-            "pattern": "^$|^[\\x21-\\x7E]+$",
+            "maxLength": 128,
             "type": "string"
           },
           "kind": {
@@ -2847,6 +2884,30 @@
           }
         },
         "required": ["kind", "name"],
+        "type": "object"
+      },
+      "CreateProviderModelInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/CreateProviderModelInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "displayName": {
+            "description": "Display name; defaults to name",
+            "maxLength": 255,
+            "type": "string"
+          },
+          "name": {
+            "description": "Model identifier; printable ASCII, no spaces",
+            "maxLength": 128,
+            "type": "string"
+          }
+        },
+        "required": ["name"],
         "type": "object"
       },
       "CreatePublicShareInputBody": {
@@ -7708,9 +7769,12 @@
           },
           "providerKind": {
             "type": "string"
+          },
+          "providerName": {
+            "type": "string"
           }
         },
-        "required": ["id", "name", "displayName", "providerId", "providerKind"],
+        "required": ["id", "name", "displayName", "providerId", "providerKind", "providerName"],
         "type": "object"
       },
       "MyCalendarEventResponse": {
@@ -8805,6 +8869,26 @@
         "required": ["apiKey"],
         "type": "object"
       },
+      "PatchProviderModelInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/PatchProviderModelInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "displayName": {
+            "maxLength": 255,
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
       "PatchProviderOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -9526,6 +9610,97 @@
           }
         },
         "required": ["id", "kind", "name", "createdAt"],
+        "type": "object"
+      },
+      "ProviderDefaultModelResult": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ProviderDefaultModelResult.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
+        "type": "object"
+      },
+      "ProviderModel": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ProviderModel.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "agentCount": {
+            "description": "Number of enabled agents bound to this model",
+            "format": "int64",
+            "type": "integer"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "id": {
+            "description": "Model public id (UUID v7)",
+            "type": "string"
+          },
+          "isDefault": {
+            "description": "True when this model is the provider's default model",
+            "type": "boolean"
+          },
+          "name": {
+            "description": "Model identifier sent to the provider",
+            "type": "string"
+          }
+        },
+        "required": ["id", "name", "displayName", "enabled", "isDefault", "agentCount"],
+        "type": "object"
+      },
+      "ProviderModelList": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ProviderModelList.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/ProviderModel"
+            },
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["models"],
+        "type": "object"
+      },
+      "ProviderModelPatchResult": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ProviderModelPatchResult.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
         "type": "object"
       },
       "ProviderStatus": {
@@ -10807,6 +10982,24 @@
           }
         },
         "required": ["id", "userAgent", "ipAddress", "current", "createdAt", "expiresAt"],
+        "type": "object"
+      },
+      "SetProviderDefaultModelInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/SetProviderDefaultModelInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "modelId": {
+            "description": "Model public id (UUID v7)",
+            "type": "string"
+          }
+        },
+        "required": ["modelId"],
         "type": "object"
       },
       "SetupOutputBody": {
@@ -12981,6 +13174,24 @@
           }
         },
         "required": ["ok"],
+        "type": "object"
+      },
+      "UpdateAgentModelInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/UpdateAgentModelInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "modelId": {
+            "description": "Model public id (UUID v7)",
+            "type": "string"
+          }
+        },
+        "required": ["modelId"],
         "type": "object"
       },
       "UpdateAgentScheduleInputBody": {
@@ -22898,6 +23109,69 @@
         "tags": ["Public"]
       }
     },
+    "/workspaces/{wsId}/ai/agents/{agentId}/model": {
+      "patch": {
+        "description": "Re-points the agent at another enabled model, including an agent whose current model or provider was disabled. A temperature above what the new model's provider accepts is lowered to its ceiling.",
+        "operationId": "ai-agents-update-model",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "agentId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAgentModelInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentModelUpdateResult"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Change the model an AI agent runs on",
+        "tags": ["Public"]
+      }
+    },
     "/workspaces/{wsId}/ai/agents/{agentId}/pause": {
       "post": {
         "description": "Flips the agent's paused flag so the runtime stops scheduling it. In-flight runs continue to completion; subsequent triggers no-op until the agent is unpaused.",
@@ -23998,6 +24272,307 @@
           }
         ],
         "summary": "Rotate an LLM provider API key",
+        "tags": ["AI"]
+      }
+    },
+    "/workspaces/{wsId}/ai/providers/{providerId}/available-models": {
+      "get": {
+        "description": "Asks the provider for the models its API key can use, as candidates for registration. Returns an empty list when the provider kind cannot enumerate models. Workspace admin only.",
+        "operationId": "ai-provider-available-models-list",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "providerId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AvailableModelList"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List the model identifiers the provider key can see",
+        "tags": ["AI"]
+      }
+    },
+    "/workspaces/{wsId}/ai/providers/{providerId}/default-model": {
+      "put": {
+        "description": "Points the provider's default model at one of its enabled models. AI features that run without an agent use the default model of the workspace's default provider. Workspace admin only.",
+        "operationId": "ai-provider-default-model-set",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "providerId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetProviderDefaultModelInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderDefaultModelResult"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Set an LLM provider's default model",
+        "tags": ["AI"]
+      }
+    },
+    "/workspaces/{wsId}/ai/providers/{providerId}/models": {
+      "get": {
+        "description": "Lists every model registered under the provider, enabled and disabled, newest first, with its default flag and the number of enabled agents using it. Workspace admin only.",
+        "operationId": "ai-provider-models-list",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "providerId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderModelList"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List the models registered under an LLM provider",
+        "tags": ["AI"]
+      },
+      "post": {
+        "description": "Registers a model identifier under the provider. A disabled model with the same name is re-enabled instead. The first model added to a provider without a default becomes its default. Workspace admin only.",
+        "operationId": "ai-provider-models-create",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "providerId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateProviderModelInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderModel"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Register a model under an LLM provider",
+        "tags": ["AI"]
+      }
+    },
+    "/workspaces/{wsId}/ai/providers/{providerId}/models/{modelId}": {
+      "patch": {
+        "description": "Changes a model's enabled flag or display name. Disabling the provider's default model or a model used by enabled agents is refused, and a refused request applies nothing. Workspace admin only.",
+        "operationId": "ai-provider-models-patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "providerId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "modelId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchProviderModelInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderModelPatchResult"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Enable, disable or rename a provider model",
         "tags": ["AI"]
       }
     },

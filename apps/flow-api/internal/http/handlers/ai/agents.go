@@ -158,10 +158,19 @@ func agentTemperature(requested *uint16, kind providers.Kind) (uint16, bool) {
 	if requested != nil {
 		temp = *requested
 	}
-	if kind == providers.KindAnthropic && temp > anthropicMaxTemperatureX100 {
+	if _, clamped := clampTemperature(temp, kind); clamped {
 		return 0, false
 	}
 	return temp, true
+}
+
+// clampTemperature lowers a stored temperature to what the provider kind
+// accepts, reporting whether it had to.
+func clampTemperature(temp uint16, kind providers.Kind) (uint16, bool) {
+	if kind == providers.KindAnthropic && temp > anthropicMaxTemperatureX100 {
+		return anthropicMaxTemperatureX100, true
+	}
+	return temp, false
 }
 
 // validEventTriggerTypes reports whether every entry is a declared eventbus
@@ -285,23 +294,6 @@ func CreateAgent(deps Deps) func(context.Context, *CreateAgentInput) (*CreateAge
 		if err != nil {
 			return nil, httpErr(apierrors.ValidationPathParamInvalid)
 		}
-		// Resolve the internal model id; the generated CreateAgent
-		// query takes the internal FK.
-		var (
-			modelID      uint32
-			modelName    string
-			providerKind string
-		)
-		const q = `SELECT m.id, m.name, p.kind FROM ai_models m
-			INNER JOIN ai_providers p ON p.id = m.provider_id
-			WHERE m.workspace_id = ? AND m.public_id = ? AND m.enabled = TRUE LIMIT 1`
-		if err := deps.DB.QueryRowContext(ctx, q, ws.ID, modelPub).Scan(&modelID, &modelName, &providerKind); err != nil {
-			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.AiModelNotFound, apierrors.InternalUnexpected))
-		}
-		temp, tempOK := agentTemperature(in.Body.Temperature, providers.Kind(providerKind))
-		if !tempOK {
-			return nil, httpErr(apierrors.ValidationBodyFieldInvalid)
-		}
 		if !validEventTriggerTypes(in.Body.EventTriggerTypes) {
 			return nil, httpErr(apierrors.ValidationBodyFieldInvalid)
 		}
@@ -321,11 +313,36 @@ func CreateAgent(deps Deps) func(context.Context, *CreateAgentInput) (*CreateAge
 			}
 			triggersRaw = raw
 		}
-		if err := dbretry.InTx(ctx, deps.DB, "ai.CreateAgent", nil, func(ctx context.Context, tx *dbretry.Tx) error {
-			insertID, err := deps.Queries.WithTx(tx.RawTx()).CreateAgent(ctx, generated.CreateAgentParams{
+		var (
+			answered  error
+			modelName string
+		)
+		txErr := dbretry.InTx(ctx, deps.DB, "ai.CreateAgent", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			answered = nil
+			q := deps.Queries.WithTx(tx.RawTx())
+			// The shared lock serializes against a concurrent model or
+			// provider disable.
+			model, err := q.GetEnabledModelForAgentForShare(ctx, generated.GetEnabledModelForAgentForShareParams{
+				WorkspaceID: ws.ID,
+				PublicID:    modelPub,
+			})
+			if errors.Is(err, sql.ErrNoRows) {
+				answered = httpErr(apierrors.AiModelNotFound)
+				return errAnswered
+			}
+			if err != nil {
+				return err
+			}
+			temp, tempOK := agentTemperature(in.Body.Temperature, providers.Kind(model.Kind))
+			if !tempOK {
+				answered = httpErr(apierrors.ValidationBodyFieldInvalid)
+				return errAnswered
+			}
+			modelName = model.Name
+			insertID, err := q.CreateAgent(ctx, generated.CreateAgentParams{
 				PublicID:        pub,
 				WorkspaceID:     ws.ID,
-				ModelID:         modelID,
+				ModelID:         model.ID,
 				Name:            in.Body.Name,
 				Description:     descNull,
 				SystemPrompt:    in.Body.SystemPrompt,
@@ -346,7 +363,11 @@ func CreateAgent(deps Deps) func(context.Context, *CreateAgentInput) (*CreateAge
 				`UPDATE ai_agents SET event_trigger_types = ? WHERE id = ?`,
 				triggersRaw, insertID)
 			return err
-		}); err != nil {
+		})
+		if answered != nil {
+			return nil, answered
+		}
+		if txErr != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		if actorID, ok := middleware.ActorFromContext(ctx); ok {
@@ -454,6 +475,86 @@ func UpdateAgentEventTriggers(deps Deps) func(context.Context, *UpdateAgentEvent
 	}
 }
 
+// UpdateAgentModel handles PATCH /workspaces/{wsId}/ai/agents/{agentId}/model.
+// An agent stranded on a disabled model or provider can be re-pointed, and a
+// temperature above the new kind's ceiling is clamped to it.
+func UpdateAgentModel(deps Deps) func(context.Context, *UpdateAgentModelInput) (*UpdateAgentModelOutput, error) {
+	return func(ctx context.Context, in *UpdateAgentModelInput) (*UpdateAgentModelOutput, error) {
+		ws, ok := middleware.WorkspaceFromContext(ctx)
+		if !ok {
+			return nil, httpErr(apierrors.WsWorkspaceNotFound)
+		}
+		agentPub, err := types.Parse(in.AgentID)
+		if err != nil {
+			return nil, httpErr(apierrors.ValidationPathParamInvalid)
+		}
+		modelPub, err := types.Parse(in.Body.ModelID)
+		if err != nil {
+			return nil, httpErr(apierrors.ValidationPathParamInvalid)
+		}
+
+		var (
+			answered error
+			meta     map[string]any
+		)
+		txErr := dbretry.InTx(ctx, deps.DB, "ai.UpdateAgentModel", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			answered = nil
+			meta = nil
+			q := deps.Queries.WithTx(tx.RawTx())
+			agent, err := q.GetAgentForModelUpdate(ctx, generated.GetAgentForModelUpdateParams{
+				WorkspaceID: ws.ID,
+				PublicID:    agentPub,
+			})
+			if errors.Is(err, sql.ErrNoRows) {
+				answered = httpErr(apierrors.AiAgentNotFound)
+				return errAnswered
+			}
+			if err != nil {
+				return err
+			}
+			if agent.ModelPublicID == modelPub {
+				return nil
+			}
+			model, err := q.GetEnabledModelForAgentForShare(ctx, generated.GetEnabledModelForAgentForShareParams{
+				WorkspaceID: ws.ID,
+				PublicID:    modelPub,
+			})
+			if errors.Is(err, sql.ErrNoRows) {
+				answered = httpErr(apierrors.AiModelNotFound)
+				return errAnswered
+			}
+			if err != nil {
+				return err
+			}
+			temp, clamped := clampTemperature(agent.Temperature, providers.Kind(model.Kind))
+			if err := q.UpdateAgentModel(ctx, generated.UpdateAgentModelParams{
+				ModelID:     model.ID,
+				Temperature: temp,
+				ID:          agent.ID,
+			}); err != nil {
+				return err
+			}
+			meta = map[string]any{"fromModel": agent.ModelName, "toModel": model.Name}
+			if clamped {
+				meta["temperatureClampedFrom"] = agent.Temperature
+			}
+			return nil
+		})
+		if answered != nil {
+			return nil, answered
+		}
+		if txErr != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if meta != nil {
+			recordAudit(ctx, deps, ws.ID, "ai_agent.update_model", "ai_agent", agentPub.String(), meta)
+		}
+		out := &UpdateAgentModelOutput{}
+		out.Body.Ok = true
+		return out, nil
+	}
+}
+
 // TriggerAgentInput is the path for
 // POST /workspaces/{wsId}/ai/agents/{agentId}/trigger.
 type TriggerAgentInput struct {
@@ -546,6 +647,7 @@ type ModelSummary struct {
 	DisplayName  string `json:"displayName"`
 	ProviderID   string `json:"providerId"`
 	ProviderKind string `json:"providerKind"`
+	ProviderName string `json:"providerName"`
 }
 
 // ListModelsInput is the query for GET /workspaces/{wsId}/ai/models.
@@ -573,48 +675,29 @@ func ListModels(deps Deps) func(context.Context, *ListModelsInput) (*ListModelsO
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
 		}
-		const q = `
-			SELECT m.public_id, m.name, m.display_name,
-			       p.public_id AS provider_public_id, p.kind AS provider_kind,
-			       COUNT(*) OVER() AS total
-			FROM ai_models m
-			INNER JOIN ai_providers p ON p.id = m.provider_id AND p.enabled = TRUE
-			WHERE m.workspace_id = ? AND m.enabled = TRUE
-			ORDER BY m.sort_weight ASC, m.created_at DESC, m.public_id DESC
-			LIMIT ? OFFSET ?`
-		rows, err := deps.DB.QueryContext(ctx, q, ws.ID, in.Limit, in.Offset)
+		rows, err := deps.Queries.ListModelsForWorkspace(ctx, generated.ListModelsForWorkspaceParams{
+			WorkspaceID: ws.ID,
+			Limit:       in.Limit,
+			Offset:      in.Offset,
+		})
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		defer rows.Close()
 		out := &ListModelsOutput{}
-		out.Body.Models = make([]ModelSummary, 0)
-		var total int64
-		for rows.Next() {
-			var (
-				modelPub    types.PublicID
-				name        string
-				displayName string
-				providerPub types.PublicID
-				providerKnd string
-				row         int64
-			)
-			if err := rows.Scan(&modelPub, &name, &displayName, &providerPub, &providerKnd, &row); err != nil {
-				return nil, httpErr(apierrors.InternalUnexpected)
-			}
-			total = row
+		out.Body.Models = make([]ModelSummary, 0, len(rows))
+		for _, r := range rows {
 			out.Body.Models = append(out.Body.Models, ModelSummary{
-				ID:           modelPub.String(),
-				Name:         name,
-				DisplayName:  displayName,
-				ProviderID:   providerPub.String(),
-				ProviderKind: providerKnd,
+				ID:           r.PublicID.String(),
+				Name:         r.Name,
+				DisplayName:  r.DisplayName,
+				ProviderID:   r.ProviderID.String(),
+				ProviderKind: string(r.ProviderKind),
+				ProviderName: r.ProviderName,
 			})
 		}
-		if err := rows.Err(); err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
+		if len(rows) > 0 {
+			out.Body.Total = totalAsInt64(rows[0].Total)
 		}
-		out.Body.Total = total
 		return out, nil
 	}
 }

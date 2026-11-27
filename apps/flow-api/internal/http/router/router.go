@@ -693,6 +693,14 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Tags:        []string{"Public"},
 		}, aihandlers.UpdateAgentEventTriggers(shared.aiDeps))
 		huma.Register(subAPI, huma.Operation{
+			OperationID: "ai-agents-update-model",
+			Method:      http.MethodPatch,
+			Path:        "/workspaces/{wsId}/ai/agents/{agentId}/model",
+			Summary:     "Change the model an AI agent runs on",
+			Description: "Re-points the agent at another enabled model, including an agent whose current model or provider was disabled. A temperature above what the new model's provider accepts is lowered to its ceiling.",
+			Tags:        []string{"Public"},
+		}, aihandlers.UpdateAgentModel(shared.aiDeps))
+		huma.Register(subAPI, huma.Operation{
 			OperationID: "ai-agent-trigger",
 			Method:      http.MethodPost,
 			Path:        "/workspaces/{wsId}/ai/agents/{agentId}/trigger",

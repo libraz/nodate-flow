@@ -45,6 +45,51 @@ func RegisterProviders(api huma.API, deps Deps) {
 		Description: "Marks the provider as removed so subsequent AI calls fail closed with AI.PROVIDER.NOT_CONFIGURED. Historical ai_invocations rows remain queryable.",
 		Tags:        []string{"AI"},
 	}, DeleteProvider(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "ai-provider-models-list",
+		Method:      http.MethodGet,
+		Path:        "/workspaces/{wsId}/ai/providers/{providerId}/models",
+		Summary:     "List the models registered under an LLM provider",
+		Description: "Lists every model registered under the provider, enabled and disabled, newest first, with its default flag and the number of enabled agents using it. Workspace admin only.",
+		Tags:        []string{"AI"},
+	}, ListProviderModels(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "ai-provider-models-create",
+		Method:      http.MethodPost,
+		Path:        "/workspaces/{wsId}/ai/providers/{providerId}/models",
+		Summary:     "Register a model under an LLM provider",
+		Description: "Registers a model identifier under the provider. A disabled model with the same name is re-enabled instead. The first model added to a provider without a default becomes its default. Workspace admin only.",
+		Tags:        []string{"AI"},
+	}, CreateProviderModel(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "ai-provider-models-patch",
+		Method:      http.MethodPatch,
+		Path:        "/workspaces/{wsId}/ai/providers/{providerId}/models/{modelId}",
+		Summary:     "Enable, disable or rename a provider model",
+		Description: "Changes a model's enabled flag or display name. Disabling the provider's default model or a model used by enabled agents is refused, and a refused request applies nothing. Workspace admin only.",
+		Tags:        []string{"AI"},
+	}, PatchProviderModel(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "ai-provider-default-model-set",
+		Method:      http.MethodPut,
+		Path:        "/workspaces/{wsId}/ai/providers/{providerId}/default-model",
+		Summary:     "Set an LLM provider's default model",
+		Description: "Points the provider's default model at one of its enabled models. AI features that run without an agent use the default model of the workspace's default provider. Workspace admin only.",
+		Tags:        []string{"AI"},
+	}, SetProviderDefaultModel(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "ai-provider-available-models-list",
+		Method:      http.MethodGet,
+		Path:        "/workspaces/{wsId}/ai/providers/{providerId}/available-models",
+		Summary:     "List the model identifiers the provider key can see",
+		Description: "Asks the provider for the models its API key can use, as candidates for registration. Returns an empty list when the provider kind cannot enumerate models. Workspace admin only.",
+		Tags:        []string{"AI"},
+	}, ListAvailableModels(deps))
 }
 
 // RegisterMcpTokens wires the per-user MCP token endpoints. The caller

@@ -314,10 +314,14 @@ func buildSharedDeps(deps Deps) *sharedDeps {
 	// inbox triage handler, and any future AI endpoint. When
 	// NF_AI_MOCK is set the resolver short-circuits to a deterministic
 	// fixture-backed provider so tests do not need a cipher.
-	var aiOrch *ai.Orchestrator
+	var (
+		aiOrch           *ai.Orchestrator
+		providerResolver ai.AgentProviderResolver
+	)
 	switch {
 	case deps.AiMock:
 		mockResolver := providers.NewMockResolver(providers.NewMockProvider(""))
+		providerResolver = mockResolver
 		budget := ai.BudgetReaderFunc(func(_ context.Context, _ uint32) (int64, error) { return 0, nil })
 		aiOrch = &ai.Orchestrator{
 			Resolver:          mockResolver,
@@ -330,6 +334,7 @@ func buildSharedDeps(deps Deps) *sharedDeps {
 		}
 	case deps.Cipher != nil:
 		resolver := providers.NewWorkspaceResolver(deps.Queries, deps.Cipher)
+		providerResolver = resolver
 		budget := ai.BudgetReaderFunc(func(ctx context.Context, wsID uint32) (int64, error) {
 			return deps.Queries.SumAiCostTodayForWorkspace(ctx, ai.DailyCostParams(ctx, deps.Queries, wsID))
 		})
@@ -368,7 +373,7 @@ func buildSharedDeps(deps Deps) *sharedDeps {
 		tlDeps:               timeline.Deps{DB: deps.DB, Queries: deps.Queries},
 		inboxDeps:            inbox.Deps{DB: deps.DB, Queries: deps.Queries, Mutations: mutationRec},
 		notifDeps:            notifications.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec},
-		aiDeps:               aihandlers.Deps{DB: deps.DB, Queries: deps.Queries, Cipher: deps.Cipher, NlQuery: nlQueryCompiler, NlCommand: nlCommandResolver, Audit: auditRec, Mutations: mutationRec, EmbedConfigured: embedClient != nil, EmbedModel: embedModel, EmbedEndpoint: embedEndpoint},
+		aiDeps:               aihandlers.Deps{DB: deps.DB, Queries: deps.Queries, Cipher: deps.Cipher, NlQuery: nlQueryCompiler, NlCommand: nlCommandResolver, Audit: auditRec, Mutations: mutationRec, Resolver: providerResolver, EmbedConfigured: embedClient != nil, EmbedModel: embedModel, EmbedEndpoint: embedEndpoint},
 		signalDeps: signals.Deps{
 			DB:                 deps.DB,
 			Queries:            deps.Queries,

@@ -126,6 +126,7 @@ var pathPlaceholders = map[string]string{
 	"lensId":        "01HX000000000000000000000A",
 	"linkId":        "01HX000000000000000000000B",
 	"memoId":        "01HX000000000000000000000W",
+	"modelId":       "01HX000000000000000000000P",
 	"notifId":       "01HX000000000000000000000C",
 	"pageId":        "01HX000000000000000000000D",
 	"prjId":         "01HX000000000000000000000E",
