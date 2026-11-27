@@ -36,6 +36,7 @@ import { isWorkspaceAdmin, useCurrentWorkspaceRole } from '../../lib/use-current
 import SaveStatus, { useSaveStatus } from '../settings/save-status';
 import ui from '../settings/settings-ui.module.css';
 import AgentModelSelect from './agent-model-select';
+import AgentToolsEditor from './agent-tools-editor';
 import {
   AGENT_SCHEDULE_KINDS,
   type AgentScheduleKind,
@@ -274,6 +275,14 @@ function AgentsList({
                   </span>
                 </div>
               )}
+              {agent.kind === 'task_agent' ? (
+                <AgentToolsEditor
+                  workspaceId={workspaceId}
+                  agentId={agent.id}
+                  tools={agent.tools ?? null}
+                  canEdit={admin}
+                />
+              ) : null}
               {canWrite && agent.scheduleKind === 'on_event' ? (
                 <EventTriggersEditor
                   workspaceId={workspaceId}

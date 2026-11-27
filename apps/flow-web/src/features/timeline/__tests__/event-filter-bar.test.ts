@@ -155,6 +155,10 @@ describe('KIND_GROUPS', () => {
       'agent.task.thought',
       'agent.task.handoff_to_user',
       'agent.task.handoff_to_agent',
+      'agent.task.run_requested',
+      'agent.task.step',
+      'agent.action.proposed',
+      'agent.action.decided',
     ]);
     expect(byKey.agent_runtime).toEqual([
       'ai.agent.paused',

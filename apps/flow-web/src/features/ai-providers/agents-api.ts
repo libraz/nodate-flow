@@ -35,6 +35,10 @@ export interface AgentSummary {
   scheduleKind: AgentScheduleKind;
   paused: boolean;
   eventTriggerTypes?: string[];
+  /** Only task agents carry grants. The API always sends it; optional here because some test fixtures omit it. */
+  kind?: components['schemas']['AgentSummary']['kind'];
+  /** Operation to mode; null for agents that cannot hold grants. */
+  tools?: components['schemas']['AgentSummary']['tools'];
   createdAt: number;
   updatedAt?: number;
 }
@@ -254,6 +258,41 @@ export function usePauseAgent(): UseMutationResult<{ ok: true }, Error, PauseAge
         'Failed to toggle agent pause',
       );
       return { ok: true };
+    },
+    onSuccess: (_res, { workspaceId }) => {
+      qc.invalidateQueries({ queryKey: agentsKeys.list(workspaceId) });
+    },
+  });
+}
+
+export interface UpdateAgentToolsArgs {
+  workspaceId: string;
+  agentId: string;
+  /** Operation to mode; an operation left out is not permitted. */
+  tools: Record<string, 'auto' | 'approval'>;
+}
+
+/**
+ * useUpdateAgentTools replaces the agent's per-operation grants wholesale;
+ * `{}` stores "nothing allowed".
+ */
+export function useUpdateAgentTools(): UseMutationResult<
+  Record<string, string>,
+  Error,
+  UpdateAgentToolsArgs
+> {
+  const qc = useQueryClient();
+  return useMutation<Record<string, string>, Error, UpdateAgentToolsArgs>({
+    mutationFn: async ({ workspaceId, agentId, tools }) => {
+      const data = await apiRequest(
+        (client) =>
+          client.PATCH('/workspaces/{wsId}/ai/agents/{agentId}/tools', {
+            params: { path: { wsId: workspaceId, agentId } },
+            body: { tools },
+          }),
+        'Failed to update agent tools',
+      );
+      return data.tools;
     },
     onSuccess: (_res, { workspaceId }) => {
       qc.invalidateQueries({ queryKey: agentsKeys.list(workspaceId) });

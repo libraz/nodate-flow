@@ -30,8 +30,12 @@ const PAGE_SIZE = 50;
 const ACTION_OPTIONS: readonly string[] = [
   'ai_agent.create',
   'ai_agent.pause',
+  'ai_agent.proposal.approve',
+  'ai_agent.proposal.reject',
+  'ai_agent.run.request',
   'ai_agent.update_model',
   'ai_agent.update_schedule',
+  'ai_agent.update_tools',
   'ai_agent.update_triggers',
   'ai_command.resolve',
   'ai_model.create',

@@ -17,14 +17,16 @@
  */
 
 import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
+import Badge from '@nodate-flow/ui/primitives/badge';
 import Button from '@nodate-flow/ui/primitives/button';
 import Combobox from '@nodate-flow/ui/primitives/combobox';
 import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { Link } from '@tanstack/react-router';
-import { Plus } from 'lucide-react';
-import { type ReactElement, useState } from 'react';
+import { History, Plus } from 'lucide-react';
+import { type ReactElement, Suspense, useState } from 'react';
+import { ErrorBoundary } from 'react-error-boundary';
 import { useTranslation } from 'react-i18next';
 
 import { formatApiError } from '../../../lib/api-error';
@@ -37,6 +39,11 @@ import {
 } from '../api';
 import TaskActionButton from '../task-action-button';
 import css from './agent-assign-section.module.css';
+import AgentProposals from './agent-proposals';
+import AgentRunNow, { PrivateTaskNotice } from './agent-run-now';
+import work from './agent-work.module.css';
+import { useCanActOnAgentWork } from './agent-work-api';
+import AgentRunHistoryDrawer from './run-history-drawer';
 
 export interface AgentAssignSectionProps {
   taskId: string;
@@ -47,7 +54,10 @@ export default function AgentAssignSection({
   taskId,
   workspaceId,
 }: AgentAssignSectionProps): ReactElement {
-  const { t } = useTranslation('aiAgents');
+  const { t, i18n } = useTranslation('aiAgents');
+  const locale = i18n?.resolvedLanguage ?? 'en';
+  const canAct = useCanActOnAgentWork(workspaceId);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const { data: assigned } = useTaskAgentActorsQuery(taskId);
   const { data: agentList } = useAgentsQuery(workspaceId);
   const addAgent = useAddTaskAgentActor();
@@ -129,21 +139,35 @@ export default function AgentAssignSection({
               onExited={() => onExited(key)}
               className={motion.enter}
             >
-              <div className={css.item}>
-                <span>{actor.agentName}</span>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  disabled={removingId === actor.id}
-                  aria-busy={removingId === actor.id}
-                  aria-label={t('task_detail.agent.assign.remove', { name: actor.agentName })}
-                  onClick={() => {
-                    void handleRemove(actor);
-                  }}
-                >
-                  ×
-                </Button>
+              <div className={work.agent}>
+                <div className={css.item}>
+                  <span className={work.identity}>
+                    <span>{actor.agentName}</span>
+                    {actor.paused ? (
+                      <Badge tone="warning">{t('task_detail.agent.run_now.paused_badge')}</Badge>
+                    ) : null}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    disabled={removingId === actor.id}
+                    aria-busy={removingId === actor.id}
+                    aria-label={t('task_detail.agent.assign.remove', { name: actor.agentName })}
+                    onClick={() => {
+                      void handleRemove(actor);
+                    }}
+                  >
+                    ×
+                  </Button>
+                </div>
+                {actor.kind === 'signal_judge' ? null : (
+                  <ErrorBoundary fallback={null}>
+                    <Suspense fallback={null}>
+                      <AgentRunNow taskId={taskId} actor={actor} canAct={canAct} />
+                    </Suspense>
+                  </ErrorBoundary>
+                )}
               </div>
             </PresenceItem>
           ))}
@@ -179,6 +203,44 @@ export default function AgentAssignSection({
           {t('task_detail.agent.assign.add')}
         </TaskActionButton>
       )}
+      <div className={work.work}>
+        {entries.length === 0 ? null : (
+          <ErrorBoundary fallback={null}>
+            <Suspense fallback={null}>
+              <PrivateTaskNotice taskId={taskId} />
+            </Suspense>
+          </ErrorBoundary>
+        )}
+        <ErrorBoundary fallback={null}>
+          <Suspense fallback={null}>
+            <AgentProposals taskId={taskId} locale={locale} canDecide={canAct} />
+          </Suspense>
+        </ErrorBoundary>
+        {entries.length === 0 ? null : (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className={work.historyButton}
+            onClick={() => {
+              setHistoryOpen(true);
+            }}
+          >
+            <History size={14} strokeWidth={1.75} aria-hidden="true" />
+            {t('task_detail.agent.run_history')}
+          </Button>
+        )}
+      </div>
+      {historyOpen ? (
+        <AgentRunHistoryDrawer
+          taskId={taskId}
+          locale={locale}
+          open={historyOpen}
+          onClose={() => {
+            setHistoryOpen(false);
+          }}
+        />
+      ) : null}
     </>
   );
 }

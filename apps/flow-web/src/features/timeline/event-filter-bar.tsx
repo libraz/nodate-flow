@@ -243,6 +243,10 @@ export const KIND_GROUPS: readonly { key: string; chips: readonly KindChip[] }[]
       chip('agent.task.thought'),
       chip('agent.task.handoff_to_user'),
       chip('agent.task.handoff_to_agent'),
+      chip('agent.task.run_requested'),
+      chip('agent.task.step'),
+      chip('agent.action.proposed'),
+      chip('agent.action.decided'),
     ],
   },
   {

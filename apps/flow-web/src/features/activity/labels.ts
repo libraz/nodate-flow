@@ -39,8 +39,12 @@ export function humanizeAction(action: string): string {
 const ACTION_KEY: ReadonlyMap<string, string> = new Map([
   ['ai_agent_create', 'action.ai_agent_create'],
   ['ai_agent_pause', 'action.ai_agent_pause'],
+  ['ai_agent_proposal_approve', 'action.ai_agent_proposal_approve'],
+  ['ai_agent_proposal_reject', 'action.ai_agent_proposal_reject'],
+  ['ai_agent_run_request', 'action.ai_agent_run_request'],
   ['ai_agent_update_model', 'action.ai_agent_update_model'],
   ['ai_agent_update_schedule', 'action.ai_agent_update_schedule'],
+  ['ai_agent_update_tools', 'action.ai_agent_update_tools'],
   ['ai_agent_update_triggers', 'action.ai_agent_update_triggers'],
   ['ai_command_resolve', 'action.ai_command_resolve'],
   ['ai_invocation', 'action.ai_invocation'],

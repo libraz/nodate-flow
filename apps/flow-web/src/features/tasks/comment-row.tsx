@@ -222,7 +222,7 @@ export default function CommentRow({
           </FormActions>
         </form>
       ) : (
-        <Markdown>{comment.body}</Markdown>
+        <Markdown allowImages={comment.authorKind !== 'agent'}>{comment.body}</Markdown>
       )}
     </Card>
   );
