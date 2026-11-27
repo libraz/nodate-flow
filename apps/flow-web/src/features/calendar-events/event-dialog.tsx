@@ -59,7 +59,6 @@ import FormActions from '../../components/form-actions';
 import { ApiError, formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import {
-  allDayLastDateKey,
   allDayRangeToDates,
   eventDateKey,
   todayKey,
@@ -91,6 +90,14 @@ import AttendeesSection from './attendees-section';
 import CreatorChip from './creator-chip';
 import styles from './event-dialog.module.css';
 import LabelPicker from './label-picker';
+import { type NotificationPreset, presetToMinutes } from './lib/notification-preset';
+import { displayEndDate, occurrenceRange } from './lib/occurrence-range';
+import {
+  presetToRRule,
+  type RecurrencePreset,
+  rruleToPreset,
+  weekdayName,
+} from './lib/recurrence-preset';
 import { useSlowPending } from './lib/use-slow-pending';
 import RecurringScopeDialog from './recurring-scope-dialog';
 
@@ -115,39 +122,6 @@ export type Flexibility = 'fixed' | 'negotiable' | 'conditional';
 
 /** Block preset chip identifiers. Maps to `blockLabel` + `showAs` on submit. */
 export type BlockPreset = 'working' | 'focus' | 'oof' | 'custom';
-
-/** Recurrence preset identifiers stored in component state. */
-/**
- * The repeat choices the dialog offers, plus `custom` — which is not
- * offered, only shown.
- *
- * The presets are lossy: a stored rule can say things none of them can
- * (an interval, a set of weekdays that is not the working week). Before,
- * that was handled by not showing the stored rule at all, so every event
- * opened reading "Does not repeat" whether or not it repeated, and the
- * only way to stop a daily standup was to delete the series. `custom`
- * lets the control tell the truth about a rule it cannot offer to
- * recreate, while still allowing the user to replace it or clear it.
- */
-export type RecurrencePreset =
-  | 'none'
-  | 'daily'
-  | 'weekdays'
-  | 'weekly'
-  | 'monthly'
-  | 'yearly'
-  | 'custom';
-
-/** Notification preset identifiers. `none` omits the field on submit. */
-export type NotificationPreset =
-  | 'none'
-  | 'at_time'
-  | '5min'
-  | '10min'
-  | '15min'
-  | '30min'
-  | '1hour'
-  | '1day';
 
 /**
  * The rendered occurrence an edit dialog was opened from, for a row that
@@ -216,166 +190,6 @@ export interface EventDialogProps {
 }
 
 /* ── helpers ────────────────────────────────────────────────────── */
-
-/** Translate a notification preset to minutes (null = omit from payload). */
-function presetToMinutes(preset: NotificationPreset): number | null {
-  switch (preset) {
-    case 'none':
-      return null;
-    case 'at_time':
-      return 0;
-    case '5min':
-      return 5;
-    case '10min':
-      return 10;
-    case '15min':
-      return 15;
-    case '30min':
-      return 30;
-    case '1hour':
-      return 60;
-    case '1day':
-      return 24 * 60;
-  }
-}
-
-/**
- * Translate a recurrence preset to a recurrence-rule payload. `'none'`
- * returns null so the caller omits the field.
- *
- * The emitted shape is the canonical {@link RecurrenceRule} the
- * `chk_calendar_events_recurrence_shape` CHECK stores: `freq` tokens are
- * lowercase (`daily` / `weekly` / `monthly` / `yearly`) and `byDay` holds
- * the uppercase two-letter codes (`MO` / `TU` / …). These are API enum
- * values — not UI copy — so they stay literal. No preset carries an
- * interval, so none needs `wkst`, and the default week start (`MO`) is
- * the one written by omission.
- */
-export function presetToRRule(preset: RecurrencePreset, _startDate: string): RecurrenceRule | null {
-  switch (preset) {
-    case 'none':
-      return null;
-    // `custom` describes a rule this control did not author and cannot
-    // reproduce, so selecting it changes nothing: null here means the
-    // caller leaves the stored rule alone.
-    case 'custom':
-      return null;
-    case 'daily':
-      return { freq: 'daily' };
-    case 'weekdays':
-      return { freq: 'weekly', byDay: ['MO', 'TU', 'WE', 'TH', 'FR'] };
-    case 'weekly':
-      return { freq: 'weekly' };
-    case 'monthly':
-      return { freq: 'monthly' };
-    case 'yearly':
-      return { freq: 'yearly' };
-  }
-}
-
-/**
- * Map a stored rule back onto the control, or `custom` when no preset
- * reproduces it.
- *
- * Deliberately strict: a rule with an interval, a count, an until or a
- * byMonthDay is not "weekly" even if its freq says so, because choosing
- * `weekly` in the control would silently drop the rest of it. Reporting
- * `custom` and leaving the rule untouched is the honest answer.
- */
-export function rruleToPreset(rule: RecurrenceRule | null | undefined): RecurrencePreset {
-  if (!rule) return 'none';
-  const plain =
-    (rule.interval === undefined || rule.interval === 1) &&
-    rule.count === undefined &&
-    rule.until === undefined &&
-    (rule.byMonthDay === undefined || rule.byMonthDay.length === 0);
-  if (!plain) return 'custom';
-
-  const byDay = rule.byDay ?? [];
-  switch (rule.freq) {
-    case 'daily':
-      return byDay.length === 0 ? 'daily' : 'custom';
-    case 'weekly': {
-      if (byDay.length === 0) return 'weekly';
-      const weekdays = ['MO', 'TU', 'WE', 'TH', 'FR'];
-      const normalized = [...byDay].map((d) => d.toUpperCase()).sort();
-      return normalized.join(',') === [...weekdays].sort().join(',') ? 'weekdays' : 'custom';
-    }
-    case 'monthly':
-      return byDay.length === 0 ? 'monthly' : 'custom';
-    case 'yearly':
-      return byDay.length === 0 ? 'yearly' : 'custom';
-    default:
-      return 'custom';
-  }
-}
-
-/**
- * The instants an edit form should open on.
- *
- * A series is stored once, as its first occurrence, while the grid draws
- * one pill per instance the rule produces. Seeded from the stored row,
- * every instance therefore opens on the series' own dates: click the
- * meeting on 14 October and the fields read 16 September, and saving
- * that range is how an occurrence gets moved back onto the master's day.
- * The occurrence carries the instant the rule gave it, so the form opens
- * there and keeps the stored duration — the one part of the range the
- * occurrence does not itself state.
- *
- * The shift is arithmetic on instants rather than on wall clocks so
- * all-day and timed rows stay on a single path: an all-day span is a
- * whole number of days in seconds, and moving both ends by the same
- * amount preserves it either way.
- *
- * `occurrenceStartAt` is only ever {@link DialogOccurrence.originalStartAt}
- * — the start the rule produced, never the start the form is holding.
- * Passing the latter would shift the range onto itself and call the
- * result an occurrence.
- */
-export function occurrenceRange(
-  stored: { startAt?: number | null; endAt?: number | null },
-  occurrenceStartAt: number | null,
-): { startAt: number | null; endAt: number | null } {
-  const startAt = stored.startAt ?? null;
-  const endAt = stored.endAt ?? null;
-  if (occurrenceStartAt === null || startAt === null) return { startAt, endAt };
-  return {
-    startAt: occurrenceStartAt,
-    endAt: endAt === null ? null : occurrenceStartAt + (endAt - startAt),
-  };
-}
-
-/**
- * The end date the form shows for a stored range. An all-day row stores
- * the day after its last day, read in UTC; a timed row ends where it ends.
- */
-export function displayEndDate(
-  range: { startAt: number | null; endAt: number | null },
-  allDay: boolean,
-  zone: Zone,
-): string {
-  if (range.endAt === null) return '';
-  if (allDay && range.startAt !== null) return allDayLastDateKey(range.startAt, range.endAt);
-  return unixToWallClock(range.endAt, zone).date;
-}
-
-/**
- * The weekday a `YYYY-MM-DD` key falls on, named in `locale`.
- *
- * The weekly repeat option names the day it repeats on, and that day is
- * a property of the event's own start rather than a separate choice.
- * `Intl` answers it in whichever language is active, so there is no day
- * table to keep in step across the locale files and no key per weekday.
- * Read in UTC because the key is already a calendar day: giving it any
- * other zone lets an offset name the day before.
- */
-export function weekdayName(dayKey: string, locale: string): string {
-  const [year, month, day] = dayKey.split('-').map(Number);
-  if (!year || !month || !day) return '';
-  return new Intl.DateTimeFormat(locale, { weekday: 'long', timeZone: 'UTC' }).format(
-    new Date(Date.UTC(year, month - 1, day)),
-  );
-}
 
 /** Default start/end times for each kind, given the clicked date. */
 function defaultTimes(kind: CalEventKind): { start: string; end: string } {
