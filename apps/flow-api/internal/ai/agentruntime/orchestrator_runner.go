@@ -34,6 +34,10 @@ import (
 //     field rounded down from CostMicros.
 //   - CostCapHit is true when the cost guard rejected the call;
 //     triggers the cost_cap handoff and pauses the agent.
+//   - EndedReason is how a task-work run ended; empty for a tick.
+//   - ContextEventPublicID is the public id of the highest task event the
+//     run's context reflected, which later runs coalesce against; zero
+//     when none.
 type ExecutionResult struct {
 	Confidence              float64
 	LastThought             string
@@ -42,6 +46,24 @@ type ExecutionResult struct {
 	CostMicros              int64
 	CostCents               int64
 	CostCapHit              bool
+	EndedReason             string
+	ContextEventPublicID    types.PublicID
+}
+
+// runOutcomePayload adds the run key, the mode and the result's end state
+// to a completed or failed payload. contextEventId is the context event's
+// public id as a canonical UUID string; the coalescing query maps it back
+// to the internal id.
+func runOutcomePayload(p map[string]any, runKey, mode string, result ExecutionResult) map[string]any {
+	p["runKey"] = runKey
+	p["mode"] = mode
+	if result.EndedReason != "" {
+		p["endedReason"] = result.EndedReason
+	}
+	if result.ContextEventPublicID != (types.PublicID{}) {
+		p["contextEventId"] = result.ContextEventPublicID.String()
+	}
+	return p
 }
 
 // AgentExecutor is the narrow dependency that OrchestratorRunner needs
@@ -190,8 +212,14 @@ func (r *OrchestratorRunner) Run(ctx context.Context, j Job, _ time.Time) error 
 	ctx = eventbus.WithActorAgentID(ctx, j.AgentID)
 
 	agentPubID := r.resolveAgentPublicID(ctx, j.AgentID)
-	taskInternalID, taskPubID, trigger := r.resolveSourceTask(ctx, j)
+	taskInternalID, taskPubID, trigger := r.resolveSourceTask(ctx, j, agentPubID)
 	ctx = WithTrigger(ctx, trigger)
+	runKey := types.New().String()
+	ctx = WithRunKey(ctx, runKey)
+	mode := RunModeTick
+	if trigger.TaskWork {
+		mode = RunModeTaskWork
+	}
 
 	started := r.Now().UTC()
 	r.bumpAttempts(ctx, j.WsID, taskInternalID, started)
@@ -204,6 +232,8 @@ func (r *OrchestratorRunner) Run(ctx context.Context, j Job, _ time.Time) error 
 		payload: map[string]any{
 			"agentId":   agentPubID,
 			"startedAt": started.Unix(),
+			"runKey":    runKey,
+			"mode":      mode,
 		},
 	})
 
@@ -243,12 +273,12 @@ func (r *OrchestratorRunner) Run(ctx context.Context, j Job, _ time.Time) error 
 			agentID:     j.AgentID,
 			agentPubID:  agentPubID,
 			taskID:      taskInternalID,
-			payload: map[string]any{
+			payload: runOutcomePayload(map[string]any{
 				"agentId":    agentPubID,
 				"startedAt":  started.Unix(),
 				"finishedAt": finished.Unix(),
 				"error":      runErr.Error(),
-			},
+			}, runKey, mode, result),
 		})
 		// Cost-cap is the one structured failure the runner also has
 		// to react to: pause the agent and emit a handoff so the task
@@ -275,11 +305,11 @@ func (r *OrchestratorRunner) Run(ctx context.Context, j Job, _ time.Time) error 
 		agentID:     j.AgentID,
 		agentPubID:  agentPubID,
 		taskID:      taskInternalID,
-		payload: map[string]any{
+		payload: runOutcomePayload(map[string]any{
 			"agentId":    agentPubID,
 			"startedAt":  started.Unix(),
 			"finishedAt": finished.Unix(),
-		},
+		}, runKey, mode, result),
 	})
 	return nil
 }
@@ -392,31 +422,43 @@ func (r *OrchestratorRunner) queries() RunnerQuerier {
 
 // resolveSourceTask looks up the source event's task_id when the run
 // was triggered by an on_event fan-out, together with the [Trigger] the
-// executor builds its prompt from. Returns zero values for interval or
-// manual runs that carry no source event id.
-func (r *OrchestratorRunner) resolveSourceTask(ctx context.Context, j Job) (uint32, string, Trigger) {
+// executor builds its prompt from and runs task work by. Returns zero
+// values for interval or manual runs that carry no source event id.
+func (r *OrchestratorRunner) resolveSourceTask(ctx context.Context, j Job, agentPubID string) (uint32, string, Trigger) {
 	if r.DB == nil || j.SourceEventID == 0 {
 		return 0, "", Trigger{}
 	}
-	const q = `SELECT e.type, e.task_id, t.public_id FROM events e
+	const q = `SELECT e.type, e.task_id, t.public_id, e.actor_user_id, e.actor_agent_id,
+			JSON_UNQUOTE(JSON_EXTRACT(e.payload_json, '$.agentId')),
+			JSON_UNQUOTE(JSON_EXTRACT(e.payload_json, '$.role'))
+		FROM events e
 		LEFT JOIN tasks t ON t.id = e.task_id
 		WHERE e.id = ? AND e.workspace_id = ? LIMIT 1`
 	var (
-		eventType string
-		taskID    sql.NullInt32
-		pubRaw    []byte
-		pubID     types.PublicID
+		eventType    string
+		taskID       sql.NullInt64
+		pubRaw       []byte
+		pubID        types.PublicID
+		actorUserID  sql.NullInt64
+		actorAgentID sql.NullInt64
+		payloadAgent sql.NullString
+		payloadRole  sql.NullString
 	)
 	// Losing this lookup detaches every event this run emits from its
 	// task, which is what the timeline is keyed by.
 	if err := dbretry.Do(ctx, "agentruntime.resolveSourceTask", func(ctx context.Context) error {
-		return r.DB.QueryRowContext(ctx, q, j.SourceEventID, j.WsID).Scan(&eventType, &taskID, &pubRaw)
+		return r.DB.QueryRowContext(ctx, q, j.SourceEventID, j.WsID).Scan(
+			&eventType, &taskID, &pubRaw, &actorUserID, &actorAgentID, &payloadAgent, &payloadRole)
 	}); err != nil {
 		slog.WarnContext(ctx, "agentruntime: source-task lookup failed",
 			slog.Uint64("event_id", j.SourceEventID), slog.Any("err", err))
 		return 0, "", Trigger{}
 	}
-	trigger := Trigger{EventType: eventType}
+	trigger := Trigger{
+		EventType:     eventType,
+		SourceEventID: int64(j.SourceEventID),    //#nosec G115 -- events.id is BIGINT, fits int64
+		TriggerUserID: uint32(actorUserID.Int64), //#nosec G115 -- users.id is INT UNSIGNED, fits uint32
+	}
 	if !taskID.Valid {
 		return 0, "", trigger
 	}
@@ -424,8 +466,16 @@ func (r *OrchestratorRunner) resolveSourceTask(ctx context.Context, j Job) (uint
 		_ = pubID.Scan(pubRaw)
 	}
 	trigger.TaskPublicID = pubID.String()
-	//#nosec G115 -- tasks.id is INT UNSIGNED, fits uint32
-	return uint32(taskID.Int32), pubID.String(), trigger
+	trigger.TaskID = uint32(taskID.Int64) //#nosec G115 -- tasks.id is INT UNSIGNED, fits uint32
+	trigger.TaskWork = isTaskWorkSource(sourceEvent{
+		Type:           eventType,
+		TaskID:         trigger.TaskID,
+		ActorUserID:    trigger.TriggerUserID,
+		ActorAgentID:   uint32(actorAgentID.Int64), //#nosec G115 -- ai_agents.id is INT UNSIGNED, fits uint32
+		PayloadAgentID: payloadAgent.String,
+		PayloadRole:    payloadRole.String,
+	}, agentPubID)
+	return trigger.TaskID, pubID.String(), trigger
 }
 
 // resolveAgentPublicID fetches the public_id (UUID v7) for the given

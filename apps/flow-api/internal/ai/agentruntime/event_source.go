@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/bgloop"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 )
 
 // OnEventAgentsQuerier is the narrow contract [EventTrigger] needs
@@ -207,8 +208,11 @@ func (q *sqlcOnEventQuerier) ListOnEventAgentsFor(ctx context.Context, workspace
 	return out, rows.Err()
 }
 
-// onEventAgentsForEventQuery resolves on_event agents bound to a
-// specific events row, enforcing ai_agents.schedule_scope:
+// onEventAgentsForEventQuery resolves the agents a specific events row
+// wakes. Only events a human caused (actor_user_id set, actor_agent_id
+// NULL) wake anyone, so agents and system writers cannot set off runs.
+// The first branch is the on_event subscription, enforcing
+// ai_agents.schedule_scope:
 //
 //   - 'workspace' (default) — matches any agent whose event_trigger_types
 //     contains the event's type, mirroring [onEventAgentsQuery].
@@ -216,6 +220,12 @@ func (q *sqlcOnEventQuerier) ListOnEventAgentsFor(ctx context.Context, workspace
 //     (kind='agent') tying the agent to the event's task_id. Events with
 //     a NULL task_id never wake an assigned-task agent because there is
 //     no task scope to bind against.
+//
+// The second branch is task work: a task agent with grants, assigned to a
+// workable task, woken by its own assignment, a handoff or run request
+// addressed to it, or a comment. The runner decides the run mode from the
+// event again (isTaskWorkSource). UNION collapses an agent both branches
+// match into one row. Event kinds are bound as parameters.
 const onEventAgentsForEventQuery = `SELECT a.id, a.workspace_id
 FROM ai_agents a
 INNER JOIN events e ON e.id = ? AND e.workspace_id = a.workspace_id
@@ -223,6 +233,8 @@ WHERE a.enabled = TRUE
   AND a.paused = FALSE
   AND a.schedule_kind = 'on_event'
   AND a.workspace_id = ?
+  AND e.actor_user_id IS NOT NULL
+  AND e.actor_agent_id IS NULL
   AND JSON_CONTAINS(a.event_trigger_types, JSON_QUOTE(e.type))
   AND (
     a.schedule_scope = 'workspace'
@@ -238,10 +250,44 @@ WHERE a.enabled = TRUE
           AND ta.enabled = TRUE
       )
     )
+  )
+UNION
+SELECT a.id, a.workspace_id
+FROM events e
+INNER JOIN tasks t ON t.id = e.task_id AND t.workspace_id = e.workspace_id
+INNER JOIN ai_agents a ON a.workspace_id = e.workspace_id
+WHERE e.id = ? AND e.workspace_id = ?
+  AND e.actor_user_id IS NOT NULL AND e.actor_agent_id IS NULL
+  AND t.enabled = TRUE AND t.visibility = 'public'
+  AND t.derived_state NOT IN ('done', 'cancelled') AND t.archived_at IS NULL
+  AND a.kind = 'task_agent' AND a.enabled = TRUE AND a.paused = FALSE
+  AND JSON_TYPE(a.tools_json) = 'OBJECT' AND JSON_LENGTH(a.tools_json) > 0
+  AND EXISTS (
+    SELECT 1 FROM task_actors ta
+    WHERE ta.workspace_id = e.workspace_id
+      AND ta.task_id = e.task_id
+      AND ta.agent_id = a.id
+      AND ta.kind = 'agent'
+      AND ta.role = 'assignee'
+      AND ta.enabled = TRUE
+  )
+  AND (
+    (e.type = ?
+      AND JSON_UNQUOTE(JSON_EXTRACT(e.payload_json, '$.agentId')) = BIN_TO_UUID(a.public_id, 0)
+      AND JSON_UNQUOTE(JSON_EXTRACT(e.payload_json, '$.role')) = 'assignee')
+    OR (e.type IN (?, ?)
+      AND JSON_UNQUOTE(JSON_EXTRACT(e.payload_json, '$.agentId')) = BIN_TO_UUID(a.public_id, 0))
+    OR e.type = ?
   )`
 
 func (q *sqlcOnEventQuerier) ListOnEventAgentsForEvent(ctx context.Context, workspaceID uint32, eventInternalID uint64) ([]OnEventAgentMatch, error) {
-	rows, err := q.db.QueryContext(ctx, onEventAgentsForEventQuery, eventInternalID, workspaceID)
+	rows, err := q.db.QueryContext(ctx, onEventAgentsForEventQuery,
+		eventInternalID, workspaceID,
+		eventInternalID, workspaceID,
+		string(eventbus.TaskActorAdded),
+		string(eventbus.AgentTaskHandoffToAgent), string(eventbus.AgentTaskRunRequested),
+		string(eventbus.TaskCommentAdded),
+	)
 	if err != nil {
 		return nil, err
 	}

@@ -48,6 +48,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/storage"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/storagegc"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/stream"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskservice"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskworkflow"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/webhook"
 	"github.com/libraz/nodate-flow/packages/go-shared/authn"
@@ -368,6 +369,8 @@ func main() {
 				Log:          invocationLogger,
 				OnInvocation: obs.RecordAIInvocation,
 				PreFlight:    &ai.PreFlight{Queries: queries},
+				TaskService:  taskservice.New(db, queries, mutationlog.New(db, queries)),
+				TaskWork:     queries,
 			}
 			// The signal_judge runner shares the same provider
 			// resolver, cost guard, and metrics hook as the task-agent

@@ -88,6 +88,13 @@ type AgentExecutor struct {
 	// run. When nil the check is bypassed and every tick invokes the
 	// provider.
 	PreFlight *PreFlight
+	// TaskService and TaskWork carry task-work runs (a run whose trigger
+	// names a task the agent is assigned to). Without them such a run fails.
+	TaskService TaskWorkService
+	TaskWork    TaskWorkQueries
+
+	// taskWorkTimeout overrides TaskWorkTimeout; zero means the default.
+	taskWorkTimeout time.Duration
 }
 
 // ExecuteAgent implements the agentruntime.AgentExecutor contract.
@@ -108,6 +115,9 @@ func (e *AgentExecutor) ExecuteAgent(ctx context.Context, workspaceID, agentID u
 	// against a spend total that is permanently zero. The judge runner
 	// passes the same id explicitly into its own InvocationRecord.
 	ctx = WithAgentID(ctx, agentID)
+	if trigger := agentruntime.TriggerFromContext(ctx); trigger.TaskWork {
+		return e.executeTaskWork(ctx, workspaceID, agentID, trigger)
+	}
 	row, err := e.Queries.GetAgentForExec(ctx, generated.GetAgentForExecParams{
 		WorkspaceID: workspaceID,
 		ID:          agentID,
