@@ -34,6 +34,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/storage"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/stream"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/suggestionprivacy"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskservice"
 	"github.com/libraz/nodate-flow/packages/go-shared/crypto"
 	"github.com/libraz/nodate-flow/packages/go-shared/email"
 )
@@ -350,6 +351,16 @@ func buildSharedDeps(deps Deps) *sharedDeps {
 		}
 	}
 
+	// The run-now endpoint checks the same daily budget the agent loop does;
+	// the mock backend spends nothing.
+	taskBudget := ai.BudgetReaderFunc(func(ctx context.Context, wsID uint32) (int64, error) {
+		if deps.AiMock {
+			return 0, nil
+		}
+		return deps.Queries.SumAiCostTodayForWorkspace(ctx, ai.DailyCostParams(ctx, deps.Queries, wsID))
+	})
+	taskBudgetGuard := ai.NewCostGuard(taskBudget, deps.AiDailyBudgetCents)
+
 	embedModel := ""
 	embedEndpoint := ""
 	if embedClient != nil {
@@ -369,7 +380,7 @@ func buildSharedDeps(deps Deps) *sharedDeps {
 		nlConstraintCompiler: nlConstraintCompiler,
 		nlCommandResolver:    nlCommandResolver,
 		prjDeps:              projects.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec},
-		taskDeps:             tasks.Deps{DB: deps.DB, Queries: deps.Queries, CalendarQueries: deps.CalendarQueries, Embedder: embedClient, NlConstraint: nlConstraintCompiler, Storage: deps.Storage, Mutations: mutationRec},
+		taskDeps:             tasks.Deps{DB: deps.DB, Queries: deps.Queries, CalendarQueries: deps.CalendarQueries, Embedder: embedClient, NlConstraint: nlConstraintCompiler, Storage: deps.Storage, Mutations: mutationRec, TaskService: taskservice.New(deps.DB, deps.Queries, mutationRec), BudgetGuard: taskBudgetGuard},
 		tlDeps:               timeline.Deps{DB: deps.DB, Queries: deps.Queries},
 		inboxDeps:            inbox.Deps{DB: deps.DB, Queries: deps.Queries, Mutations: mutationRec},
 		notifDeps:            notifications.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec},

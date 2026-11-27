@@ -18,6 +18,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/execution"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 )
@@ -35,8 +36,13 @@ type AgentSummary struct {
 	ScheduleKind      string   `json:"scheduleKind"`
 	Paused            bool     `json:"paused"`
 	EventTriggerTypes []string `json:"eventTriggerTypes,omitempty"`
-	CreatedAt         int64    `json:"createdAt"`
-	UpdatedAt         *int64   `json:"updatedAt,omitempty"`
+	Kind              string   `json:"kind" enum:"task_agent,signal_judge"`
+	// Tools maps each granted task operation to its mode (auto or
+	// approval); an operation without a key is not permitted. Null for a
+	// signal_judge, which carries no grants.
+	Tools     map[string]string `json:"tools" nullable:"true"`
+	CreatedAt int64             `json:"createdAt"`
+	UpdatedAt *int64            `json:"updatedAt,omitempty"`
 }
 
 // ListAgentsInput is the query for GET /workspaces/{wsId}/ai/agents.
@@ -116,6 +122,8 @@ func ListAgents(deps Deps) func(context.Context, *ListAgentsInput) (*ListAgentsO
 				ScheduleKind:      string(r.ScheduleKind),
 				Paused:            r.Paused,
 				EventTriggerTypes: triggerByPub[r.PublicID.String()],
+				Kind:              string(r.Kind),
+				Tools:             agentToolsView(r.Kind, r.ToolsJson),
 				CreatedAt:         r.CreatedAt.Unix(),
 				UpdatedAt:         nullTimeUnixPtr(r.UpdatedAt),
 			})
@@ -173,11 +181,41 @@ func clampTemperature(temp uint16, kind providers.Kind) (uint16, bool) {
 	return temp, false
 }
 
+// agentToolsView renders stored grants for the API: a signal_judge has none
+// (null), and a task agent whose stored value cannot be read shows as
+// granting nothing, which is also how the runtime treats it.
+func agentToolsView(kind generated.AiAgentsKind, raw json.RawMessage) map[string]string {
+	if kind != generated.AiAgentsKindTaskAgent {
+		return nil
+	}
+	out := map[string]string{}
+	grants, err := execution.ParseToolGrants(raw)
+	if err != nil {
+		return out
+	}
+	for tool, mode := range grants {
+		out[string(tool)] = string(mode)
+	}
+	return out
+}
+
+// runtimeOnlyEventKinds are appended by the task-work machinery itself, so
+// an agent subscribing to one would be woken by its own bookkeeping.
+var runtimeOnlyEventKinds = map[string]struct{}{
+	string(eventbus.AgentTaskStep):         {},
+	string(eventbus.AgentActionProposed):   {},
+	string(eventbus.AgentActionDecided):    {},
+	string(eventbus.AgentTaskRunRequested): {},
+}
+
 // validEventTriggerTypes reports whether every entry is a declared eventbus
-// kind.
+// kind an agent may subscribe to.
 func validEventTriggerTypes(kinds []string) bool {
 	known := make(map[string]struct{}, len(eventbus.Kinds()))
 	for _, k := range eventbus.Kinds() {
+		if _, reserved := runtimeOnlyEventKinds[string(k)]; reserved {
+			continue
+		}
 		known[string(k)] = struct{}{}
 	}
 	for _, k := range kinds {
@@ -282,8 +320,8 @@ type CreateAgentOutput struct {
 }
 
 // CreateAgent provisions a new ai_agents row bound to the given
-// ai_models public id. The handler does not accept tools_json yet;
-// agents mint tool access implicitly via their paired MCP token.
+// ai_models public id. The row starts with every task operation granted in
+// approval mode; auto is an explicit later choice (PATCH .../tools).
 func CreateAgent(deps Deps) func(context.Context, *CreateAgentInput) (*CreateAgentOutput, error) {
 	return func(ctx context.Context, in *CreateAgentInput) (*CreateAgentOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
@@ -302,6 +340,11 @@ func CreateAgent(deps Deps) func(context.Context, *CreateAgentInput) (*CreateAge
 			scheduleKind = "disabled"
 		}
 		pub := types.New()
+		defaultTools := execution.DefaultTaskAgentTools()
+		toolsRaw, jerr := execution.MarshalToolGrants(defaultTools)
+		if jerr != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
 		descNull := sql.NullString{String: in.Body.Description, Valid: in.Body.Description != ""}
 		// The agent row and its event triggers land together: a trigger write
 		// failure must not leave a created agent that never fires.
@@ -348,7 +391,7 @@ func CreateAgent(deps Deps) func(context.Context, *CreateAgentInput) (*CreateAge
 				SystemPrompt:    in.Body.SystemPrompt,
 				Temperature:     temp,
 				MaxOutputTokens: sql.NullInt32{},
-				ToolsJson:       json.RawMessage(`null`),
+				ToolsJson:       toolsRaw,
 				ScheduleKind:    generated.AiAgentsScheduleKind(scheduleKind),
 			})
 			if err != nil {
@@ -391,6 +434,8 @@ func CreateAgent(deps Deps) func(context.Context, *CreateAgentInput) (*CreateAge
 			ScheduleKind:      scheduleKind,
 			Paused:            false,
 			EventTriggerTypes: in.Body.EventTriggerTypes,
+			Kind:              string(generated.AiAgentsKindTaskAgent),
+			Tools:             agentToolsView(generated.AiAgentsKindTaskAgent, toolsRaw),
 			CreatedAt:         now.Unix(),
 		}}
 		return out, nil
@@ -471,6 +516,59 @@ func UpdateAgentEventTriggers(deps Deps) func(context.Context, *UpdateAgentEvent
 		}
 		out := &UpdateAgentEventTriggersOutput{}
 		out.Body.Ok = true
+		return out, nil
+	}
+}
+
+// UpdateAgentTools handles PATCH /workspaces/{wsId}/ai/agents/{agentId}/tools.
+// The body replaces the agent's grants wholesale; an empty object grants
+// nothing, so the agent no longer acts on tasks.
+func UpdateAgentTools(deps Deps) func(context.Context, *UpdateAgentToolsInput) (*UpdateAgentToolsOutput, error) {
+	return func(ctx context.Context, in *UpdateAgentToolsInput) (*UpdateAgentToolsOutput, error) {
+		ws, ok := middleware.WorkspaceFromContext(ctx)
+		if !ok {
+			return nil, httpErr(apierrors.WsWorkspaceNotFound)
+		}
+		agentPub, err := types.Parse(in.AgentID)
+		if err != nil {
+			return nil, httpErr(apierrors.ValidationPathParamInvalid)
+		}
+		agent, err := deps.Queries.GetAgentKindByPublicID(ctx, generated.GetAgentKindByPublicIDParams{
+			WorkspaceID: ws.ID,
+			PublicID:    agentPub,
+		})
+		if err != nil {
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.AiAgentNotFound, apierrors.InternalUnexpected))
+		}
+		if !agent.Enabled {
+			return nil, httpErr(apierrors.AiAgentNotFound)
+		}
+		if agent.Kind != generated.AiAgentsKindTaskAgent {
+			return nil, httpErr(apierrors.WsAgentToolsKindNotGrantable)
+		}
+		grants, err := execution.ValidateToolGrants(in.Body.Tools)
+		if err != nil {
+			return nil, httpErr(apierrors.WsAgentToolsUnknownEntry)
+		}
+		raw, err := execution.MarshalToolGrants(grants)
+		if err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		// A write of the stored value affects no rows, so the count says
+		// nothing about whether the agent exists; the read above did.
+		if _, err := deps.Queries.UpdateAgentTools(ctx, generated.UpdateAgentToolsParams{
+			ToolsJson:   raw,
+			WorkspaceID: ws.ID,
+			PublicID:    agentPub,
+		}); err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		recordAudit(ctx, deps, ws.ID, "ai_agent.update_tools", "ai_agent", agentPub.String(), map[string]any{
+			"from": agentToolsView(agent.Kind, agent.ToolsJson),
+			"to":   in.Body.Tools,
+		})
+		out := &UpdateAgentToolsOutput{}
+		out.Body.Tools = agentToolsView(generated.AiAgentsKindTaskAgent, raw)
 		return out, nil
 	}
 }

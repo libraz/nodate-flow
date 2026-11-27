@@ -37,7 +37,7 @@ func TestValidEventTriggerTypes(t *testing.T) {
 	if !validEventTriggerTypes(nil) {
 		t.Error("an empty list clears the triggers and must be valid")
 	}
-	if !validEventTriggerTypes([]string{string(eventbus.Kinds()[0])}) {
+	if !validEventTriggerTypes([]string{string(eventbus.TaskCommentAdded)}) {
 		t.Error("a declared kind must be valid")
 	}
 	if validEventTriggerTypes([]string{"not.a.kind"}) {

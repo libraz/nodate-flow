@@ -6,14 +6,15 @@ package tasks
 
 import (
 	"context"
-
 	"database/sql"
+	"encoding/json"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/execution"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
@@ -35,13 +36,20 @@ func AddAgentActor(deps Deps) func(context.Context, *AddTaskAgentActorInput) (*A
 		if err != nil {
 			return nil, httpErr(apierrors.AiProviderNotConfigured)
 		}
-		agentID, err := deps.Queries.FindAgentIDByPublicIDForWorkspace(ctx, generated.FindAgentIDByPublicIDForWorkspaceParams{
+		agent, err := deps.Queries.GetAgentKindByPublicID(ctx, generated.GetAgentKindByPublicIDParams{
 			WorkspaceID: ws.ID,
 			PublicID:    agentPub,
 		})
 		if err != nil {
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.AiProviderNotConfigured, apierrors.InternalUnexpected))
 		}
+		if !agent.Enabled {
+			return nil, httpErr(apierrors.AiProviderNotConfigured)
+		}
+		if agent.Kind != generated.AiAgentsKindTaskAgent {
+			return nil, httpErr(apierrors.WsTaskAgentKindNotAssignable)
+		}
+		agentID := agent.ID
 		role, perr := parseActorRole(in.Body.Role)
 		if perr != nil {
 			return nil, translateActorRoleError(perr)
@@ -56,6 +64,9 @@ func AddAgentActor(deps Deps) func(context.Context, *AddTaskAgentActorInput) (*A
 				TaskID:      task.ID,
 				AgentID:     sql.NullInt32{Int32: int32(agentID), Valid: true}, //#nosec G115 -- agent id is agents.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 				Role:        role,
+				// Assigning again replaces the delegator: the person who
+				// assigns is who the agent acts for.
+				DelegatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: actorID != 0}, //#nosec G115 -- users.id fits int32 within realistic deployments
 			}); err != nil {
 				return err
 			}
@@ -78,9 +89,12 @@ func AddAgentActor(deps Deps) func(context.Context, *AddTaskAgentActorInput) (*A
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		return &AddTaskAgentActorOutput{Body: TaskAgentActor{
-			ID:      pub.String(),
-			AgentID: agentPub.String(),
-			Role:    in.Body.Role,
+			ID:        pub.String(),
+			AgentID:   agentPub.String(),
+			Role:      in.Body.Role,
+			Kind:      string(agent.Kind),
+			Paused:    agent.Paused,
+			HasGrants: hasGrants(agent.ToolsJson),
 		}}, nil
 	}
 }
@@ -117,6 +131,9 @@ func ListAgentActors(deps Deps) func(context.Context, *ListTaskAgentActorsInput)
 				AgentID:   r.AgentPublicID.String(),
 				AgentName: r.AgentName,
 				Role:      string(r.Role),
+				Kind:      string(r.Kind),
+				Paused:    r.Paused,
+				HasGrants: hasGrants(r.ToolsJson),
 				CreatedAt: r.CreatedAt.Unix(),
 			}
 			entry.UpdatedAt = nullTimeUnix(r.UpdatedAt)
@@ -127,4 +144,11 @@ func ListAgentActors(deps Deps) func(context.Context, *ListTaskAgentActorsInput)
 		}
 		return out, nil
 	}
+}
+
+// hasGrants reports whether stored grants allow at least one operation. A
+// value that cannot be read grants nothing, as it does at run time.
+func hasGrants(raw json.RawMessage) bool {
+	grants, err := execution.ParseToolGrants(raw)
+	return err == nil && len(grants) > 0
 }

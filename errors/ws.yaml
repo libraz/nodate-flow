@@ -325,7 +325,6 @@ resources:
 
       task_not_workable:
         code: WS.TASK_AGENT.TASK_NOT_WORKABLE
-        reserved: "returned by the agent task-work handlers being added in the same change"
         status: 422
         message: "An agent cannot work on this task"
         message_ja: "このタスクではエージェントを動かせません"
@@ -335,7 +334,6 @@ resources:
 
       kind_not_assignable:
         code: WS.TASK_AGENT.KIND_NOT_ASSIGNABLE
-        reserved: "returned by the agent task-work handlers being added in the same change"
         status: 422
         message: "This kind of agent cannot be assigned to tasks"
         message_ja: "この種類のエージェントはタスクに割り当てられません"
@@ -345,7 +343,6 @@ resources:
 
       no_grants:
         code: WS.TASK_AGENT.NO_GRANTS
-        reserved: "returned by the agent task-work handlers being added in the same change"
         status: 422
         message: "This agent has not been allowed to do anything yet"
         message_ja: "このエージェントにはまだ許可された操作がありません"
@@ -358,7 +355,6 @@ resources:
     errors:
       not_found:
         code: WS.AGENT_PROPOSAL.NOT_FOUND
-        reserved: "returned by the agent task-work handlers being added in the same change"
         status: 404
         message: "Proposal not found"
         message_ja: "提案が見つかりません"
@@ -368,7 +364,6 @@ resources:
 
       already_decided:
         code: WS.AGENT_PROPOSAL.ALREADY_DECIDED
-        reserved: "returned by the agent task-work handlers being added in the same change"
         status: 409
         message: "This proposal has already been decided"
         message_ja: "この提案は既に判断済みです"
@@ -378,7 +373,6 @@ resources:
 
       stale:
         code: WS.AGENT_PROPOSAL.STALE
-        reserved: "returned by the agent task-work handlers being added in the same change"
         status: 409
         message: "The task changed since this was proposed, so it was not applied"
         message_ja: "提案後にタスクが変更されたため、適用されませんでした"
@@ -388,7 +382,6 @@ resources:
 
       expired:
         code: WS.AGENT_PROPOSAL.EXPIRED
-        reserved: "returned by the agent task-work handlers being added in the same change"
         status: 410
         message: "This proposal has expired"
         message_ja: "この提案は期限切れです"
@@ -401,7 +394,6 @@ resources:
     errors:
       unknown_entry:
         code: WS.AGENT_TOOLS.UNKNOWN_ENTRY
-        reserved: "returned by the agent task-work handlers being added in the same change"
         status: 422
         message: "One of the agent's permissions is not recognized"
         message_ja: "エージェントの許可設定に認識できない項目があります"
@@ -411,7 +403,6 @@ resources:
 
       kind_not_grantable:
         code: WS.AGENT_TOOLS.KIND_NOT_GRANTABLE
-        reserved: "returned by the agent task-work handlers being added in the same change"
         status: 422
         message: "Permissions cannot be set for this kind of agent"
         message_ja: "この種類のエージェントには許可設定ができません"

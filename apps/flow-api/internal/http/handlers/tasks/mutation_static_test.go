@@ -59,6 +59,11 @@ var writeOperationsWithoutMutationLog = map[string]string{
 	"tasks-propose-reply":           "returns a reply proposal for the caller to review and apply through existing task mutations",
 	"tasks-propose-smart":           "returns an LLM draft for the caller to apply; tasks-apply-smart records the change",
 	"calendar-events-shift-propose": "computes a shift proposal in a read-only transaction",
+	// The decision is recorded where it is made: taskservice.Decide appends
+	// agent.action.decided and the audit row in the decision's transaction,
+	// which the package-local reachability walk cannot follow.
+	"tasks-agent-proposals-approve": "taskservice.Decide records the decision event and audit row in its own transaction",
+	"tasks-agent-proposals-reject":  "taskservice.Decide records the decision event and audit row in its own transaction",
 }
 
 // readOperationsRequiringMutationLog names the GET operations that must

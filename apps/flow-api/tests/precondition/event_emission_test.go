@@ -47,10 +47,6 @@ var reservedKinds = []ReservedKind{
 		Reason: "removing an agent actor goes through the same path as a user actor and appends task.actor.removed",
 	},
 	{
-		Name:   "AgentTaskRunRequested",
-		Reason: "the run-now endpoint that appends it is being added in the same change",
-	},
-	{
 		Name:   "AgentTaskThought",
 		Reason: "an agent's reasoning is persisted to tasks.agent_memo, which is a column write with no event beside it",
 	},

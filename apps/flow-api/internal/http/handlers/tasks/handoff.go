@@ -55,14 +55,20 @@ func HandoffToAgent(deps Deps) func(context.Context, *HandoffToAgentInput) (*Han
 		if err != nil {
 			return nil, httpErr(apierrors.AiAgentNotFound)
 		}
-		agentInternalID, err := deps.Queries.FindAgentIDByPublicIDForWorkspace(ctx,
-			generated.FindAgentIDByPublicIDForWorkspaceParams{
-				WorkspaceID: ws.ID,
-				PublicID:    agentPub,
-			})
+		agent, err := deps.Queries.GetAgentKindByPublicID(ctx, generated.GetAgentKindByPublicIDParams{
+			WorkspaceID: ws.ID,
+			PublicID:    agentPub,
+		})
 		if err != nil {
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.AiAgentNotFound, apierrors.InternalUnexpected))
 		}
+		if !agent.Enabled {
+			return nil, httpErr(apierrors.AiAgentNotFound)
+		}
+		if agent.Kind != generated.AiAgentsKindTaskAgent {
+			return nil, httpErr(apierrors.WsTaskAgentKindNotAssignable)
+		}
+		agentInternalID := agent.ID
 
 		// Survey existing agent assignees so we can detect the no-op
 		// case (same agent already assigned) and capture the prior
@@ -145,6 +151,8 @@ func HandoffToAgent(deps Deps) func(context.Context, *HandoffToAgentInput) (*Han
 				TaskID:      task.ID,
 				AgentID:     sql.NullInt32{Int32: int32(agentInternalID), Valid: true}, //#nosec G115 -- ai_agents.id is INT UNSIGNED, fits int32 within realistic deployments
 				Role:        generated.TaskActorsRoleAssignee,
+				// The person handing the task over is who the agent acts for.
+				DelegatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: actorID != 0}, //#nosec G115 -- users.id fits int32 within realistic deployments
 			}); err != nil {
 				return err
 			}

@@ -285,6 +285,26 @@ type UpdateAgentModelOutput struct {
 	Body AgentModelUpdateResult
 }
 
+// UpdateAgentToolsInput is the body for
+// PATCH /workspaces/{wsId}/ai/agents/{agentId}/tools.
+type UpdateAgentToolsInput struct {
+	WsID    string `path:"wsId"`
+	AgentID string `path:"agentId"`
+	Body    struct {
+		Tools map[string]string `json:"tools" required:"true" doc:"Operation to mode (auto or approval). Operations: add_comment, set_priority, set_due_on, transition_task, create_subtask. An operation left out is not permitted; {} permits nothing."`
+	}
+}
+
+// AgentToolsResult is the saved grants.
+type AgentToolsResult struct {
+	Tools map[string]string `json:"tools"`
+}
+
+// UpdateAgentToolsOutput is the response for the grants change.
+type UpdateAgentToolsOutput struct {
+	Body AgentToolsResult
+}
+
 // McpTokenSummary is the masked DTO for an mcp_tokens row. It NEVER
 // carries the plaintext token nor its hash.
 //

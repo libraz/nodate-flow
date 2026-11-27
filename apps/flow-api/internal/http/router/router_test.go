@@ -130,6 +130,7 @@ var pathPlaceholders = map[string]string{
 	"notifId":       "01HX000000000000000000000C",
 	"pageId":        "01HX000000000000000000000D",
 	"prjId":         "01HX000000000000000000000E",
+	"proposalId":    "01HX000000000000000000000Z",
 	"providerId":    "01HX000000000000000000000F",
 	"reactionId":    "01HX000000000000000000000G",
 	// /schemas/{schema} takes a component name, not an id. The value names
@@ -137,6 +138,7 @@ var pathPlaceholders = map[string]string{
 	// exercises a lookup that can succeed rather than one that always
 	// misses.
 	"schema":       "HealthOutputBody",
+	"runKey":       "01HX0000000000000000000004",
 	"shareId":      "01HX000000000000000000000X",
 	"snowflake":    "123456789012345678",
 	"submissionId": "01HX0000000000000000000002",

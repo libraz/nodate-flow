@@ -5,6 +5,7 @@ package tasks
 import (
 	"database/sql"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/embed"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/nlconstraint"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
@@ -12,6 +13,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/storage"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskservice"
 )
 
 // httpErr delegates to handlerutil.HTTPErr.
@@ -43,6 +45,12 @@ type Deps struct {
 	// read through the same statement the calendar surfaces use.
 	// Required by those endpoints; they refuse when it is absent.
 	CalendarQueries *calendar.Queries
+	// TaskService decides agent proposals and lists them. Required by the
+	// proposal endpoints; they answer an internal error when it is absent.
+	TaskService *taskservice.Service
+	// BudgetGuard is the workspace daily AI budget the run-now endpoint
+	// consults before it records a run request. Nil disables the check.
+	BudgetGuard ai.BudgetChecker
 }
 
 // nullStr delegates to handlerutil.NullStr.
@@ -687,6 +695,13 @@ type TaskAgentActor struct {
 	AgentID   string `json:"agentId"`
 	AgentName string `json:"agentName"`
 	Role      string `json:"role"`
+	// Kind is the agent's kind (task_agent or signal_judge).
+	Kind string `json:"kind" enum:"task_agent,signal_judge"`
+	// Paused is true while the agent's kill switch is on.
+	Paused bool `json:"paused"`
+	// HasGrants is true when the agent has been allowed at least one task
+	// operation; without one a run request is refused.
+	HasGrants bool   `json:"hasGrants"`
 	UpdatedAt *int64 `json:"updatedAt,omitempty"`
 	CreatedAt int64  `json:"createdAt"`
 }

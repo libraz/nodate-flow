@@ -846,6 +846,14 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Description: "Creates a new project in the workspace. The caller becomes the first project member with admin role. Requires workspace admin role.",
 			Tags:        []string{"Workspace"},
 		}, projects.Create(shared.prjDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "ai-agent-tools-update",
+			Method:      http.MethodPatch,
+			Path:        "/workspaces/{wsId}/ai/agents/{agentId}/tools",
+			Summary:     "Replace what an AI agent is allowed to do on tasks",
+			Description: "Replaces the agent's per-operation grants: each of add_comment, set_priority, set_due_on, transition_task and create_subtask maps to auto (apply directly when the person who assigned the agent and the person who triggered it could also do it) or approval (wait for a person to approve). An operation left out is not permitted, and {} permits nothing. Only task agents have grants. Requires workspace admin role.",
+			Tags:        []string{"Public"},
+		}, aihandlers.UpdateAgentTools(shared.aiDeps))
 		aihandlers.RegisterProviders(subAPI, shared.aiDeps)
 		aihandlers.RegisterEmbeddingSettings(subAPI, shared.aiDeps)
 		aihandlers.RegisterAutoActionSettings(subAPI, shared.aiDeps)

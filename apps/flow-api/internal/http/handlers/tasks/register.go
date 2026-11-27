@@ -162,6 +162,24 @@ func RegisterTaskScopedReads(api huma.API, deps Deps) {
 	}, ListAgentRuns(deps))
 
 	huma.Register(api, huma.Operation{
+		OperationID: "tasks-agent-run-steps-list",
+		Method:      http.MethodGet,
+		Path:        "/tasks/{id}/agent-runs/{runKey}/steps",
+		Summary:     "List the steps of one agent run on a task",
+		Description: "Returns the tool calls an agent made during one task-work run, in step order, with each outcome (applied, proposed, noop, skipped, not_permitted, invalid, failed, stopped). The run key comes from the run's agent-runs payload. At most 64 steps.",
+		Tags:        []string{"Tasks"},
+	}, ListAgentSteps(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-agent-proposals-list",
+		Method:      http.MethodGet,
+		Path:        "/tasks/{id}/agent-proposals",
+		Summary:     "List agent proposals on a task",
+		Description: "Returns the operations agents proposed on the task and are waiting for a person to approve. status=pending returns every live pending proposal (expired ones are left out); status=all returns the newest proposals of any status, up to limit.",
+		Tags:        []string{"Tasks"},
+	}, ListAgentProposals(deps))
+
+	huma.Register(api, huma.Operation{
 		OperationID: "tasks-comments-list",
 		Method:      http.MethodGet,
 		Path:        "/tasks/{id}/comments",
@@ -225,6 +243,34 @@ func RegisterTaskScopedCommenterWrites(api huma.API, deps Deps) {
 		Description: "Appends a comment from the caller and notifies users mentioned in the body. Send an Idempotency-Key to safely retry the request.",
 		Tags:        []string{"Tasks"},
 	}, AddComment(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID:   "tasks-agents-run",
+		Method:        http.MethodPost,
+		Path:          "/tasks/{id}/agents/{agentId}/run",
+		DefaultStatus: http.StatusAccepted,
+		Summary:       "Ask an assigned AI agent to work on the task now",
+		Description:   "Records a run request for an agent that is assigned to the task and returns 202; the agent's runtime picks it up. Refused when the agent is not assigned (WS.TASK_AGENT.NOT_ASSIGNED), is paused (AI.AGENT.PAUSED), has no allowed operations (WS.TASK_AGENT.NO_GRANTS), the task is private, finished or archived (WS.TASK_AGENT.TASK_NOT_WORKABLE), or a budget is used up (AI.COST.GUARD_EXCEEDED, WS.TASK_AGENT.COST_CAP_EXCEEDED).",
+		Tags:          []string{"Tasks"},
+	}, RunAgent(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-agent-proposals-approve",
+		Method:      http.MethodPost,
+		Path:        "/tasks/{id}/agent-proposals/{proposalId}/approve",
+		Summary:     "Approve an agent proposal and apply it",
+		Description: "Applies the proposed operation as the agent, provided the caller could make that change themselves. Nothing is applied when the target value changed since the proposal (WS.AGENT_PROPOSAL.STALE), the proposal expired (WS.AGENT_PROPOSAL.EXPIRED) or was already decided (WS.AGENT_PROPOSAL.ALREADY_DECIDED); a paused agent leaves the proposal pending (AI.AGENT.PAUSED).",
+		Tags:        []string{"Tasks"},
+	}, ApproveAgentProposal(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-agent-proposals-reject",
+		Method:      http.MethodPost,
+		Path:        "/tasks/{id}/agent-proposals/{proposalId}/reject",
+		Summary:     "Reject an agent proposal",
+		Description: "Marks the proposal rejected and keeps the optional reason (up to 500 characters), which the agent reads on its next run. Rejecting does not start a run.",
+		Tags:        []string{"Tasks"},
+	}, RejectAgentProposal(deps))
 
 	huma.Register(api, huma.Operation{
 		OperationID: "tasks-comments-edit",
