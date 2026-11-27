@@ -1,6 +1,7 @@
 /**
- * AppShell owns the only command palette; the top-bar search, the dock and
- * Cmd/Ctrl+K all open that one instance.
+ * AppShell owns the only command palette; the top-bar search and
+ * Cmd/Ctrl+K open that one instance. The dock's AI button opens the AI
+ * suggestions panel instead.
  */
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -35,6 +36,7 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
+import { AI_PANEL_ID, useAiPanelStore } from '../../../features/glass-dock/ai-panel-store';
 import AppShell from '../app-shell';
 import { OPEN_COMMAND_PALETTE_EVENT, useCommandPaletteStore } from '../command-palette-store';
 
@@ -51,6 +53,7 @@ function renderShell(): void {
 
 beforeEach(() => {
   useCommandPaletteStore.getState().closePalette();
+  useAiPanelStore.setState({ open: false, returnFocus: false });
 });
 
 describe('command palette ownership', () => {
@@ -65,12 +68,17 @@ describe('command palette ownership', () => {
     expect(screen.getAllByRole('dialog')).toHaveLength(1);
   });
 
-  it('opens one dialog in command mode from the dock AI button', async () => {
+  it('toggles the AI suggestions panel, not the palette, from the dock AI button', async () => {
     renderShell();
-    await userEvent.setup().click(screen.getByRole('button', { name: 'dock.ai_assist' }));
-    const dialogs = screen.getAllByRole('dialog');
-    expect(dialogs).toHaveLength(1);
-    expect(dialogs[0]?.getAttribute('data-command-mode')).toBe('true');
+    const button = screen.getByRole('button', { name: 'glass_dock.expand' });
+    expect(button.getAttribute('aria-expanded')).toBe('false');
+
+    await userEvent.setup().click(button);
+
+    expect(useAiPanelStore.getState().open).toBe(true);
+    expect(button.getAttribute('aria-expanded')).toBe('true');
+    expect(button.getAttribute('aria-controls')).toBe(AI_PANEL_ID);
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('opens and toggles one dialog with Cmd+K', async () => {

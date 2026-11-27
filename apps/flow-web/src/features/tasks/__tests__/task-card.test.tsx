@@ -75,16 +75,15 @@ describe('<TaskCard>', () => {
       <TaskCard {...defaultProps({ task: aTaskItem({ dueOn: '2099-12-31' }) })} />,
     );
 
-    // The due date badge should have the aria-label from i18n key.
-    const dueBadge = screen.getByLabelText(/^tasks\.columns\.due: /);
-    expect(dueBadge).toBeDefined();
+    // The due date carries a visually hidden "due" prefix from the i18n key.
+    const due = screen.getByText(/^tasks\.columns\.due:/).closest('time');
+    expect(due?.getAttribute('datetime')).toBe('2099-12-31');
   });
 
   it('does not render due date badge when dueOn is absent', () => {
     renderWithProviders(<TaskCard {...defaultProps()} />);
 
-    const badges = screen.queryByLabelText(/^tasks\.columns\.due/);
-    expect(badges).toBeNull();
+    expect(screen.queryByText(/^tasks\.columns\.due/)).toBeNull();
   });
 
   it('renders blocked-by badge when blockedByOpenCount > 0', () => {

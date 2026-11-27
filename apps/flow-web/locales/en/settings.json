@@ -452,7 +452,6 @@
   "settings": {
     "data": {
       "title": "Imports & Exports",
-      "description": "Export the workspace's tasks as CSV or JSON, or import tasks from a CSV file. Only CSV imports can run at the moment.",
       "export": {
         "title": "Export tasks",
         "description": "Download this workspace's tasks as CSV or JSON, up to 10,000 per file. Comments, attachments and other data are not included.",

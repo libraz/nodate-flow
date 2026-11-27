@@ -9,16 +9,15 @@
  */
 
 import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
-import Badge, { type BadgeTone } from '@nodate-flow/ui/primitives/badge';
 import Button from '@nodate-flow/ui/primitives/button';
 import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
-import Select from '@nodate-flow/ui/primitives/select';
+import SegmentedControl from '@nodate-flow/ui/primitives/segmented-control';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { Plus, X } from 'lucide-react';
-import { type ReactElement, useId, useMemo, useState } from 'react';
+import { Link2, Plus, X } from 'lucide-react';
+import { type ReactElement, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatApiError } from '../../lib/api-error';
 import {
@@ -30,8 +29,9 @@ import {
   useRemoveTaskDependency,
   useTaskDependenciesQuery,
 } from './api';
-import { STATE_KEY, STATE_TONE } from './constants';
+import { STATE_KEY } from './constants';
 import styles from './dependencies-section.module.css';
+import StateDot from './state-dot';
 import TaskActionButton from './task-action-button';
 import TaskSearchPicker from './task-search-picker';
 import searchStyles from './task-search-picker.module.css';
@@ -44,8 +44,12 @@ interface DependenciesSectionProps {
 
 /**
  * DependenciesSection renders incoming/outgoing dependency edges and
- * an inline picker to add new ones.
+ * an inline picker to add new ones. With no edges and no picker open it
+ * collapses to a single `data-compact` add button, which the detail page
+ * gathers into its "Add to this task" row.
  */
+
+type GroupTone = 'danger' | 'warning' | 'neutral';
 export default function DependenciesSection({
   taskId,
   workspaceId,
@@ -124,16 +128,27 @@ export default function DependenciesSection({
     }
   };
 
+  if (isEmpty && !picking) {
+    return (
+      <div data-compact="">
+        <TaskActionButton
+          icon={<Link2 size={14} aria-hidden />}
+          aria-label={t('tasks.detail.dependencies.add')}
+          onClick={() => {
+            setPicking(true);
+          }}
+        >
+          {t('tasks.detail.add_to_task.dependency')}
+        </TaskActionButton>
+      </div>
+    );
+  }
+
   return (
-    <section
-      aria-label={t('tasks.detail.dependencies.title')}
-      className={styles.section}
-      data-empty={isEmpty && !picking ? '' : undefined}
-    >
+    <section aria-label={t('tasks.detail.dependencies.title')} className={styles.section}>
       <TaskSectionHeading
         title={t('tasks.detail.dependencies.title')}
         hint={t('tasks.detail.dependencies.hint')}
-        {...(isEmpty ? { count: 0 } : {})}
         trailing={
           !picking ? (
             <TaskActionButton
@@ -213,7 +228,7 @@ function DependencyGroup({
 }: {
   label: string;
   items: TaskDependencyEdge[];
-  tone: BadgeTone;
+  tone: GroupTone;
   onRemove: (edge: TaskDependencyEdge) => void | Promise<void>;
   removingId: string | null;
 }): ReactElement | null {
@@ -223,8 +238,9 @@ function DependencyGroup({
   return (
     <div className={styles.group}>
       <div className={styles.groupHeader}>
-        <Badge tone={tone}>{label}</Badge>
-        <span className={styles.groupCount}>({items.length})</span>
+        <span className={styles.groupMark} data-tone={tone} aria-hidden />
+        <span>{label}</span>
+        <span className={styles.groupCount}>{items.length}</span>
       </div>
       <ul className={styles.groupList}>
         {entries.map(({ key, item: edge, present }) => {
@@ -238,9 +254,6 @@ function DependencyGroup({
               className={motion.enter}
             >
               <div className={styles.groupItem}>
-                <Badge tone={STATE_TONE[state] ?? 'neutral'}>
-                  {t(STATE_KEY[state] ?? 'tasks.status.open')}
-                </Badge>
                 <Link
                   to="/tasks/$taskId"
                   params={{ taskId: edge.otherTaskId }}
@@ -249,6 +262,10 @@ function DependencyGroup({
                 >
                   {edge.otherTaskTitle}
                 </Link>
+                <span className={styles.itemState}>
+                  <StateDot state={state} />
+                  {t(STATE_KEY[state] ?? 'tasks.status.open')}
+                </span>
                 <Button
                   type="button"
                   variant="ghost"
@@ -286,7 +303,6 @@ function DependencyPicker({
 }): ReactElement {
   const { t } = useTranslation('common');
   const [kind, setKind] = useState<TaskDependencyKind>('blocks');
-  const kindHintId = useId();
   const add = useAddTaskDependency();
 
   const handlePick = async (toTaskId: string): Promise<void> => {
@@ -310,24 +326,20 @@ function DependencyPicker({
       emptyText={t('tasks.detail.dependencies.searchEmpty')}
       cancelText={t('tasks.detail.dependencies.addCancel')}
       leading={
-        <Select
-          aria-label={t('tasks.detail.dependencies.kindLabel')}
-          aria-describedby={kindHintId}
+        <SegmentedControl<TaskDependencyKind>
+          ariaLabel={t('tasks.detail.dependencies.kindLabel')}
+          size="sm"
           value={kind}
-          onChange={(e) => {
-            setKind(e.target.value as TaskDependencyKind);
-          }}
-          className={styles.kindSelect}
-        >
-          <option value="blocks">{t('tasks.detail.dependencies.kind.blocks')}</option>
-          <option value="relates">{t('tasks.detail.dependencies.kind.relates')}</option>
-          <option value="duplicates">{t('tasks.detail.dependencies.kind.duplicates')}</option>
-        </Select>
+          onChange={setKind}
+          options={[
+            { value: 'blocks', label: t('tasks.detail.dependencies.kind.blocks') },
+            { value: 'relates', label: t('tasks.detail.dependencies.kind.relates') },
+            { value: 'duplicates', label: t('tasks.detail.dependencies.kind.duplicates') },
+          ]}
+        />
       }
       description={
-        <p id={kindHintId} className={searchStyles.pickerHint}>
-          {t('tasks.detail.dependencies.kindHint')}
-        </p>
+        <p className={searchStyles.pickerHint}>{t('tasks.detail.dependencies.kindHint')}</p>
       }
       onPick={handlePick}
       onClose={onClose}

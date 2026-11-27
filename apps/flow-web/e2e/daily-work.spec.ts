@@ -12,6 +12,7 @@ import enCommon from '../locales/en/common.json' with { type: 'json' };
 import enHelp from '../locales/en/help.json' with { type: 'json' };
 import enInbox from '../locales/en/inbox.json' with { type: 'json' };
 import enNotifications from '../locales/en/notifications.json' with { type: 'json' };
+import jaCommon from '../locales/ja/common.json' with { type: 'json' };
 import jaHelp from '../locales/ja/help.json' with { type: 'json' };
 import jaInbox from '../locales/ja/inbox.json' with { type: 'json' };
 import jaNotifications from '../locales/ja/notifications.json' with { type: 'json' };
@@ -248,19 +249,24 @@ test.describe('inbox and notifications wording', () => {
   } as const;
 
   for (const [locale, { inbox, notifications, help }] of Object.entries(locales)) {
-    test(`${locale}: the inbox subtitle names Notifications and Intake, the notifications help names the Inbox`, () => {
-      expect(inbox.view.subtitle).toContain(notifications.view.title);
-      expect(inbox.view.subtitle).toContain(inbox.tab.intake);
+    test(`${locale}: the inbox help names Notifications and Intake, the notifications help names the Inbox`, () => {
+      expect(help.inbox.tips.t1).toContain(notifications.view.title);
+      expect(help.inbox.tips.t1).toContain(inbox.tab.intake);
       expect(help.notifications.summary).toContain(inbox.view.title);
     });
   }
 
-  test('ja tenant sees the subtitle on /inbox', async ({ page }) => {
+  test('ja tenant sees the Japanese inbox help panel on /inbox', async ({ page }) => {
     const tenant = await createTestTenant({ locale: 'ja' });
     try {
       await injectAuth(page.context(), tenant);
       await page.goto('/inbox');
-      await expect(page.getByText(jaInbox.view.subtitle)).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByRole('heading', { name: jaInbox.view.title })).toBeVisible({
+        timeout: 15_000,
+      });
+      await page.getByRole('button', { name: jaCommon.help.trigger }).click();
+      await expect(page.getByText(jaHelp.inbox.summary)).toBeVisible();
+      await expect(page.getByText(jaHelp.inbox.tips.t1)).toBeVisible();
     } finally {
       await cleanupTenant(tenant);
     }

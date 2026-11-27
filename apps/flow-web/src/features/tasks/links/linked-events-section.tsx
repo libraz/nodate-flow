@@ -3,14 +3,14 @@
  * sub-section on the task detail page.
  *
  * Composition:
- * - header: the shared section heading with count, a "Link event"
- *   button that opens the popover picker, and a disclosure chevron.
- * - body (when expanded): empty state, list of `LinkedEventRow`s, and
- *   the picker popover anchored to the trigger button.
+ * - no links: a single `data-compact` "Link event" button that opens the
+ *   popover picker; the detail page gathers it into its "Add to this
+ *   task" row.
+ * - with links: the shared section heading with count, the same picker
+ *   trigger and a disclosure chevron, then the list of `LinkedEventRow`s.
  *
  * Disclosure state is persisted in localStorage via
- * `useCollapsibleState`. The default is open when there are no links
- * (so the empty-state CTA is visible) or up to five links; it
+ * `useCollapsibleState`. The default is open up to five links; it
  * collapses by default when the list is long enough that the user
  * probably wants to see other sections first.
  *
@@ -30,7 +30,7 @@ import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { useQueryClient } from '@tanstack/react-query';
-import { Plus } from 'lucide-react';
+import { CalendarPlus, Plus } from 'lucide-react';
 import { type ReactElement, useState } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { useTranslation } from 'react-i18next';
@@ -205,64 +205,75 @@ function LinkedEventsSectionImpl({
   const bodyId = `${COLLAPSE_KEY}-body`;
   const isEmpty = entries.length === 0;
 
-  return (
-    <section
-      className={styles.section}
-      aria-labelledby={titleId}
-      data-empty={isEmpty ? '' : undefined}
+  const picker = (trigger: ReactElement): ReactElement => (
+    <EventPicker
+      workspaceId={workspaceId}
+      taskId={taskId}
+      alreadyLinkedEventIds={linkedEventIds}
+      locale={locale}
+      open={pickerOpen}
+      onOpenChange={setPickerOpen}
+      onLink={handleLink}
     >
+      {trigger}
+    </EventPicker>
+  );
+
+  // No links yet: one add button the detail page gathers into its "Add to this task" row.
+  if (isEmpty) {
+    return (
+      <div data-compact="">
+        {picker(
+          <TaskActionButton
+            icon={<CalendarPlus size={14} aria-hidden />}
+            aria-haspopup="dialog"
+            aria-label={t('trigger.linkEvent')}
+          >
+            {t('common:tasks.detail.add_to_task.event')}
+          </TaskActionButton>,
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <section className={styles.section} aria-labelledby={titleId}>
       <TaskSectionHeading
         id={titleId}
         title={t('section.title')}
         count={total}
-        trailing={
-          <EventPicker
-            workspaceId={workspaceId}
-            taskId={taskId}
-            alreadyLinkedEventIds={linkedEventIds}
-            locale={locale}
-            open={pickerOpen}
-            onOpenChange={setPickerOpen}
-            onLink={handleLink}
-          >
-            <TaskActionButton icon={<Plus size={14} aria-hidden />} aria-haspopup="dialog">
-              {t('trigger.linkEvent')}
-            </TaskActionButton>
-          </EventPicker>
-        }
-        {...(isEmpty
-          ? {}
-          : {
-              toggle: {
-                collapsed,
-                onToggle: toggle,
-                controlsId: bodyId,
-                label: t(collapsed ? 'section.expand' : 'section.collapse'),
-              },
-            })}
+        trailing={picker(
+          <TaskActionButton icon={<Plus size={14} aria-hidden />} aria-haspopup="dialog">
+            {t('trigger.linkEvent')}
+          </TaskActionButton>,
+        )}
+        toggle={{
+          collapsed,
+          onToggle: toggle,
+          controlsId: bodyId,
+          label: t(collapsed ? 'section.expand' : 'section.collapse'),
+        }}
       />
 
-      <Collapse open={!collapsed && !isEmpty} id={bodyId}>
-        {isEmpty ? null : (
-          <ul className={styles.list}>
-            {entries.map(({ key, item: entry, present }) => (
-              <PresenceItem
-                key={key}
-                as="li"
-                present={present}
-                onExited={() => onExited(key)}
-                className={motion.enter}
-              >
-                <LinkedEventRow
-                  link={entry}
-                  locale={locale}
-                  onUnlink={handleUnlink}
-                  isOptimistic={entry.id.startsWith('optimistic-')}
-                />
-              </PresenceItem>
-            ))}
-          </ul>
-        )}
+      <Collapse open={!collapsed} id={bodyId}>
+        <ul className={styles.list}>
+          {entries.map(({ key, item: entry, present }) => (
+            <PresenceItem
+              key={key}
+              as="li"
+              present={present}
+              onExited={() => onExited(key)}
+              className={motion.enter}
+            >
+              <LinkedEventRow
+                link={entry}
+                locale={locale}
+                onUnlink={handleUnlink}
+                isOptimistic={entry.id.startsWith('optimistic-')}
+              />
+            </PresenceItem>
+          ))}
+        </ul>
       </Collapse>
     </section>
   );

@@ -1,7 +1,7 @@
-/* Project timeline tab: section heading above the shared timeline view. */
+/* Project timeline tab: the shared timeline view under a screen-reader heading. */
 
 .section {
   display: flex;
   flex-direction: column;
-  gap: var(--nf-space-5);
+  gap: var(--nf-space-4);
 }

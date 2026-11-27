@@ -1,52 +1,9 @@
 /*
- * AI suggestions dock — the collapsed pill and the expanded panel share
- * the same inline-end/block-end anchor, so the panel grows out of the
- * spot the pill occupied. Height and bottom offset come from the app
- * shell's `--nf-dock-*` properties, so the pill shares the glass dock's
- * baseline (or rides a row above it on narrow screens) and `<main>`
- * reserves room for both.
+ * AI suggestions panel — opened from the glass dock's AI button and
+ * centred just above it, so the bottom edge never carries a second
+ * floating control. Offsets come from the app shell's `--nf-dock-*`
+ * properties.
  */
-
-.pill {
-  position: fixed;
-  inset-block-end: calc(var(--nf-dock-offset) + var(--nf-dock-pill-lift));
-  inset-inline-end: var(--nf-space-4);
-  box-sizing: border-box;
-  block-size: var(--nf-dock-block-size);
-  z-index: var(--nf-z-sticky);
-  display: flex;
-  align-items: center;
-  gap: var(--nf-space-2);
-  padding-block: 0;
-  padding-inline: var(--nf-space-3-5);
-  border-radius: var(--nf-radius-pill);
-  border: var(--nf-space-px) solid var(--nf-color-border);
-  background: var(--nf-color-surface);
-  color: var(--nf-color-fg);
-  box-shadow: var(--nf-shadow-lg);
-  cursor: pointer;
-  font-family: var(--nf-font-sans);
-  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
-  transition:
-    background-color var(--nf-duration-fast) var(--nf-ease-standard),
-    border-color var(--nf-duration-fast) var(--nf-ease-standard),
-    scale var(--nf-duration-instant) var(--nf-ease-standard);
-}
-
-.pill:hover {
-  background: var(--nf-color-surface-hover);
-  border-color: var(--nf-color-border-strong);
-}
-
-.pill:active {
-  scale: var(--nf-motion-press-scale);
-}
-
-.pillLabel {
-  white-space: nowrap;
-  font-size: var(--nf-text-supporting);
-  font-weight: var(--nf-weight-semibold);
-}
 
 /* Remounted on every count change (keyed in JSX), so this replays. */
 .count {
@@ -57,12 +14,14 @@
 
 .panel {
   position: fixed;
-  inset-block-end: calc(var(--nf-dock-offset) + var(--nf-dock-pill-lift));
-  inset-inline-end: var(--nf-space-4);
+  inset-block-end: calc(var(--nf-dock-offset) + var(--nf-dock-block-size) + var(--nf-space-2));
+  /* Centred without a transform, matching the dock, so `translate` stays free for the animation. */
+  inset-inline: 0;
+  margin-inline: auto;
   z-index: var(--nf-z-sticky);
   /* nf-token-override: component dimension, not a spacing step */
   inline-size: min(22.5rem, calc(100vw - var(--nf-space-8)));
-  max-block-size: 70vh;
+  max-block-size: calc(100dvh - var(--nf-topbar-height) - var(--nf-dock-clearance));
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -175,15 +134,6 @@
   text-align: center;
   /* Keyed in JSX, so each status/empty swap replays the fade. */
   animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
-}
-
-.description {
-  margin: 0;
-  padding: var(--nf-space-3);
-  padding-block-end: 0;
-  font-size: var(--nf-text-xs);
-  line-height: var(--nf-leading-normal);
-  color: var(--nf-color-fg-muted);
 }
 
 .fieldHint {

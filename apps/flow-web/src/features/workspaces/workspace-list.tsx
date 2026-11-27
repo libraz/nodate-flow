@@ -76,7 +76,6 @@ export default function WorkspaceList(): ReactElement {
     <PageFrame>
       <PageHeader
         title={t('workspaces.title')}
-        description={t('workspaces.description')}
         help="workspaces"
         actions={
           <Button variant="primary" onClick={handleCreate}>

@@ -1,4 +1,4 @@
-/** Component tests for PageHeader's help integration. */
+/** Component tests for PageHeader's help and description handling. */
 
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
@@ -19,21 +19,16 @@ describe('<PageHeader> help', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Inbox' })).not.toBeNull();
   });
 
-  it('adds the button and uses the topic summary as description', () => {
+  it('adds the button but keeps the topic summary inside the help panel', () => {
     render(<PageHeader title="Inbox" help="demo" />);
     expect(screen.getByRole('button', { name: 'help.trigger' })).not.toBeNull();
     expect(screen.getByRole('heading', { level: 1, name: 'Inbox' })).not.toBeNull();
-    expect(screen.getByText('Demo summary')).not.toBeNull();
-  });
-
-  it('prefers an explicit description over the summary', () => {
-    render(<PageHeader title="Inbox" help="demo" description="Own text" />);
-    expect(screen.getByText('Own text')).not.toBeNull();
     expect(screen.queryByText('Demo summary')).toBeNull();
   });
 
-  it('shows no description when the topic has no summary', () => {
-    render(<PageHeader title="Inbox" help="missing" />);
-    expect(screen.queryByText('missing.summary')).toBeNull();
+  it('renders an explicit description with its full text as the title', () => {
+    render(<PageHeader title="Inbox" help="demo" description="Own text" />);
+    expect(screen.getByText('Own text').getAttribute('title')).toBe('Own text');
+    expect(screen.queryByText('Demo summary')).toBeNull();
   });
 });

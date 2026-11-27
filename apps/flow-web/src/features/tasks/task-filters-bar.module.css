@@ -1,42 +1,67 @@
 /*
- * TaskFiltersBar — styles extracted from inline `style` blocks. Tokens
- * only — no hardcoded px / hex / rem outside design-system primitives.
+ * TaskFiltersBar — one toolbar row (search / Filters / saved views, then the
+ * caller's actions at the end) and a chip summary row only while filtering.
+ * Tokens only.
  */
 
 .bar {
-  /* One control height for every input, chip, button and trigger in the bar. */
+  /* One control height for every input, button and trigger in the bar. */
   --nf-control-height: var(--nf-space-8);
   display: flex;
   flex-direction: column;
   gap: var(--nf-space-2);
 }
 
-.controlsRow {
+.toolbar {
+  /* The view switcher drops its labels when this row runs short (task-view-switcher.module.css). */
+  container: task-toolbar / inline-size;
   display: flex;
-  gap: var(--nf-space-3) var(--nf-space-5);
+  gap: var(--nf-space-2);
   align-items: center;
   flex-wrap: wrap;
 }
 
-/* Text inputs carry more block padding than the 32px row allows. */
-.controlsRow input {
+/* Text inputs carry more block padding than the control row allows. */
+.toolbar input {
   padding-block: var(--nf-space-1);
 }
 
+/* Search gives way first when the row is tight. */
 .searchInput {
   /* nf-token-override: component dimension, not a spacing step */
-  inline-size: 18rem;
-}
-
-.assigneePicker {
+  flex: 1 1 10rem;
+  min-inline-size: 0;
   /* nf-token-override: component dimension, not a spacing step */
-  inline-size: 12rem;
+  max-inline-size: 18rem;
 }
 
-.filterGroup {
-  display: inline-flex;
+.filtersButton {
+  gap: var(--nf-space-2);
+}
+
+.filtersButton[data-active] {
+  border-color: var(--nf-color-accent);
+}
+
+.count {
+  min-inline-size: 1.25em;
+  justify-content: center;
+  font-size: var(--nf-text-supporting);
+  font-variant-numeric: tabular-nums;
+}
+
+.lensSkeleton {
+  /* nf-token-override: matches the lens trigger button footprint */
+  inline-size: 5rem;
+  block-size: var(--nf-control-height);
+}
+
+.actions {
+  display: flex;
   align-items: center;
   gap: var(--nf-space-2);
+  margin-inline-start: auto;
+  min-inline-size: 0;
 }
 
 .groupLabel {
@@ -46,21 +71,46 @@
   white-space: nowrap;
 }
 
-.lensSkeleton {
-  /* nf-token-override: matches the lens trigger button footprint */
-  inline-size: 5rem;
-  /* nf-token-override: same footprint as the inline size above */
-  block-size: 2rem;
+/* Wide enough that each facet's chips stay on one or two lines. */
+.popoverPanel {
+  /* nf-token-override: component dimension, not a spacing step */
+  inline-size: min(30rem, calc(100vw - 2 * var(--nf-space-2)));
+  /* nf-token-override: component dimension, not a spacing step */
+  max-inline-size: min(30rem, calc(100vw - 2 * var(--nf-space-2)));
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-4);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
 }
 
 .toggleGroup {
-  display: inline-flex;
+  display: flex;
   gap: var(--nf-space-2);
   flex-wrap: wrap;
+  /* nf-token-override: a long member list scrolls instead of growing the panel */
+  max-block-size: 10rem;
+  overflow-y: auto;
 }
 
-.clearButton {
-  margin-inline-start: auto;
+.facetSkeleton {
+  inline-size: 100%;
+  /* nf-token-override: placeholder sized to the content it stands in for */
+  block-size: 3.5rem;
+}
+
+.panelFooter {
+  display: flex;
+  justify-content: flex-end;
+  padding-block-start: var(--nf-space-3);
+  border-block-start: var(--nf-space-px) solid var(--nf-color-border);
 }
 
 .chipsRow {
@@ -68,4 +118,27 @@
   gap: var(--nf-space-2);
   flex-wrap: wrap;
   align-items: center;
+}
+
+/* Narrow: search takes its own line, every other control shares the next. */
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
+@media (max-width: 639px) {
+  .searchInput {
+    flex-basis: 100%;
+    max-inline-size: none;
+  }
+
+  /* Icon-only Filters and Saved views triggers. */
+  .toolbar > button {
+    padding-inline: var(--nf-space-3);
+  }
+
+  .collapsibleLabel {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 }

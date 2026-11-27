@@ -18,9 +18,21 @@
   display: inline;
 }
 
-/* Matches the app-shell mobile boundary: icons only, names stay in the accessible label. */
+/* Icons only on a narrow viewport or a crowded tasks toolbar; names stay in the accessible label. */
 /* nf-token-override: media-query breakpoint; var() is not allowed in a query */
 @media (max-width: 639px) {
+  .label {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+/* nf-breakpoint-override: tasks toolbar width below which the labelled segments no longer fit on one row; nf-token-override: var() is not allowed in a container query */
+@container task-toolbar (max-width: 1056px) {
   .label {
     position: absolute;
     inline-size: 1px;

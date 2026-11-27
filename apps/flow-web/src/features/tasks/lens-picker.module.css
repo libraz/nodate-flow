@@ -8,19 +8,19 @@
  */
 
 .trigger {
-  display: inline-flex;
-  align-items: center;
-  /* Shares the filter bar's control height. */
-  min-block-size: var(--nf-control-height);
-  background: none;
-  border: 1px solid var(--nf-color-border);
-  border-radius: var(--nf-radius-xs);
-  padding-block: 0;
-  padding-inline: var(--nf-space-3);
-  color: var(--nf-color-fg-muted);
-  cursor: pointer;
-  font: inherit;
-  font-size: var(--nf-text-sm);
+  gap: var(--nf-space-2);
+}
+
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
+@media (max-width: 639px) {
+  .triggerLabel {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 }
 
 .saveHint {
@@ -194,7 +194,6 @@
 
 /* ── Interaction states ─────────────────────────────────────── */
 
-.trigger,
 .optionApply,
 .optionDelete,
 .optionAction,
@@ -203,12 +202,6 @@
     background-color var(--nf-duration-instant) var(--nf-ease-standard),
     border-color var(--nf-duration-instant) var(--nf-ease-standard),
     color var(--nf-duration-instant) var(--nf-ease-standard);
-}
-
-.trigger:hover,
-.trigger[aria-expanded="true"] {
-  border-color: var(--nf-color-border-strong);
-  color: var(--nf-color-fg);
 }
 
 .option {
@@ -240,7 +233,6 @@
   background: color-mix(in oklab, var(--nf-color-accent) 88%, var(--nf-color-fg));
 }
 
-.trigger:focus-visible,
 .optionApply:focus-visible,
 .optionDelete:focus-visible,
 .optionAction:focus-visible,

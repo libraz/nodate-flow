@@ -2,7 +2,8 @@
  * Single source for the app's navigation destinations. The sidebar, the
  * workspace switcher menu and the command palette all render from
  * `NAV_ENTRIES`, so a destination cannot be reachable from one and missing
- * from another.
+ * from another. `workspace` holds the daily destinations; `more` sits behind
+ * the sidebar's disclosure; `footer` renders as the sidebar's icon row.
  */
 
 import {
@@ -127,16 +128,8 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
     needsWorkspace: false,
   },
   {
-    key: 'members',
-    group: 'workspace',
-    icon: Users,
-    labelKey: 'nav.members',
-    route: '/workspaces/$id/members',
-    needsWorkspace: true,
-  },
-  {
     key: 'reminders',
-    group: 'workspace',
+    group: 'more',
     icon: BellRing,
     labelKey: 'nav.reminders',
     hintKey: 'nav.hint.reminders',
@@ -145,7 +138,7 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   },
   {
     key: 'archive',
-    group: 'workspace',
+    group: 'more',
     icon: Archive,
     labelKey: 'nav.archive',
     hintKey: 'nav.hint.archive',
@@ -187,6 +180,15 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
     hintKey: 'nav.hint.history',
     route: '/workspaces/$id/timeline',
     activePrefixes: ['/workspaces/$id/activity'],
+    needsWorkspace: true,
+  },
+  {
+    key: 'members',
+    group: 'more',
+    icon: Users,
+    labelKey: 'nav.members',
+    hintKey: 'nav.hint.members',
+    route: '/workspaces/$id/members',
     needsWorkspace: true,
   },
   {

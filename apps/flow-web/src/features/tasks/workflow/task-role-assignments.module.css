@@ -43,11 +43,12 @@
   min-inline-size: 0;
 }
 
-/* One line where it fits; wraps in a narrow column. */
+/* One line where it fits; the first icon lines up with the value column's text edge. */
 .addRow {
   display: flex;
   flex-wrap: wrap;
   gap: var(--nf-space-1);
+  margin-inline-start: calc(var(--nf-space-3) * -1);
 }
 
 .muted,

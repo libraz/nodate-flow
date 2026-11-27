@@ -1,15 +1,15 @@
 /**
  * TaskCard — compact card used inside the board columns.
  *
- * Shows title, priority, due date, count badges, label chips and assignees. On
+ * Shows title, priority, due date, counts, label chips and assignees. On
  * the board it is the drag source: `dragHandle` wires pointer, touch and
  * keyboard dragging. The title link is the card's keyboard handle (Space lifts,
  * Enter opens), so a card costs two tab stops: the link and the move menu.
  * Native HTML5 drag stays off.
  */
 
+import VisuallyHidden from '@nodate-flow/ui/a11y/visually-hidden';
 import { cx } from '@nodate-flow/ui/lib/cx';
-import Badge from '@nodate-flow/ui/primitives/badge';
 import Card from '@nodate-flow/ui/primitives/card';
 import { Link } from '@tanstack/react-router';
 import type { CSSProperties, DOMAttributes, ReactElement } from 'react';
@@ -20,7 +20,8 @@ import { useEffectiveZone } from '../../lib/use-effective-timezone';
 import type { Label } from '../labels/api';
 import LabelBadge from '../labels/label-badge';
 import type { TaskDerivedState, TaskListItem, TaskPriority, TransitionName } from './api';
-import { PRIORITY_KEY, PRIORITY_TONE } from './constants';
+import { PRIORITY_KEY } from './constants';
+import PriorityMark from './priority-mark';
 import css from './task-card.module.css';
 import {
   AssigneeStack,
@@ -88,7 +89,6 @@ export default function TaskCard({
   const zone = useEffectiveZone();
   const locale = i18n.resolvedLanguage ?? 'en';
   const priority = (task.priority as TaskPriority) ?? 0;
-  const tone = PRIORITY_TONE[priority] ?? 'neutral';
   const priorityLabel = t(PRIORITY_KEY[priority] ?? 'tasks.priority.none');
   const hiddenLabels = labels.slice(MAX_LABEL_CHIPS);
   const listFormat = new Intl.ListFormat(locale, { type: 'conjunction' });
@@ -159,14 +159,21 @@ export default function TaskCard({
         />
       </div>
       <div className={css.meta}>
-        {priority > 0 ? <Badge tone={tone}>{priorityLabel}</Badge> : null}
+        {priority > 0 ? (
+          <span className={css.priority}>
+            <PriorityMark priority={priority} />
+            {priorityLabel}
+          </span>
+        ) : null}
         {task.dueOn ? (
-          <Badge
-            tone={isOverdue(task.dueOn, zone) && !closed ? 'danger' : 'neutral'}
-            aria-label={`${t('tasks.columns.due')}: ${formatDate(task.dueOn, locale)}`}
+          <time
+            dateTime={task.dueOn}
+            className={css.due}
+            data-overdue={isOverdue(task.dueOn, zone) && !closed ? 'true' : undefined}
           >
+            <VisuallyHidden>{`${t('tasks.columns.due')}: `}</VisuallyHidden>
             {formatDate(task.dueOn, locale)}
-          </Badge>
+          </time>
         ) : null}
         <BlockedCountBadge count={blockedByOpenCount} />
         <SubtaskCountBadge task={task} />

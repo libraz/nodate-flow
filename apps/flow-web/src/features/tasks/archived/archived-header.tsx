@@ -40,7 +40,6 @@ export default function ArchivedHeader({
       titleId="archive-title"
       help="task-archive"
       title={t('page.title')}
-      description={t('page.subtitle')}
       actions={
         ago ? (
           <p className={styles.countLine} aria-live="polite">

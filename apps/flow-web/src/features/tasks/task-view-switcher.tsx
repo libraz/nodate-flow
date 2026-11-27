@@ -51,6 +51,7 @@ export default function TaskViewSwitcher(): ReactElement {
           value={view}
           onChange={setTaskView}
           options={options}
+          size="sm"
           ariaLabel={t('tasks.views_label')}
         />
       </span>

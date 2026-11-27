@@ -119,9 +119,9 @@ describe('NAV_ENTRIES model', () => {
     }
   });
 
-  it('gives every low-frequency entry, the archive and the reminders a hint', () => {
+  it('gives every entry behind the More disclosure a hint', () => {
     for (const entry of NAV_ENTRIES) {
-      if (entry.group === 'more' || entry.key === 'archive' || entry.key === 'reminders') {
+      if (entry.group === 'more') {
         expect(entry.hintKey).toBeDefined();
       }
     }
@@ -147,10 +147,12 @@ describe('palette and sidebar render the same destinations', () => {
     await user.click(screen.getByRole('button', { name: 'nav.more' }));
     await user.click(screen.getByRole('button', { name: /nav\.switchWorkspace/ }));
 
+    // Footer entries are icon-only links, named by their aria-label.
     for (const entry of NAV_ENTRIES) {
-      const candidates = screen
-        .queryAllByText(entry.labelKey)
-        .filter((el) => el.closest('a') !== null);
+      const candidates = [
+        ...screen.queryAllByText(entry.labelKey).filter((el) => el.closest('a') !== null),
+        ...screen.queryAllByRole('link', { name: entry.labelKey }),
+      ];
       expect(candidates.length, entry.labelKey).toBeGreaterThan(0);
     }
   });

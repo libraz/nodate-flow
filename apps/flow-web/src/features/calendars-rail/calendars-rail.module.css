@@ -206,8 +206,26 @@
   color: var(--nf-color-danger-fg);
 }
 
-.addButton {
-  align-self: flex-start;
+/* Same inline padding and swatch-to-label gap as `.row`, so the label starts
+   where the calendar names do. Scoped under the stack to outrank the button. */
+.triggerStack .addButton {
+  align-self: stretch;
+  justify-content: flex-start;
+  gap: var(--nf-space-2);
+  padding-inline: var(--nf-space-2);
+  color: var(--nf-color-fg-muted);
+}
+
+.triggerStack .addButton:hover {
+  color: var(--nf-color-fg);
+}
+
+.addIcon {
+  display: inline-flex;
+  justify-content: center;
+  flex-shrink: 0;
+  /* nf-token-override: matches the `.dot` swatch column */
+  inline-size: 0.625rem;
 }
 
 .triggerStack {
@@ -215,7 +233,7 @@
   flex-direction: column;
   gap: var(--nf-space-px);
   margin-block-start: var(--nf-space-1);
-  align-items: flex-start;
+  align-items: stretch;
 }
 
 .empty {

@@ -58,12 +58,18 @@
   white-space: nowrap;
 }
 
-/* Icon + count inside a badge. */
+/* Icon + count in muted text; blockers take the danger tint. */
 .countMark {
   display: inline-flex;
   align-items: center;
   gap: var(--nf-space-1);
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-xs);
   font-variant-numeric: tabular-nums;
+}
+
+.countMark[data-tone="danger"] {
+  color: var(--nf-color-danger-fg);
 }
 
 /* Muted "+N" after a capped list of labels or avatars. */

@@ -86,6 +86,23 @@ function labelKeyFor(
 }
 
 /**
+ * The header "?" explains the open tab; tabs without a topic of their own
+ * fall back to the project topic, which covers members and settings.
+ */
+function helpTopicFor(key: ProjectSubNavKey): string {
+  switch (key) {
+    case 'tasks':
+      return 'project-tasks';
+    case 'gantt':
+      return 'project-gantt';
+    case 'timeline':
+      return 'timeline';
+    default:
+      return 'project';
+  }
+}
+
+/**
  * ProjectFavoriteStar resolves the existing favorite entry (if any)
  * for the current project and renders the FavoriteButton in the
  * correct toggle state. Uses `useFavoritesQuery` (suspense) so the
@@ -142,7 +159,7 @@ function ProjectLayout(): ReactElement {
       <PageHeader
         title={project.name}
         description={project.description}
-        help="project"
+        help={helpTopicFor(activeNavKey)}
         actions={
           <Suspense fallback={null}>
             <ProjectFavoriteStar projectId={projectId} workspaceId={id} />

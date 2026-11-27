@@ -3,12 +3,28 @@
 .section {
   display: flex;
   flex-direction: column;
-  gap: var(--nf-space-5);
+  gap: var(--nf-space-4);
 }
 
 .newTask {
   flex-shrink: 0;
   white-space: nowrap;
+}
+
+.newTaskShort {
+  display: none;
+}
+
+/* Narrow: the button keeps a short label so the toolbar fits one row under search. */
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
+@media (max-width: 639px) {
+  .newTaskLong {
+    display: none;
+  }
+
+  .newTaskShort {
+    display: inline;
+  }
 }
 
 /* Same minimum height as the list grid, so the view does not jump when it resolves. */

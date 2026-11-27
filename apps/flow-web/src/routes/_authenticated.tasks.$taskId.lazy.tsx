@@ -359,13 +359,15 @@ function DescriptionForm({
         autoFocus
         workspaceId={workspaceId}
         aria-label={t('tasks.detail.description_edit')}
+        footer={
+          <FormActions hint>
+            <Button type="button" variant="ghost" onClick={onClose}>
+              {t('tasks.detail.cancel')}
+            </Button>
+            <Button type="submit">{t('tasks.detail.save')}</Button>
+          </FormActions>
+        }
       />
-      <FormActions hint>
-        <Button type="button" variant="ghost" onClick={onClose}>
-          {t('tasks.detail.cancel')}
-        </Button>
-        <Button type="submit">{t('tasks.detail.save')}</Button>
-      </FormActions>
     </form>
   );
 }
@@ -428,9 +430,10 @@ function DescriptionEditor({
 /**
  * DescriptionSection is the column's one card: the heading row carries
  * History and Edit, the card holds the body and, in its footer, the
- * reactions. The history drawer mounts lazily — it stays unmounted until the
- * user opens it for the first time, after which the standard react-query
- * cache governs revisits.
+ * reactions. With no description it is only the dashed click target, and
+ * reactions show below it only once someone has reacted. The history drawer
+ * mounts lazily — it stays unmounted until the user opens it for the first
+ * time, after which the standard react-query cache governs revisits.
  */
 function DescriptionSection({
   id,
@@ -448,6 +451,19 @@ function DescriptionSection({
   // Set once an edit ends, so the edit button that remounts takes focus back.
   const [returnFocus, setReturnFocus] = useState(false);
   const canEdit = !editing && initial.length > 0;
+  const bare = !editing && initial.length === 0;
+  const editor = (
+    <DescriptionEditor
+      id={id}
+      initial={initial}
+      workspaceId={workspaceId}
+      editing={editing}
+      onEditingChange={(next) => {
+        setReturnFocus(!next);
+        setEditing(next);
+      }}
+    />
+  );
   return (
     <section className={css.descriptionSection} aria-labelledby={headingId}>
       <TaskSectionHeading
@@ -476,24 +492,24 @@ function DescriptionSection({
           </>
         }
       />
-      <Card className={css.descriptionCard}>
-        <DescriptionEditor
-          id={id}
-          initial={initial}
-          workspaceId={workspaceId}
-          editing={editing}
-          onEditingChange={(next) => {
-            setReturnFocus(!next);
-            setEditing(next);
-          }}
-        />
-        <div className={css.reactions}>
-          {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
-          <Suspense fallback={<Skeleton style={{ blockSize: '1.5rem', inlineSize: '8rem' }} />}>
-            <ReactionsSection taskId={id} />
+      {bare ? (
+        <>
+          {editor}
+          <Suspense fallback={null}>
+            <ReactionsSection taskId={id} onlyWhenReacted />
           </Suspense>
-        </div>
-      </Card>
+        </>
+      ) : (
+        <Card className={css.descriptionCard}>
+          {editor}
+          <div className={css.reactions}>
+            {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
+            <Suspense fallback={<Skeleton style={{ blockSize: '1.5rem', inlineSize: '8rem' }} />}>
+              <ReactionsSection taskId={id} />
+            </Suspense>
+          </div>
+        </Card>
+      )}
       {historyOpen ? (
         <DescriptionHistoryDrawer
           taskId={id}
@@ -506,9 +522,17 @@ function DescriptionSection({
   );
 }
 
-function ReactionsSection({ taskId }: { taskId: string }): ReactElement {
+function ReactionsSection({
+  taskId,
+  onlyWhenReacted = false,
+}: {
+  taskId: string;
+  /** Renders nothing until the task has a reaction. */
+  onlyWhenReacted?: boolean;
+}): ReactElement | null {
   const currentUser = useAuth(selectUser);
   const { data: reactions } = useTaskReactionsQuery(taskId);
+  if (onlyWhenReacted && reactions.length === 0) return null;
   return (
     <ReactionBar taskId={taskId} reactions={reactions} currentUserId={currentUser?.id ?? ''} />
   );
@@ -675,9 +699,7 @@ function AssigneesSection({
 
   return (
     <>
-      {entries.length === 0 ? (
-        <p className={css.empty}>{t('tasks.detail.assignees.empty')}</p>
-      ) : (
+      {entries.length === 0 ? null : (
         <ul className={css.plainList}>
           {entries.map(({ key, item: a, present }) => (
             <PresenceItem
@@ -1231,9 +1253,18 @@ function useIsNarrow(): boolean {
   return narrow;
 }
 
+/** Placeholder for one button of the "Add to this task" row while its section loads. */
+function AddItemSkeleton(): ReactElement {
+  return (
+    <div data-compact="">
+      <Skeleton className={css.addSkeleton} />
+    </div>
+  );
+}
+
 function TaskDetailPanel({ id }: TaskDetailPanelProps): ReactElement {
   const { data: task } = useTaskQuery(id);
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation('common');
   const state = task.derivedState as TaskDerivedState;
   const priority = (task.priority as TaskPriority) ?? 0;
   const isNarrow = useIsNarrow();
@@ -1284,33 +1315,39 @@ function TaskDetailPanel({ id }: TaskDetailPanelProps): ReactElement {
               />
             </Suspense>
           </div>
-          <div className={cx(css.section, css.relatedSection)}>
-            {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
-            <Suspense fallback={<Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />}>
-              <DependenciesSection taskId={id} workspaceId={task.workspaceId} />
-            </Suspense>
+          {/*
+            Secondary sections. Each renders a full section once it has items and a single
+            data-compact button while empty; the CSS gathers the buttons into one quiet
+            "Add to this task" row after the full sections.
+          */}
+          <div className={cx(css.section, css.addGroup)}>
+            <span className={css.addBreak} aria-hidden />
+            <span className={css.addLabel}>{t('tasks.detail.add_to_task.label')}</span>
+            <div className={css.addItem}>
+              <Suspense fallback={<AddItemSkeleton />}>
+                <DependenciesSection taskId={id} workspaceId={task.workspaceId} />
+              </Suspense>
+            </div>
+            <div className={css.addItem}>
+              <Suspense fallback={<AddItemSkeleton />}>
+                <TaskAttachments taskId={id} />
+              </Suspense>
+            </div>
+            <div className={css.addItem}>
+              <Suspense fallback={<AddItemSkeleton />}>
+                <LinkedEventsSection taskId={id} workspaceId={task.workspaceId} locale={locale} />
+              </Suspense>
+            </div>
+            <div className={css.addItem}>
+              <TaskWorkflowPanel
+                key={id}
+                taskId={id}
+                workspaceId={task.workspaceId}
+                projectId={task.projectId}
+              />
+            </div>
           </div>
-          <div className={cx(css.section, css.relatedSection)}>
-            {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
-            <Suspense fallback={<Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />}>
-              <TaskAttachments taskId={id} />
-            </Suspense>
-          </div>
-          <div className={cx(css.section, css.relatedSection)}>
-            {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
-            <Suspense fallback={<Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />}>
-              <LinkedEventsSection taskId={id} workspaceId={task.workspaceId} locale={locale} />
-            </Suspense>
-          </div>
-          <div className={cx(css.section, css.relatedSection)}>
-            <TaskWorkflowPanel
-              key={id}
-              taskId={id}
-              workspaceId={task.workspaceId}
-              projectId={task.projectId}
-            />
-          </div>
-          <div className={cx(css.section, css.relatedSection)}>
+          <div className={css.section}>
             <Suspense fallback={<SectionSkeleton />}>
               <TaskSourceLinks taskId={id} />
             </Suspense>

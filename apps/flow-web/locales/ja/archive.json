@@ -1,7 +1,6 @@
 {
   "page": {
     "title": "アーカイブ",
-    "subtitle": "保管したタスクとプロジェクトはここに残ります。消えていません。",
     "countWithLast": "{count, plural, other {#件のタスク}} · 最終アーカイブ {ago}"
   },
   "filters": {

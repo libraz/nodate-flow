@@ -26,7 +26,22 @@
 .monthNav {
   display: flex;
   align-items: center;
-  gap: var(--nf-space-2);
+  gap: var(--nf-space-3);
+}
+
+/* Previous / Today / Next as one bordered group of equal-height buttons. */
+.navGroup {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--nf-space-0-5);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-md);
+  background: var(--nf-color-surface);
+}
+
+/* Inner radius = group radius minus its padding, so the corners stay concentric. */
+.navGroup .navButton {
+  border-radius: calc(var(--nf-radius-md) - var(--nf-space-0-5));
 }
 
 .monthLabel {
@@ -299,10 +314,6 @@
   white-space: nowrap;
   line-height: var(--nf-leading-tight);
   max-inline-size: 70%;
-}
-
-.countBadge {
-  font-variant-numeric: tabular-nums;
 }
 
 .pillList {
@@ -585,6 +596,12 @@
 .mobileRailBar {
   display: flex;
   justify-content: flex-end;
+  gap: var(--nf-space-1);
+}
+
+/* The layer chips stacked in the phone popover. */
+.layersPopover {
+  padding: var(--nf-space-1);
 }
 
 /* Tighter section padding on phones so the month-scroll gets more width. */

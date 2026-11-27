@@ -75,7 +75,8 @@ function readInitialCollapsed(): boolean {
 /**
  * One navigation destination from `NAV_ENTRIES`. `forcedActive` overrides the
  * router's own active state for the entries whose section spans more than
- * their own path (personal and workspace settings).
+ * their own path (personal and workspace settings). `iconOnly` renders the
+ * compact footer form: no visible label, the label as its tooltip.
  */
 function NavLinkItem({
   entry,
@@ -84,6 +85,7 @@ function NavLinkItem({
   exact = false,
   forcedActive,
   sub = false,
+  iconOnly = false,
   onClick,
 }: {
   entry: NavEntry;
@@ -92,13 +94,14 @@ function NavLinkItem({
   exact?: boolean;
   forcedActive?: boolean;
   sub?: boolean;
+  iconOnly?: boolean;
   onClick?: () => void;
 }): ReactElement {
   const { t } = useTranslation('common');
   const label = t(entry.labelKey);
   const hint = entry.hintKey ? t(entry.hintKey) : null;
-  const tooltip = railCollapsed ? label : hint;
-  const baseClass = cx(styles.item, sub && styles.subItem);
+  const tooltip = railCollapsed || iconOnly ? label : hint;
+  const baseClass = iconOnly ? styles.footerButton : cx(styles.item, sub && styles.subItem);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const prefixActive =
     entry.activePrefixes !== undefined &&
@@ -120,12 +123,12 @@ function NavLinkItem({
       activeProps={{ className: cx(baseClass, styles.itemActive, 'nf-focus-ring-inset') }}
     >
       <Icon icon={entry.icon} decorative />
-      <span className={styles.label}>{label}</span>
+      {iconOnly ? null : <span className={styles.label}>{label}</span>}
     </Link>
   );
   if (tooltip === null) return link;
   return (
-    <Tooltip content={tooltip} placement="right">
+    <Tooltip content={tooltip} placement={iconOnly && !railCollapsed ? 'top' : 'right'}>
       {link}
     </Tooltip>
   );
@@ -294,7 +297,7 @@ function FavoriteRow({
  * Sidebar entries scoped to the current workspace. Suspends on first
  * load; the outer Sidebar wraps this in a Suspense with a null
  * fallback so the rest of the nav renders immediately. With no
- * favorites it says where the star is, so the section is discoverable.
+ * favorites the section is not rendered at all.
  */
 function FavoritesSection({
   workspaceId,
@@ -302,21 +305,18 @@ function FavoritesSection({
 }: {
   workspaceId: string;
   pathname: string;
-}): ReactElement {
+}): ReactElement | null {
   const { t } = useTranslation('labels');
   const { data: favorites } = useFavoritesQuery(workspaceId);
+  if (favorites.length === 0) return null;
   return (
     <div className={styles.section}>
       <div className={styles.sectionLabel} title={t('favorites.sidebar_title')}>
         {t('favorites.sidebar_title')}
       </div>
-      {favorites.length === 0 ? (
-        <p className={styles.sectionEmpty}>{t('favorites.empty')}</p>
-      ) : (
-        favorites.map((f) => (
-          <FavoriteRow key={f.id} favorite={f} workspaceId={workspaceId} pathname={pathname} />
-        ))
-      )}
+      {favorites.map((f) => (
+        <FavoriteRow key={f.id} favorite={f} workspaceId={workspaceId} pathname={pathname} />
+      ))}
     </div>
   );
 }
@@ -566,23 +566,18 @@ function WorkspaceArea({
 function ShortcutsButton({ railCollapsed }: { railCollapsed: boolean }): ReactElement {
   const { t } = useTranslation('common');
   const label = t('nav.shortcuts');
-  const button = (
-    <button
-      type="button"
-      className={cx(styles.item, 'nf-focus-ring-inset')}
-      aria-label={label}
-      onClick={() => {
-        window.dispatchEvent(new CustomEvent(OPEN_SHORTCUTS_HELP_EVENT));
-      }}
-    >
-      <Icon icon={Keyboard} decorative />
-      <span className={styles.label}>{label}</span>
-    </button>
-  );
-  if (!railCollapsed) return button;
   return (
-    <Tooltip content={label} placement="right">
-      {button}
+    <Tooltip content={label} placement={railCollapsed ? 'right' : 'top'}>
+      <button
+        type="button"
+        className={cx(styles.footerButton, 'nf-focus-ring-inset')}
+        aria-label={label}
+        onClick={() => {
+          window.dispatchEvent(new CustomEvent(OPEN_SHORTCUTS_HELP_EVENT));
+        }}
+      >
+        <Icon icon={Keyboard} decorative />
+      </button>
     </Tooltip>
   );
 }
@@ -731,6 +726,7 @@ export default function Sidebar(): ReactElement {
               />
             </Suspense>
           </div>
+          {/* One compact row: settings, shortcuts and the rail toggle (a column in the rail). */}
           <div className={styles.navFooter}>
             {currentWorkspaceId ? (
               <NavLinkItem
@@ -738,6 +734,7 @@ export default function Sidebar(): ReactElement {
                 workspaceId={currentWorkspaceId}
                 railCollapsed={railCollapsed}
                 forcedActive={pathname.startsWith(`/workspaces/${currentWorkspaceId}/settings`)}
+                iconOnly
               />
             ) : null}
             <NavLinkItem
@@ -745,21 +742,20 @@ export default function Sidebar(): ReactElement {
               workspaceId={null}
               railCollapsed={railCollapsed}
               forcedActive={pathname.startsWith('/settings')}
+              iconOnly
             />
             <ShortcutsButton railCollapsed={railCollapsed} />
+            <button
+              type="button"
+              className={cx(styles.footerButton, styles.toggle, 'nf-focus-ring-inset')}
+              onClick={handleToggle}
+              aria-label={railCollapsed ? t('nav.expand') : t('nav.collapse')}
+              aria-expanded={!railCollapsed}
+            >
+              <Icon icon={isMobile ? X : railCollapsed ? ChevronsRight : ChevronsLeft} decorative />
+            </button>
           </div>
         </nav>
-        <div className={styles.footer}>
-          <button
-            type="button"
-            className={cx(styles.toggle, 'nf-focus-ring-inset')}
-            onClick={handleToggle}
-            aria-label={railCollapsed ? t('nav.expand') : t('nav.collapse')}
-            aria-expanded={!railCollapsed}
-          >
-            <Icon icon={isMobile ? X : railCollapsed ? ChevronsRight : ChevronsLeft} decorative />
-          </button>
-        </div>
       </aside>
     </>
   );

@@ -174,49 +174,57 @@ export default function InboxList(): ReactElement {
       (!handoffOnly || item.kind === HANDOFF_KIND),
   );
 
+  // With nothing in the inbox the filter and triage controls have nothing to
+  // act on, so only the empty state shows.
+  const showToolbar = items.length > 0 || suggestionPresence.entries.length > 0;
+
   return (
     <div className={styles.body}>
-      <div className={styles.toolbar}>
-        {workspaces.length > 1 && (
-          <label className={styles.workspaceField} htmlFor={workspaceSelectId}>
-            {t('filter.workspace_label')}
-            <Select
-              id={workspaceSelectId}
-              value={selectedWorkspaceId}
-              onChange={handleWorkspaceChange}
-              className={styles.workspaceSelect}
-            >
-              <option value="all">{t('filter.workspace_all')}</option>
-              {workspaces.map((workspace) => (
-                <option key={workspace.id} value={workspace.id}>
-                  {workspace.name}
-                </option>
-              ))}
-            </Select>
-          </label>
-        )}
-        <Tooltip content={t('filter.handoff_hint')}>
-          <ToggleChip pressed={handoffOnly} onPressedChange={setHandoffOnly}>
-            {t('filter.handoff')}
-          </ToggleChip>
-        </Tooltip>
-        <Tooltip content={tAi('triage.hint')}>
-          <Button
-            type="button"
-            className={styles.toolbarEnd}
-            onClick={handleTriageClick}
-            disabled={triageDisabled}
-            aria-busy={triage.isPending}
-            aria-describedby={triageStatusId}
-          >
-            <AiSparkle kind="suggests" />
-            {triage.isPending ? tAi('triage.running') : tAi('triage.trigger')}
-          </Button>
-        </Tooltip>
-      </div>
-      <p id={triageStatusId} className={styles.triageStatus}>
-        {triageStatus}
-      </p>
+      {showToolbar ? (
+        <>
+          <div className={styles.toolbar}>
+            {workspaces.length > 1 && (
+              <label className={styles.workspaceField} htmlFor={workspaceSelectId}>
+                {t('filter.workspace_label')}
+                <Select
+                  id={workspaceSelectId}
+                  value={selectedWorkspaceId}
+                  onChange={handleWorkspaceChange}
+                  className={styles.workspaceSelect}
+                >
+                  <option value="all">{t('filter.workspace_all')}</option>
+                  {workspaces.map((workspace) => (
+                    <option key={workspace.id} value={workspace.id}>
+                      {workspace.name}
+                    </option>
+                  ))}
+                </Select>
+              </label>
+            )}
+            <Tooltip content={t('filter.handoff_hint')}>
+              <ToggleChip pressed={handoffOnly} onPressedChange={setHandoffOnly}>
+                {t('filter.handoff')}
+              </ToggleChip>
+            </Tooltip>
+            <Tooltip content={tAi('triage.hint')}>
+              <Button
+                type="button"
+                className={styles.toolbarEnd}
+                onClick={handleTriageClick}
+                disabled={triageDisabled}
+                aria-busy={triage.isPending}
+                aria-describedby={triageStatusId}
+              >
+                <AiSparkle kind="suggests" />
+                {triage.isPending ? tAi('triage.running') : tAi('triage.trigger')}
+              </Button>
+            </Tooltip>
+          </div>
+          <p id={triageStatusId} className={styles.triageStatus}>
+            {triageStatus}
+          </p>
+        </>
+      ) : null}
 
       {suggestionPresence.entries.length > 0 ? (
         <section aria-label={tAi('triage.result_title')} className={styles.suggestions}>

@@ -124,14 +124,6 @@
   color: var(--nf-color-danger-fg);
 }
 
-.emptyMessage {
-  margin: 0;
-  text-align: center;
-  color: var(--nf-color-fg-muted);
-  padding: var(--nf-space-3) 0;
-  font-size: var(--nf-text-sm);
-}
-
 .rsvpHint {
   margin: 0;
   font-size: var(--nf-text-xs);
@@ -146,9 +138,4 @@
   flex-direction: column;
   gap: var(--nf-space-2);
   --presence-gap: var(--nf-space-2);
-}
-
-.loadingSkeleton {
-  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
-  block-size: 4rem;
 }

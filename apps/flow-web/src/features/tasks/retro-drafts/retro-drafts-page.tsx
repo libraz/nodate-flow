@@ -253,7 +253,6 @@ export default function RetroDraftsPage({ workspaceId }: RetroDraftsPageProps): 
         titleId="retro-drafts-title"
         help="retro-drafts"
         title={t('tasks.retro.queue.title')}
-        description={t('tasks.retro.queue.description')}
       />
       {body}
     </section>

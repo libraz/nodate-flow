@@ -81,7 +81,9 @@ export default function TaskRoleAssignments({
   return (
     <div className={css.root}>
       {reviewActors.length === 0 ? (
-        <p className={css.muted}>{t('taskWorkflow.noReviewers')}</p>
+        canManageRoles ? null : (
+          <p className={css.muted}>{t('taskWorkflow.noReviewers')}</p>
+        )
       ) : (
         <ul className={css.list}>
           {reviewActors.map((actor) => (
@@ -149,16 +151,18 @@ export default function TaskRoleAssignments({
           <TaskActionButton
             icon={<Plus size={14} aria-hidden />}
             disabled={addActor.isPending}
+            aria-label={t('taskWorkflow.addReviewer')}
             onClick={() => startPicking('reviewer')}
           >
-            {t('taskWorkflow.addReviewer')}
+            {t('taskWorkflow.addReviewerShort')}
           </TaskActionButton>
           <TaskActionButton
             icon={<Plus size={14} aria-hidden />}
             disabled={addActor.isPending}
+            aria-label={t('taskWorkflow.addApprover')}
             onClick={() => startPicking('approver')}
           >
-            {t('taskWorkflow.addApprover')}
+            {t('taskWorkflow.addApproverShort')}
           </TaskActionButton>
         </div>
       )}

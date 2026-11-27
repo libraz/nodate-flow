@@ -21,6 +21,7 @@ import {
   type CSSProperties,
   type KeyboardEvent,
   type ReactElement,
+  type ReactNode,
   type RefObject,
   useRef,
   useState,
@@ -53,6 +54,11 @@ interface MarkdownEditorProps {
   onKeyDown?: ((event: KeyboardEvent<HTMLTextAreaElement>) => void) | undefined;
   /** Lets the parent move focus into the textarea. */
   textareaRef?: RefObject<HTMLTextAreaElement | null> | undefined;
+  /**
+   * Form actions for a compact composer: they share one line with the
+   * mention hint under the textarea instead of adding a row of their own.
+   */
+  footer?: ReactNode;
 }
 
 /** Wrap the selected text (or insert at cursor) with `before` / `after`. */
@@ -119,6 +125,7 @@ export default function MarkdownEditor({
   placeholder,
   onKeyDown,
   textareaRef: externalRef,
+  footer,
 }: MarkdownEditorProps): ReactElement {
   const { t } = useTranslation('common');
   const [previewing, setPreviewing] = useState(false);
@@ -154,7 +161,7 @@ export default function MarkdownEditor({
   };
 
   return (
-    <div className={css.root}>
+    <div className={cx(css.root, footer !== undefined && css.withFooter)}>
       {/* Toolbar */}
       <div role="toolbar" aria-label={t('tasks.markdown_editor.toolbar')} className={css.toolbar}>
         <Button
@@ -281,6 +288,7 @@ export default function MarkdownEditor({
           />
         </div>
       )}
+      {footer !== undefined ? <div className={css.footer}>{footer}</div> : null}
     </div>
   );
 }

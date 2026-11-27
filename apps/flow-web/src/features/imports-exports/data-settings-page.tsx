@@ -673,11 +673,7 @@ export default function DataSettingsPage(): ReactElement {
 
   return (
     <div className={ui.page}>
-      <PageHeader
-        title={t('settings.data.title')}
-        description={t('settings.data.description')}
-        help="workspace-settings-data"
-      />
+      <PageHeader title={t('settings.data.title')} help="workspace-settings-data" />
       <ExportsCard workspaceId={id} />
       <ImportsCard workspaceId={id} />
     </div>

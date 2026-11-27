@@ -6,6 +6,7 @@ import { HttpResponse, http } from 'msw';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { API_URL, server, useMockApi } from '../../../../tests/msw/server';
 import { authStore } from '../../auth/auth-store';
+import { useAiPanelStore } from '../ai-panel-store';
 import GlassDock from '../glass-dock';
 
 const { navigateMock } = vi.hoisted(() => ({ navigateMock: vi.fn() }));
@@ -204,12 +205,11 @@ function seedSession(): void {
   });
 }
 
-async function openDock(
-  user: ReturnType<typeof userEvent.setup>,
-  recommendedAction = 'archive',
-): Promise<void> {
+async function openDock(recommendedAction = 'archive'): Promise<void> {
+  // The glass dock's AI button opens the panel through this store.
+  useAiPanelStore.setState({ open: true, returnFocus: false });
   renderWithProviders(<GlassDock />);
-  await user.click(await screen.findByRole('button', { name: 'glass_dock.expand' }));
+  await screen.findByRole('region', { name: 'glass_dock.title' });
   const known = ['open', 'snooze', 'archive'].includes(recommendedAction);
   await screen.findByText(known ? `edit.action.${recommendedAction}` : recommendedAction);
 }
@@ -227,6 +227,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  useAiPanelStore.setState({ open: false, returnFocus: false });
   authStore.getState().clearSession();
   vi.restoreAllMocks();
 });
@@ -235,7 +236,7 @@ describe('GlassDock suggestion actions', () => {
   it('executes archive through the atomic suggestion command', async () => {
     const user = userEvent.setup();
     const { operations, executeBodies } = installHandlers(aSuggestion(), anInboxItem());
-    await openDock(user);
+    await openDock();
 
     await user.click(screen.getByRole('button', { name: 'action.apply' }));
 
@@ -256,7 +257,7 @@ describe('GlassDock suggestion actions', () => {
       aSuggestion({ recommendedAction: 'snooze' }),
       anInboxItem(),
     );
-    await openDock(user, 'snooze');
+    await openDock('snooze');
 
     await user.click(screen.getByRole('button', { name: 'action.apply' }));
 
@@ -272,7 +273,7 @@ describe('GlassDock suggestion actions', () => {
       anInboxItem({ taskId: 'task-open' }),
     );
     navigateMock.mockImplementation(() => Promise.resolve());
-    await openDock(user, 'open');
+    await openDock('open');
 
     await user.click(screen.getByRole('button', { name: 'action.apply' }));
 
@@ -296,7 +297,7 @@ describe('GlassDock suggestion actions', () => {
       anInboxItem(),
       { executeStatus: 500 },
     );
-    await openDock(user);
+    await openDock();
 
     await user.click(screen.getByRole('button', { name: 'action.apply' }));
 
@@ -321,7 +322,7 @@ describe('GlassDock suggestion actions', () => {
       aSuggestion({ recommendedAction: 'delete' }),
       anInboxItem(),
     );
-    await openDock(user, 'delete');
+    await openDock('delete');
 
     await user.click(screen.getByRole('button', { name: 'action.apply' }));
 
@@ -340,7 +341,7 @@ describe('GlassDock suggestion actions', () => {
       anInboxItemWithoutTask(),
       { executeStatus: 404 },
     );
-    await openDock(user, 'open');
+    await openDock('open');
 
     await user.click(screen.getByRole('button', { name: 'action.apply' }));
 
@@ -359,7 +360,7 @@ describe('GlassDock suggestion actions', () => {
       aSuggestion({ recommendedAction: 'open' }),
       anInboxItem(),
     );
-    await openDock(user, 'open');
+    await openDock('open');
 
     await user.click(screen.getByRole('button', { name: 'action.edit' }));
     expect(await screen.findByRole('dialog')).toBeTruthy();
@@ -392,7 +393,7 @@ describe('GlassDock suggestion actions', () => {
   it('persists a dismissal before removing the suggestion from the dock', async () => {
     const user = userEvent.setup();
     const { operations, decisionBodies } = installHandlers(aSuggestion(), anInboxItem());
-    await openDock(user);
+    await openDock();
 
     await user.click(screen.getByRole('button', { name: 'action.dismiss' }));
 
@@ -406,9 +407,8 @@ describe('GlassDock suggestion actions', () => {
   });
 
   it('shows legacy suggestions but disables actions until triage captures a source version', async () => {
-    const user = userEvent.setup();
     installHandlers(aSuggestion({ sourceVersionStatus: 'legacy' }), anInboxItem());
-    await openDock(user);
+    await openDock();
 
     expect(screen.getByRole('note')).toBeTruthy();
     expect(

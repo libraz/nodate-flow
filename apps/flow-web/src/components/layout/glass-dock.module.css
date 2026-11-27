@@ -24,6 +24,7 @@
 }
 
 .button {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -50,6 +51,31 @@
 }
 
 /* Focus ring supplied by the global `.nf-focus-ring` utility (added in JSX). */
+
+/* Pending AI suggestions; remounted on each count change (keyed in JSX) so the pop replays. */
+.count {
+  position: absolute;
+  inset-block-start: var(--nf-space-0-5);
+  inset-inline-end: var(--nf-space-0-5);
+  box-sizing: border-box;
+  /* nf-token-override: component dimension, not a spacing step */
+  min-inline-size: 1rem;
+  /* nf-token-override: component dimension, not a spacing step */
+  block-size: 1rem;
+  padding-inline: var(--nf-space-1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--nf-radius-pill);
+  background: var(--nf-color-accent);
+  color: var(--nf-color-fg-on-accent);
+  font-size: var(--nf-text-micro);
+  font-weight: var(--nf-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  pointer-events: none;
+  animation: global(nf-scale-in) var(--nf-duration-base) var(--nf-ease-out);
+}
 
 .divider {
   inline-size: var(--nf-space-px);

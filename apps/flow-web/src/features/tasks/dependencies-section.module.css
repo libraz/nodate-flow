@@ -16,14 +16,33 @@
   gap: var(--nf-space-2);
 }
 
+.group + .group {
+  margin-block-start: var(--nf-space-1);
+}
+
+/* A quiet label: a tone dot, the relation, and the count. */
 .groupHeader {
   display: flex;
   align-items: center;
-  gap: var(--nf-space-2);
+  gap: var(--nf-space-1-5);
   font-size: var(--nf-text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  font-weight: var(--nf-weight-medium);
   color: var(--nf-color-fg-muted);
+}
+
+.groupMark {
+  inline-size: var(--nf-space-1-5);
+  block-size: var(--nf-space-1-5);
+  border-radius: var(--nf-radius-pill);
+  background: var(--nf-color-fg-subtle);
+}
+
+.groupMark[data-tone="danger"] {
+  background: var(--nf-color-danger);
+}
+
+.groupMark[data-tone="warning"] {
+  background: var(--nf-color-warning);
 }
 
 .groupCount {
@@ -31,7 +50,7 @@
 }
 
 .groupList {
-  --presence-gap: var(--nf-space-1);
+  --presence-gap: 0;
   list-style: none;
   margin: 0;
   padding: 0;
@@ -44,10 +63,11 @@
   display: flex;
   align-items: center;
   gap: var(--nf-space-2);
-  padding-block: var(--nf-space-2);
-  padding-inline: var(--nf-space-3);
+  padding-block: var(--nf-space-0-5);
+  padding-inline: var(--nf-space-2) 0;
+  margin-inline: calc(var(--nf-space-2) * -1) 0;
   border-radius: var(--nf-radius-sm);
-  background: var(--nf-color-surface);
+  font-size: var(--nf-text-sm);
   transition: background-color var(--nf-duration-instant) var(--nf-ease-standard);
 }
 
@@ -76,7 +96,13 @@
   box-shadow: var(--nf-shadow-focus);
 }
 
-.kindSelect {
-  /* nf-token-override: component dimension, not a spacing step */
-  inline-size: 12rem;
+/* The other task's state: a dot and a muted label, after the title. */
+.itemState {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--nf-space-1-5);
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  white-space: nowrap;
 }

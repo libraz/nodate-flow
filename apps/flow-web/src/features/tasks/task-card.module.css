@@ -79,8 +79,32 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--nf-space-2);
+  gap: var(--nf-space-1-5) var(--nf-space-3);
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-xs);
   font-variant-numeric: tabular-nums;
+}
+
+.priority {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+}
+
+.due[data-overdue="true"] {
+  color: var(--nf-color-danger-fg);
+  font-weight: var(--nf-weight-medium);
+}
+
+/* Closed cards recede: flat, quieter surface and muted content. */
+.card[data-closed="true"] {
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Colour drops out rather than contrast, so the muted text still reads. */
+.card[data-closed="true"] .meta {
+  filter: grayscale(1);
 }
 
 /* Long label names stop at 10em. */

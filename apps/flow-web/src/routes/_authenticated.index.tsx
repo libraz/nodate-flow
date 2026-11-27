@@ -1,94 +1,79 @@
 /**
- * Authenticated home (/). Dashboard with quick-access widgets:
- * - Greeting + branding
- * - Assigned task summary (from GET /me/tasks)
- * - Workspace quick links
- * - Quick actions (create task, search)
+ * Authenticated home (/): greeting with the New task action, a count
+ * strip that links into My tasks, the first open assigned tasks, workspace
+ * links when there is more than one, and the selected workspace's widgets.
  */
 
 import { useFirstLoadStagger } from '@nodate-flow/ui/hooks/use-first-load-stagger';
 import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
 import Icon from '@nodate-flow/ui/icon';
 import { cx } from '@nodate-flow/ui/lib/cx';
+import Badge from '@nodate-flow/ui/primitives/badge';
 import Button, { buttonClassName } from '@nodate-flow/ui/primitives/button';
 import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { createFileRoute, Link } from '@tanstack/react-router';
-import {
-  CalendarDays,
-  CheckCircle2,
-  Clock,
-  FolderKanban,
-  Inbox,
-  type LucideIcon,
-  Plus,
-  Search,
-} from 'lucide-react';
+import { FolderKanban, Plus } from 'lucide-react';
 import { type CSSProperties, type ReactElement, Suspense, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { OPEN_COMMAND_PALETTE_EVENT } from '../components/layout/command-palette-store';
 import { OPEN_CREATE_TASK_EVENT } from '../components/layout/glass-dock';
 import PageFrame from '../components/page-frame';
 import PageHeader from '../components/page-header';
 import { selectUser, useAuth } from '../features/auth/auth-store';
 import DashboardView from '../features/dashboard/dashboard-view';
 import OnboardingChecklist from '../features/onboarding/onboarding-checklist';
-import { type MyTaskListItem, type TaskDerivedState, useMyTasksQuery } from '../features/tasks/api';
+import {
+  type MyTaskListItem,
+  type TaskDerivedState,
+  type TaskPriority,
+  useMyTasksQuery,
+} from '../features/tasks/api';
 import CompleteTaskButton from '../features/tasks/complete-task-button';
-import { STATE_COLOR } from '../features/tasks/constants';
+import { PRIORITY_KEY, PRIORITY_TONE, STATE_COLOR } from '../features/tasks/constants';
 import rowStyles from '../features/tasks/task-row.module.css';
+import {
+  DEFAULT_MY_TASK_FILTERS,
+  resetMyTaskFilters,
+  setMyTaskFilters,
+} from '../features/tasks/use-my-task-filters';
 import { useWorkspacesQuery } from '../features/workspaces/api';
 import { todayKey } from '../lib/date-utils';
+import { formatDueDate } from '../lib/format-date';
 import { useCurrentWorkspaceId } from '../lib/use-current-workspace';
 import { useEffectiveZone } from '../lib/use-effective-timezone';
 import styles from './_authenticated.index.module.css';
 
-/* ── Stat card ─────────────────────────────────────────────── */
+/* ── Count strip ──────────────────────────────────────────── */
 
-type StatTone = 'accent' | 'danger' | 'warning' | 'success';
-
-const STAT_TONE_CLASS: Record<StatTone, string | undefined> = {
-  accent: undefined,
-  danger: styles.statIconDanger,
-  warning: styles.statIconWarning,
-  success: styles.statIconSuccess,
-};
-
-function StatCard({
-  icon,
+/**
+ * One count in the strip; a link into My tasks. `onSelect` sets the My tasks
+ * filters the count corresponds to before the navigation lands.
+ */
+function StatLink({
   label,
   value,
-  tone,
+  danger,
+  onSelect,
 }: {
-  icon: LucideIcon;
   label: string;
   value: number;
-  tone: StatTone;
+  danger?: boolean;
+  onSelect: () => void;
 }): ReactElement {
   return (
-    <div className={styles.stat}>
-      <div className={cx(styles.statIcon, STAT_TONE_CLASS[tone])}>
-        <Icon icon={icon} decorative />
-      </div>
-      <div className={styles.statText}>
-        <div className={styles.statValue}>{value}</div>
-        <div className={styles.statLabel}>{label}</div>
-      </div>
-    </div>
+    <Link to="/today" className={cx(styles.stat, 'nf-focus-ring')} onClick={onSelect}>
+      <span className={cx(styles.statValue, danger && value > 0 && styles.statValueDanger)}>
+        {value}
+      </span>
+      <span className={styles.statLabel}>{label}</span>
+    </Link>
   );
 }
 
-/** Reserves the stat row and the list heading while the summary loads. */
+/** Reserves the count strip while the summary loads. */
 function TaskSummarySkeleton(): ReactElement {
-  return (
-    <div className={styles.stats} aria-busy="true">
-      <Skeleton className={styles.statSkeleton} />
-      <Skeleton className={styles.statSkeleton} />
-      <Skeleton className={styles.statSkeleton} />
-      <Skeleton className={styles.statSkeleton} />
-    </div>
-  );
+  return <Skeleton className={styles.statSkeleton} aria-busy="true" />;
 }
 
 /* ── Task summary (suspense boundary) ──────────────────────── */
@@ -96,53 +81,70 @@ function TaskSummarySkeleton(): ReactElement {
 /** The home summary's rows; a completed row collapses out so the rows below close the gap. */
 function RecentTaskList({
   tasks,
+  today,
   stagger,
 }: {
   tasks: MyTaskListItem[];
+  /** `YYYY-MM-DD` in the effective zone; a due date before it is overdue. */
+  today: string;
   stagger: (index: number) => CSSProperties | undefined;
 }): ReactElement {
+  const { t, i18n } = useTranslation('common');
+  const locale = i18n.resolvedLanguage ?? 'en';
   const { entries, onExited } = usePresenceList(tasks, (task) => task.id);
 
   return (
-    <ul className={rowStyles.list}>
-      {entries.map(({ key, item: task, present }, index) => (
-        <PresenceItem key={key} as="li" present={present} onExited={() => onExited(key)}>
-          <div
-            className={cx(motion.enter, rowStyles.item)}
-            style={
-              {
-                ...stagger(index),
-                '--state-tone': STATE_COLOR[task.derivedState as TaskDerivedState],
-              } as CSSProperties
-            }
-          >
-            {task.actorRole === 'assignee' ? (
-              <CompleteTaskButton
-                task={{
-                  id: task.id,
-                  title: task.title,
-                  derivedState: task.derivedState as TaskDerivedState,
-                  projectId: task.projectId,
-                }}
-              />
-            ) : (
-              <span aria-hidden="true" />
-            )}
-            <Link
-              to="/tasks/$taskId"
-              params={{ taskId: task.id }}
-              className={cx(rowStyles.row, 'nf-focus-ring')}
+    <ul className={cx(rowStyles.list, styles.recentList)}>
+      {entries.map(({ key, item: task, present }, index) => {
+        const pri = (task.priority ?? 0) as TaskPriority;
+        const overdue = task.dueOn !== undefined && task.dueOn < today;
+        return (
+          <PresenceItem key={key} as="li" present={present} onExited={() => onExited(key)}>
+            <div
+              className={cx(motion.enter, rowStyles.item)}
+              style={
+                {
+                  ...stagger(index),
+                  '--state-tone': STATE_COLOR[task.derivedState as TaskDerivedState],
+                } as CSSProperties
+              }
             >
-              <span className={rowStyles.taskTitle} title={task.title}>
-                {task.title}
-              </span>
-              {task.projectName ? (
-                <span className={rowStyles.context}>{task.projectName}</span>
-              ) : null}
-            </Link>
-          </div>
-        </PresenceItem>
-      ))}
+              {task.actorRole === 'assignee' ? (
+                <CompleteTaskButton
+                  task={{
+                    id: task.id,
+                    title: task.title,
+                    derivedState: task.derivedState as TaskDerivedState,
+                    projectId: task.projectId,
+                  }}
+                />
+              ) : (
+                <span aria-hidden="true" />
+              )}
+              <Link
+                to="/tasks/$taskId"
+                params={{ taskId: task.id }}
+                className={cx(rowStyles.row, 'nf-focus-ring')}
+              >
+                <span className={rowStyles.taskTitle} title={task.title}>
+                  {task.title}
+                </span>
+                {pri > 0 ? <Badge tone={PRIORITY_TONE[pri]}>{t(PRIORITY_KEY[pri])}</Badge> : null}
+                {task.projectName ? (
+                  <span className={cx(rowStyles.context, rowStyles.contextHideNarrow)}>
+                    {task.projectName}
+                  </span>
+                ) : null}
+                {task.dueOn ? (
+                  <span className={cx(rowStyles.due, overdue && styles.dueOverdue)}>
+                    {formatDueDate(task.dueOn, locale)}
+                  </span>
+                ) : null}
+              </Link>
+            </div>
+          </PresenceItem>
+        );
+      })}
     </ul>
   );
 }
@@ -158,13 +160,8 @@ function TaskSummary(): ReactElement {
   const zone = useEffectiveZone();
   const { data: tasks } = useMyTasksQuery();
 
-  // The authenticated layout listens for this event.
-  const handleCreateTask = (): void => {
-    window.dispatchEvent(new Event(OPEN_CREATE_TASK_EVENT));
-  };
-
+  const today = todayKey(zone);
   const counts = useMemo(() => {
-    const today = todayKey(zone);
     let open = 0;
     let overdue = 0;
     let dueToday = 0;
@@ -180,7 +177,7 @@ function TaskSummary(): ReactElement {
       if (t.dueOn === today) dueToday++;
     }
     return { open, overdue, dueToday, done };
-  }, [tasks, zone]);
+  }, [tasks, today]);
 
   const recentTasks = useMemo(() => {
     return tasks
@@ -190,49 +187,37 @@ function TaskSummary(): ReactElement {
 
   return (
     <>
-      <div className={cx(styles.stats, styles.statsEnter)}>
-        <StatCard
-          icon={FolderKanban}
-          label={t('home.stat_open')}
-          value={counts.open}
-          tone="accent"
-        />
-        <StatCard
-          icon={Clock}
+      <nav className={cx(styles.stats, styles.statsEnter)} aria-label={t('home.stats_label')}>
+        <StatLink label={t('home.stat_open')} value={counts.open} onSelect={resetMyTaskFilters} />
+        <StatLink
           label={t('home.stat_overdue')}
           value={counts.overdue}
-          tone="danger"
+          danger
+          onSelect={resetMyTaskFilters}
         />
-        <StatCard
-          icon={CalendarDays}
+        <StatLink
           label={t('home.stat_due_today')}
           value={counts.dueToday}
-          tone="warning"
+          onSelect={resetMyTaskFilters}
         />
-        <StatCard
-          icon={CheckCircle2}
+        <StatLink
           label={t('home.stat_done')}
           value={counts.done}
-          tone="success"
+          onSelect={() => {
+            setMyTaskFilters({ ...DEFAULT_MY_TASK_FILTERS, states: ['done'] });
+          }}
         />
-      </div>
-      <p className={styles.statHint}>{t('home.stat_hint')}</p>
+      </nav>
 
       {recentTasks.length === 0 ? (
         <section>
           <h2 className={styles.sectionTitle}>{t('home.recent_tasks')}</h2>
-          <div className={styles.emptyTasks}>
-            <p className={styles.mutedText}>{t('home.recent_tasks_empty')}</p>
-            <Button type="button" onClick={handleCreateTask}>
-              <Icon icon={Plus} decorative />
-              {t('home.quick_create')}
-            </Button>
-          </div>
+          <p className={styles.mutedText}>{t('home.recent_tasks_empty')}</p>
         </section>
       ) : (
         <section>
           <h2 className={styles.sectionTitle}>{t('home.recent_tasks')}</h2>
-          <RecentTaskList tasks={recentTasks} stagger={stagger} />
+          <RecentTaskList tasks={recentTasks} today={today} stagger={stagger} />
           <Link to="/today" className={cx(styles.viewAll, 'nf-focus-ring')}>
             {t('home.view_all_tasks')}
           </Link>
@@ -248,8 +233,9 @@ function WorkspaceLinks(): ReactElement | null {
   const { t } = useTranslation('common');
   const { data: workspaces } = useWorkspacesQuery();
 
-  // With no workspace the checklist and the sidebar already point at /setup.
-  if (workspaces.length === 0) return null;
+  // With no workspace the checklist and the sidebar already point at /setup;
+  // with one, the sidebar's workspace switcher is the same link.
+  if (workspaces.length < 2) return null;
 
   return (
     <section>
@@ -268,16 +254,6 @@ function WorkspaceLinks(): ReactElement | null {
         ))}
       </div>
     </section>
-  );
-}
-
-/** Reserves one row of workspace chips while the list loads. */
-function WorkspaceLinksSkeleton(): ReactElement {
-  return (
-    <div className={styles.workspaces} aria-busy="true">
-      <Skeleton className={styles.workspaceSkeleton} />
-      <Skeleton className={styles.workspaceSkeleton} />
-    </div>
   );
 }
 
@@ -301,42 +277,33 @@ function HomePage(): ReactElement {
     ? t('home.greeting_name', { name: user.displayName })
     : t('landing.hello');
 
-  // The authenticated layout listens for both events.
+  // The authenticated layout listens for this event.
   const handleCreateTask = (): void => {
     window.dispatchEvent(new Event(OPEN_CREATE_TASK_EVENT));
-  };
-  const handleSearch = (): void => {
-    window.dispatchEvent(new Event(OPEN_COMMAND_PALETTE_EVENT));
   };
 
   return (
     <PageFrame>
-      <PageHeader title={greeting} description={t('home.description')} help="home" />
+      <PageHeader
+        title={greeting}
+        help="home"
+        actions={
+          <Button type="button" variant="primary" onClick={handleCreateTask}>
+            <Icon icon={Plus} decorative />
+            {t('home.quick_create')}
+          </Button>
+        }
+      />
 
       <Suspense fallback={null}>
         <OnboardingChecklist />
       </Suspense>
 
-      <div className={styles.quickActions}>
-        <Button type="button" variant="primary" onClick={handleCreateTask}>
-          <Icon icon={Plus} decorative />
-          {t('home.quick_create')}
-        </Button>
-        <Button type="button" onClick={handleSearch}>
-          <Icon icon={Search} decorative />
-          {t('home.quick_search')}
-        </Button>
-        <Link to="/inbox" className={buttonClassName()}>
-          <Icon icon={Inbox} decorative />
-          {t('nav.inbox')}
-        </Link>
-      </div>
-
       <Suspense fallback={<TaskSummarySkeleton />}>
         <TaskSummary />
       </Suspense>
 
-      <Suspense fallback={<WorkspaceLinksSkeleton />}>
+      <Suspense fallback={null}>
         <WorkspaceLinks />
       </Suspense>
 

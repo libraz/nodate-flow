@@ -2,8 +2,8 @@
  * /workspaces/$id/projects/$projectId/tasks — section layout for the
  * tasks views (lazy).
  *
- * Hosts the view switcher (Board / List), the filters bar, the
- * "New task" button, and an <Outlet /> for the active view.
+ * One toolbar row (search, filters, saved views, view switcher, New task)
+ * above an <Outlet /> for the active view.
  */
 
 import Icon from '@nodate-flow/ui/icon';
@@ -48,28 +48,30 @@ function TasksSectionLayout(): ReactElement {
 
   return (
     <section className={styles.section}>
-      <ProjectSectionHeader
-        title={t('tasks.title')}
-        help="project-tasks"
-        description={t('tasks.description')}
+      <ProjectSectionHeader title={t('tasks.title')} />
+      <TaskFiltersBar
+        projectId={projectId}
+        workspaceId={project.workspaceId}
         actions={
           <>
             <TaskViewSwitcher />
             <Button
               variant="primary"
               className={styles.newTask}
+              aria-label={t('tasks.new')}
               onClick={() => {
                 setCreateOpen(true);
               }}
             >
               <Icon icon={Plus} decorative />
-              {t('tasks.new')}
+              <span className={styles.newTaskLong}>{t('tasks.new')}</span>
+              <span aria-hidden className={styles.newTaskShort}>
+                {t('tasks.new_short')}
+              </span>
             </Button>
           </>
         }
       />
-
-      <TaskFiltersBar projectId={projectId} workspaceId={project.workspaceId} />
 
       <Suspense
         fallback={

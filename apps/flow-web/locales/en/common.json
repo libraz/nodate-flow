@@ -26,16 +26,14 @@
   },
   "home": {
     "greeting_name": "Hello, {name}.",
+    "stats_label": "Task counts",
     "quick_create": "New task",
-    "quick_search": "Search",
     "stat_open": "Open tasks",
     "stat_overdue": "Overdue",
     "stat_due_today": "Due today",
     "stat_done": "Completed",
     "recent_tasks": "My tasks",
     "view_all_tasks": "View all tasks →",
-    "description": "Your assigned work across workspaces, and the dashboard of the workspace you have selected.",
-    "stat_hint": "Counts tasks where you are assignee, reviewer or approver in any workspace. Overdue and Due today follow your time zone.",
     "recent_tasks_empty": "You have no assigned tasks yet."
   },
   "nav": {
@@ -77,6 +75,7 @@
       "cta": "Create a workspace"
     },
     "hint": {
+      "members": "People in this workspace and pending invitations.",
       "reminders": "Tasks that are overdue or due within 3 days.",
       "archive": "Tasks and projects you archived. You can restore them.",
       "history": "Task changes (Timeline) and the record of what people, AI and integrations did (Activity log), in one place.",
@@ -94,7 +93,7 @@
       "current": "Current workspace: {name}"
     },
     "search": {
-      "placeholder": "Search tasks or jump to a page… (type > for AI commands)"
+      "placeholder": "Search or jump to…"
     },
     "user_menu": {
       "open": "Account menu",
@@ -117,7 +116,7 @@
     "quick_actions": "Quick actions",
     "new_task": "New task",
     "quick_capture": "Quick capture",
-    "ai_assist": "AI command",
+    "ai_assist": "AI suggestions",
     "command_palette": {
       "title": "Command palette",
       "placeholder": "Search tasks and projects, or type > for an AI command",
@@ -168,7 +167,8 @@
       "details": "Details"
     },
     "quick_capture_hint": "Create a task with just a title in the project you are viewing, or your first project. Priority is set to Medium.",
-    "ai_assist_hint": "Type a request in plain language, for example complete the login bug. AI proposes an action and runs it only after you press Enter again."
+    "ai_assist_hint": "Review what AI proposes for this workspace and filter tasks in plain language. For an AI command, open the palette and type >.",
+    "ai_pending_label": "{label} ({count, plural, one {# pending} other {# pending}})"
   },
   "glass_dock": {
     "unavailable": "AI suggestions unavailable"
@@ -213,7 +213,6 @@
   },
   "today": {
     "title": "My tasks",
-    "subtitle": "Tasks where you hold a role, across all workspaces.",
     "empty": "Nothing is assigned to you yet. Tasks appear here when you are added as assignee, reviewer, approver or watcher.",
     "loading": "Loading your tasks…",
     "error": "Failed to load your tasks.",
@@ -279,12 +278,10 @@
     "zoom_preset_aria": "Zoom preset",
     "critical_path": "Critical path",
     "critical_path_none": "No critical path found.",
-    "description": "A read-only schedule. Bars run from each task's start date to its due date and arrows show blocking dependencies. Click a bar to open the task.",
     "critical_path_hint": "Highlights the longest chain of tasks that block one another. A delay anywhere on it delays the end of the project."
   },
   "calendar": {
     "title": "Calendar",
-    "subtitle": "Tasks assigned to you and events from every workspace, on a monthly grid. Click a day to add, drag to reschedule.",
     "prev": "Previous month",
     "next": "Next month",
     "today": "Today",
@@ -673,7 +670,6 @@
       "slug_hint": "A short letters-and-numbers name used in URLs. Leave it empty and one is made from the name; you can change it later in Settings.",
       "submit": "Create workspace"
     },
-    "description": "A workspace is the shared space for a team: its projects, tasks, calendars, pages and members.",
     "role_desc": {
       "owner": "Manages everything, including deleting the workspace and making others owners.",
       "admin": "Manages members, settings and all work. Cannot delete the workspace.",
@@ -797,6 +793,7 @@
   "tasks": {
     "title": "Tasks",
     "new": "New task",
+    "new_short": "New",
     "empty": "No tasks yet. Create your first one to get started.",
     "limit_notice": "Showing the first {count} tasks. Refine filters to narrow the view.",
     "title_placeholder": "Task title…",
@@ -879,6 +876,8 @@
     },
     "filters": {
       "search_placeholder": "Search tasks…",
+      "button": "Filters",
+      "button_label": "{count, plural, =0 {Filters} other {Filters, # active}}",
       "status": "Status",
       "assignee": "Assignee",
       "priority": "Priority",
@@ -1003,8 +1002,13 @@
         "title": "Assignees",
         "add": "Add assignee",
         "remove": "Remove {name}",
-        "empty": "No assignees yet.",
         "none": "No members available."
+      },
+      "add_to_task": {
+        "label": "Add to this task",
+        "dependency": "Dependency",
+        "attachment": "Attachment",
+        "event": "Calendar event"
       },
       "activity": {
         "title": "Activity"
@@ -1246,7 +1250,6 @@
     "retro": {
       "queue": {
         "title": "Retrospective drafts",
-        "description": "Draft retrospectives the AI created from completed tasks and calendar events. Accept to promote to a regular task, or discard to remove.",
         "empty": "No retrospective drafts right now",
         "linked_original": "Linked to: {sourceTitle}",
         "created_by_ai": "Drafted by AI {agentName} · {when}",
@@ -1272,7 +1275,6 @@
         "discard_hint": "Archives the draft. You can restore it from the Archive page."
       }
     },
-    "description": "All tasks in this project. Switch between board, list, dependencies and spreadsheet; your choice is remembered on this device.",
     "views_hint": "Board groups tasks by state. List and Spreadsheet show one row per task; Spreadsheet is built for fast keyboard editing. Dependencies draws which tasks block which.",
     "empty_filtered": "No tasks match the current filters. Clear the filters to see all tasks.",
     "views_label": "Task view"
@@ -1373,7 +1375,6 @@
     "inbox": {
       "title": "Pending invites",
       "count_badge": "{count}",
-      "empty": "No pending invites. When someone invites your email address to an event, it shows up here.",
       "rsvp_hint": "Open the link in the invitation email to respond.",
       "load_error": "Failed to load invites.",
       "calendar_workspace": "{calendar} · {workspace}",
@@ -1598,6 +1599,8 @@
     },
     "addReviewer": "Add reviewer",
     "addApprover": "Add approver",
+    "addReviewerShort": "Reviewer",
+    "addApproverShort": "Approver",
     "reviewerRole": "Reviewer",
     "approverRole": "Approver",
     "rolesHeading": "Review roles",

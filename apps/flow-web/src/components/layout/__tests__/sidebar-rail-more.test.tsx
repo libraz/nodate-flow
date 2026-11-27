@@ -116,7 +116,7 @@ describe('collapsed rail More', () => {
     await user.click(trigger);
 
     const dialog = await screen.findByRole('dialog', { name: 'nav.more' });
-    expect(MORE_LABELS).toHaveLength(4);
+    expect(MORE_LABELS).toHaveLength(7);
     for (const name of MORE_LABELS) {
       expect(dialog.querySelector(`a[aria-label="${name}"]`)).not.toBeNull();
     }

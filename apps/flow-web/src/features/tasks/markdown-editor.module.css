@@ -55,3 +55,40 @@
   margin: 0;
   color: var(--nf-color-fg-muted);
 }
+
+/*
+ * Composer layout: the mention hint under the textarea and the form actions
+ * share one line. The write pane dissolves so its children join the grid.
+ */
+.withFooter {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--nf-space-3);
+}
+
+.withFooter > *,
+.withFooter > .write > * {
+  grid-column: 1 / -1;
+}
+
+.withFooter > .write {
+  display: contents;
+}
+
+.withFooter > .write > p {
+  grid-column: 1;
+  margin: 0;
+}
+
+.withFooter > .footer {
+  grid-column: 2;
+}
+
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
+@media (max-width: 639px) {
+  /* Too narrow to share: the hint takes the full line and the actions follow it. */
+  .withFooter > .footer {
+    grid-column: 1 / -1;
+  }
+}

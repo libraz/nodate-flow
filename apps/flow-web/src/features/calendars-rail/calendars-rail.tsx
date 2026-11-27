@@ -37,7 +37,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import Tooltip from '@nodate-flow/ui/primitives/tooltip';
 import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { useQueries } from '@tanstack/react-query';
-import { ChevronLeft, Eye, EyeOff, MoreVertical } from 'lucide-react';
+import { ChevronLeft, Eye, EyeOff, MoreVertical, Plus } from 'lucide-react';
 import { type ButtonHTMLAttributes, type ReactElement, type Ref, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -261,6 +261,10 @@ function CalendarsSection({
           className={styles.addButton}
           onClick={() => setMode('discover')}
         >
+          {/* Sits in the swatch column so the label lines up with the calendar names. */}
+          <span className={styles.addIcon} aria-hidden>
+            <Plus size={12} />
+          </span>
           {t('calendars_rail.add_teammate')}
         </Button>
       </div>

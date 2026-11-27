@@ -135,19 +135,19 @@ describe('sidebar on a route without a workspace id', () => {
     expect(await screen.findByRole('heading', { name: 'Acme' })).toBeTruthy();
   });
 
-  it('lists the workspace destinations beneath it', async () => {
+  it('lists the daily workspace destinations beneath it, the rest behind More', async () => {
     renderSidebar();
     await screen.findByRole('heading', { name: 'Acme' });
 
     const hrefs: Record<string, string> = {
       'nav.projects': '/workspaces/ws-1/projects',
-      'nav.members': '/workspaces/ws-1/members',
-      'nav.reminders': '/workspaces/ws-1/reminders',
-      'nav.archive': '/workspaces/ws-1/tasks/archived',
       'nav.pages': '/pages',
     };
     for (const [name, href] of Object.entries(hrefs)) {
       expect(screen.getByRole('link', { name }).getAttribute('href')).toBe(href);
+    }
+    for (const name of ['nav.members', 'nav.reminders', 'nav.archive']) {
+      expect(screen.queryByRole('link', { name })).toBeNull();
     }
     expect(screen.getByRole('button', { name: 'nav.more' })).toBeTruthy();
   });
@@ -222,7 +222,14 @@ describe('new project button', () => {
 });
 
 describe('favorites placement', () => {
+  it('renders no favorites section while there are none', async () => {
+    renderSidebar();
+    await screen.findByRole('button', { name: 'nav.more' });
+    expect(screen.queryByText('favorites.sidebar_title')).toBeNull();
+  });
+
   it('renders the favorites section after the More toggle', async () => {
+    mocks.favorites = [{ id: 'f1', targetType: 'project', targetId: 'p2', title: 'Roadmap' }];
     renderSidebar();
     const toggle = await screen.findByRole('button', { name: 'nav.more' });
     const favorites = await screen.findByText('favorites.sidebar_title');

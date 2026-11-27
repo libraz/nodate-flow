@@ -31,9 +31,9 @@ import { expandAllRecurrences, type RecurrenceRule } from '@nodate-flow/ui/calen
 import { usePresence } from '@nodate-flow/ui/hooks/use-presence';
 import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
 import { cx } from '@nodate-flow/ui/lib/cx';
-import Badge from '@nodate-flow/ui/primitives/badge';
 import Button from '@nodate-flow/ui/primitives/button';
 import Drawer from '@nodate-flow/ui/primitives/drawer';
+import Popover from '@nodate-flow/ui/primitives/popover';
 import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { ToggleChip, ToggleChipGroup } from '@nodate-flow/ui/primitives/toggle-chip';
@@ -49,7 +49,7 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
-import { CalendarRange, ChevronLeft, ChevronRight, Users } from 'lucide-react';
+import { CalendarRange, ChevronLeft, ChevronRight, Layers, Users } from 'lucide-react';
 import { DateTime } from 'luxon';
 import {
   type CSSProperties,
@@ -1273,25 +1273,81 @@ function CalendarRoute(): ReactElement {
     [navigate],
   );
 
+  // Quiet tinted chips: the swatch carries each layer's colour, so the
+  // toggles do not outshout the grid they filter.
+  const layerChips = (
+    <ToggleChipGroup label={t('calendar.layers')}>
+      <ToggleChip
+        pressed={layers.tasksDue}
+        tone="tint"
+        onPressedChange={(v) => setLayers((s) => ({ ...s, tasksDue: v }))}
+        color="var(--nf-cal-task-color)"
+      >
+        {t('calendar.layer.tasks_due')}
+      </ToggleChip>
+      <ToggleChip
+        pressed={layers.events}
+        tone="tint"
+        onPressedChange={(v) => setLayers((s) => ({ ...s, events: v }))}
+        label={t('calendar.layer.events')}
+      >
+        <span className={styles.kindChip}>
+          <span aria-hidden className={eventKindSampleClassName} data-kind="event" />
+          {t('calendar.layer.events')}
+        </span>
+      </ToggleChip>
+      <ToggleChip
+        pressed={layers.blocks}
+        tone="tint"
+        onPressedChange={(v) => setLayers((s) => ({ ...s, blocks: v }))}
+        label={t('calendar.layer.blocks')}
+      >
+        <span className={styles.kindChip}>
+          <span aria-hidden className={eventKindSampleClassName} data-kind="block" />
+          {t('calendar.layer.blocks')}
+        </span>
+      </ToggleChip>
+      <ToggleChip
+        pressed={layers.free}
+        tone="tint"
+        onPressedChange={(v) => setLayers((s) => ({ ...s, free: v }))}
+        label={t('calendar.layer.free')}
+      >
+        <span className={styles.kindChip}>
+          <span aria-hidden className={eventKindSampleClassName} data-kind="free" />
+          {t('calendar.layer.free')}
+        </span>
+      </ToggleChip>
+      <ToggleChip
+        pressed={layers.milestone}
+        tone="tint"
+        onPressedChange={(v) => setLayers((s) => ({ ...s, milestone: v }))}
+        label={t('calendar.layer.milestone')}
+      >
+        <span className={styles.kindChip}>
+          <span aria-hidden className={eventKindSampleClassName} data-kind="milestone" />
+          {t('calendar.layer.milestone')}
+        </span>
+      </ToggleChip>
+      {country ? (
+        <ToggleChip
+          pressed={layers.holidays}
+          tone="tint"
+          onPressedChange={(v) => setLayers((s) => ({ ...s, holidays: v }))}
+          color="var(--nf-color-danger)"
+        >
+          {t('calendar.layer.holidays')}
+        </ToggleChip>
+      ) : null}
+    </ToggleChipGroup>
+  );
+
   return (
     <PageFrame width="full" className={styles.section}>
-      <PageHeader
-        title={t('calendar.title')}
-        description={t('calendar.subtitle')}
-        help="calendar"
-      />
+      <PageHeader title={t('calendar.title')} help="calendar" />
 
       <div className={styles.toolbar}>
         <div className={styles.monthNav}>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            aria-label={t('calendar.prev')}
-            onClick={goPrev}
-          >
-            <ChevronLeft size={16} aria-hidden />
-          </Button>
           <h2 className={styles.monthLabel} aria-live="polite">
             {/* Keyed so the label settles in with the grid rather than
                 swapping under it. */}
@@ -1299,84 +1355,49 @@ function CalendarRoute(): ReactElement {
               {monthLabel}
             </span>
           </h2>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            aria-label={t('calendar.next')}
-            onClick={goNext}
-          >
-            <ChevronRight size={16} aria-hidden />
-          </Button>
-          <Button type="button" variant="ghost" size="sm" onClick={goToday}>
-            {t('calendar.today')}
-          </Button>
+          {/* One control group, so the three steps share a size and a rhythm. */}
+          <div className={styles.navGroup}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className={styles.navButton}
+              aria-label={t('calendar.prev')}
+              onClick={goPrev}
+            >
+              <ChevronLeft size={16} aria-hidden />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className={styles.navButton}
+              onClick={goToday}
+            >
+              {t('calendar.today')}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className={styles.navButton}
+              aria-label={t('calendar.next')}
+              onClick={goNext}
+            >
+              <ChevronRight size={16} aria-hidden />
+            </Button>
+          </div>
         </div>
 
-        {/* The wrapper takes the tooltip: the group does not forward handlers. */}
+        {/* The wrapper takes the tooltip: the group does not forward handlers.
+            On a phone the chips fold into a popover so they do not push the
+            grid down by two rows. */}
         <div className={styles.filters}>
-          <Tooltip content={t('calendar.layerHint')}>
-            <div className={styles.layers}>
-              <ToggleChipGroup label={t('calendar.layers')}>
-                <ToggleChip
-                  pressed={layers.tasksDue}
-                  onPressedChange={(v) => setLayers((s) => ({ ...s, tasksDue: v }))}
-                  color="var(--nf-cal-task-color)"
-                >
-                  {t('calendar.layer.tasks_due')}
-                </ToggleChip>
-                <ToggleChip
-                  pressed={layers.events}
-                  onPressedChange={(v) => setLayers((s) => ({ ...s, events: v }))}
-                  label={t('calendar.layer.events')}
-                >
-                  <span className={styles.kindChip}>
-                    <span aria-hidden className={eventKindSampleClassName} data-kind="event" />
-                    {t('calendar.layer.events')}
-                  </span>
-                </ToggleChip>
-                <ToggleChip
-                  pressed={layers.blocks}
-                  onPressedChange={(v) => setLayers((s) => ({ ...s, blocks: v }))}
-                  label={t('calendar.layer.blocks')}
-                >
-                  <span className={styles.kindChip}>
-                    <span aria-hidden className={eventKindSampleClassName} data-kind="block" />
-                    {t('calendar.layer.blocks')}
-                  </span>
-                </ToggleChip>
-                <ToggleChip
-                  pressed={layers.free}
-                  onPressedChange={(v) => setLayers((s) => ({ ...s, free: v }))}
-                  label={t('calendar.layer.free')}
-                >
-                  <span className={styles.kindChip}>
-                    <span aria-hidden className={eventKindSampleClassName} data-kind="free" />
-                    {t('calendar.layer.free')}
-                  </span>
-                </ToggleChip>
-                <ToggleChip
-                  pressed={layers.milestone}
-                  onPressedChange={(v) => setLayers((s) => ({ ...s, milestone: v }))}
-                  label={t('calendar.layer.milestone')}
-                >
-                  <span className={styles.kindChip}>
-                    <span aria-hidden className={eventKindSampleClassName} data-kind="milestone" />
-                    {t('calendar.layer.milestone')}
-                  </span>
-                </ToggleChip>
-                {country ? (
-                  <ToggleChip
-                    pressed={layers.holidays}
-                    onPressedChange={(v) => setLayers((s) => ({ ...s, holidays: v }))}
-                    color="var(--nf-color-danger)"
-                  >
-                    {t('calendar.layer.holidays')}
-                  </ToggleChip>
-                ) : null}
-              </ToggleChipGroup>
-            </div>
-          </Tooltip>
+          {isMobile ? null : (
+            <Tooltip content={t('calendar.layerHint')}>
+              <div className={styles.layers}>{layerChips}</div>
+            </Tooltip>
+          )}
           {labelLegend ? (
             <LabelLegend
               legend={labelLegend}
@@ -1390,6 +1411,16 @@ function CalendarRoute(): ReactElement {
       {/* Mobile-only trigger to open the calendars rail as a drawer. */}
       {isMobile ? (
         <div className={styles.mobileRailBar}>
+          <Popover
+            content={<div className={styles.layersPopover}>{layerChips}</div>}
+            placement="bottom-end"
+            ariaLabel={t('calendar.layers')}
+          >
+            <Button type="button" variant="ghost" size="sm">
+              <Layers size={16} aria-hidden />
+              {t('calendar.layers')}
+            </Button>
+          </Popover>
           <Button
             type="button"
             variant="ghost"
@@ -1592,10 +1623,6 @@ function CalendarRoute(): ReactElement {
                           >
                             {t('calendar.more', { count: hiddenCount })}
                           </button>
-                        ) : primaryHoliday === null && totalCount > 0 ? (
-                          <Badge tone="neutral" className={styles.countBadge}>
-                            {totalCount}
-                          </Badge>
                         ) : null}
                       </div>
                       <DayPillList

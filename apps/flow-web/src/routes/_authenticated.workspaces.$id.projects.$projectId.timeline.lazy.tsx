@@ -27,11 +27,7 @@ function ProjectTimelineRoute(): ReactElement {
   const { t } = useTranslation('timeline');
   return (
     <section className={styles.section}>
-      <ProjectSectionHeader
-        title={t('view.title')}
-        help="timeline"
-        description={t('view.description')}
-      />
+      <ProjectSectionHeader title={t('view.title')} />
       <Suspense fallback={<TimelineSkeleton />}>
         <ProjectTimelineInner projectId={projectId} />
       </Suspense>

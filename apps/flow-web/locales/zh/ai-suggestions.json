@@ -111,8 +111,7 @@
       "dismiss_failed": "无法忽略该建议",
       "edit_failed": "无法保存该建议",
       "identity_changed": "账号或工作区已切换。请重新打开该建议后再试。"
-    },
-    "description": "用自然语言描述任务来筛选，并查看 AI 对此工作区的建议。应用建议之前不会有任何改动。"
+    }
   },
   "state_suggestions": {
     "title": "下一步建议"

@@ -5,7 +5,6 @@
 
 import VisuallyHidden from '@nodate-flow/ui/a11y/visually-hidden';
 import Avatar from '@nodate-flow/ui/primitives/avatar';
-import Badge from '@nodate-flow/ui/primitives/badge';
 import { Link } from '@tanstack/react-router';
 import { CornerDownRight, ListTree, Lock, MessageSquare } from 'lucide-react';
 import type { ReactElement, ReactNode } from 'react';
@@ -14,7 +13,7 @@ import { useTranslation } from 'react-i18next';
 import type { TaskListItem } from './api';
 import css from './task-marks.module.css';
 
-/** A neutral badge with a 12px icon and a tabular count. */
+/** A 12px icon and a tabular count in muted text; `danger` tints it. */
 function CountBadge({
   icon,
   count,
@@ -27,12 +26,10 @@ function CountBadge({
   tone?: 'neutral' | 'danger';
 }): ReactElement {
   return (
-    <Badge tone={tone} aria-label={label} title={label}>
-      <span className={css.countMark}>
-        {icon}
-        {count}
-      </span>
-    </Badge>
+    <span role="img" aria-label={label} title={label} data-tone={tone} className={css.countMark}>
+      {icon}
+      <span aria-hidden="true">{count}</span>
+    </span>
   );
 }
 

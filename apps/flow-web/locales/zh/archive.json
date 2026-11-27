@@ -1,7 +1,6 @@
 {
   "page": {
     "title": "归档",
-    "subtitle": "你存放的任务和项目都在这里。它们没有消失。",
     "countWithLast": "{count, plural, other {# 个任务}} · 最近归档于 {ago}"
   },
   "filters": {

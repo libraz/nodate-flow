@@ -3,11 +3,19 @@
 .frame {
   display: flex;
   flex-direction: column;
-  gap: var(--nf-space-6);
+  gap: var(--nf-space-5);
   padding: var(--nf-space-page);
   inline-size: 100%;
   min-inline-size: 0;
   box-sizing: border-box;
+}
+
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
+@media (max-width: 639px) {
+  .frame {
+    gap: var(--nf-space-4);
+    padding: var(--nf-space-4);
+  }
 }
 
 .standard {
@@ -26,7 +34,7 @@
 .heading {
   display: flex;
   flex-direction: column;
-  gap: var(--nf-space-1-5);
+  gap: var(--nf-space-1);
   /* nf-token-override: basis at which actions wrap under the title, not a spacing step */
   flex: 1 1 20rem;
   min-inline-size: 0;
@@ -51,8 +59,11 @@
 
 .description {
   margin: 0;
-  font-size: var(--nf-text-base);
+  font-size: var(--nf-text-sm);
   color: var(--nf-color-fg-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .actions {
@@ -61,4 +72,13 @@
   align-items: center;
   gap: var(--nf-space-2);
   margin-inline-start: auto;
+}
+
+/* Phones: compact actions (an icon, one short button) stay on the title row; wider clusters still wrap. */
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
+@media (max-width: 639px) {
+  .heading {
+    /* nf-token-override: basis at which actions wrap under the title, not a spacing step */
+    flex-basis: 12rem;
+  }
 }

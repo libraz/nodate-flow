@@ -452,7 +452,6 @@
   "settings": {
     "data": {
       "title": "导入与导出",
-      "description": "将工作区任务导出为 CSV 或 JSON，或从 CSV 导入任务。目前只有 CSV 导入可以运行。",
       "export": {
         "title": "导出任务",
         "description": "将此工作区的任务下载为 CSV 或 JSON，每个文件最多 10,000 条。评论、附件等其他数据不包含在内。",

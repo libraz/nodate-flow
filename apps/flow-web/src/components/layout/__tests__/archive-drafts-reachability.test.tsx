@@ -107,19 +107,20 @@ beforeEach(() => {
 });
 
 describe('sidebar workspace navigation', () => {
-  it('links to the Archive Room without opening anything', () => {
+  it('keeps the archive, reminders and members behind the More disclosure', async () => {
     renderSidebar();
+    expect(screen.queryByText('nav.archive')).toBeNull();
 
-    const link = screen.getByText('nav.archive').closest('a');
-    expect(link).not.toBeNull();
-    expect(link?.getAttribute('href')).toBe('/workspaces/ws-1/tasks/archived');
-  });
+    await userEvent.setup().click(screen.getByRole('button', { name: 'nav.more' }));
 
-  it('links to the reminders page without opening anything', () => {
-    renderSidebar();
-
-    const link = screen.getByText('nav.reminders').closest('a');
-    expect(link?.getAttribute('href')).toBe('/workspaces/ws-1/reminders');
+    const expected: Record<string, string> = {
+      'nav.archive': '/workspaces/ws-1/tasks/archived',
+      'nav.reminders': '/workspaces/ws-1/reminders',
+      'nav.members': '/workspaces/ws-1/members',
+    };
+    for (const [key, href] of Object.entries(expected)) {
+      expect(screen.getByText(key).closest('a')?.getAttribute('href')).toBe(href);
+    }
   });
 
   it('keeps the retrospective-draft queue behind the More disclosure', async () => {

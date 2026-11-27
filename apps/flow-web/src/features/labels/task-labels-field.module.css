@@ -9,6 +9,12 @@
   gap: var(--presence-gap);
 }
 
+/* The add action takes its own line, like the other property rows, its icon on the value text edge. */
+.chips > li:last-child {
+  flex-basis: 100%;
+  margin-inline-start: calc(var(--nf-space-3) * -1);
+}
+
 /* A long name truncates inside the chip instead of widening the row. */
 .chips > li,
 .chips > li > * {

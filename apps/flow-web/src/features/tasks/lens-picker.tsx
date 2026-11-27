@@ -16,10 +16,11 @@
  * even when only some of them can withdraw it.
  */
 
+import Button from '@nodate-flow/ui/primitives/button';
 import Popover from '@nodate-flow/ui/primitives/popover';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { useQueryClient } from '@tanstack/react-query';
-import { Share2 } from 'lucide-react';
+import { Bookmark, Share2 } from 'lucide-react';
 import { type ReactElement, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -354,9 +355,15 @@ export default function LensPicker({ workspaceId, projectId }: LensPickerProps):
   return (
     <>
       <Popover open={open} onOpenChange={setOpen} placement="bottom-end" content={panel}>
-        <button type="button" aria-haspopup="listbox" className={styles.trigger}>
-          {t('tasks.lens.title')}
-        </button>
+        <Button
+          type="button"
+          aria-haspopup="listbox"
+          aria-label={t('tasks.lens.title')}
+          className={styles.trigger}
+        >
+          <Bookmark aria-hidden size="1em" />
+          <span className={styles.triggerLabel}>{t('tasks.lens.title')}</span>
+        </Button>
       </Popover>
       {shareLens ? (
         <ShareLensDialog

@@ -28,6 +28,13 @@
   color: var(--nf-color-danger-fg);
 }
 
+/* Overdue is carried by the due date's colour, not a tinted row. Scoped under
+   the section so it outranks the shared row's muted due colour. */
+.section .dueOverdue {
+  color: var(--nf-color-danger-fg);
+  font-weight: var(--nf-weight-medium);
+}
+
 .sectionCount {
   font-variant-numeric: tabular-nums;
   font-weight: var(--nf-weight-regular);

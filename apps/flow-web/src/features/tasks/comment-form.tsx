@@ -60,12 +60,14 @@ export default function CommentForm({ taskId, workspaceId }: CommentFormProps): 
         placeholder={t('tasks.comments.add_placeholder')}
         aria-label={t('tasks.comments.title')}
         rows={3}
+        footer={
+          <FormActions hint={{ disabled: body.trim().length === 0 || add.isPending }}>
+            <Button type="submit" disabled={body.trim().length === 0 || add.isPending}>
+              {t('tasks.comments.add')}
+            </Button>
+          </FormActions>
+        }
       />
-      <FormActions hint={{ disabled: body.trim().length === 0 || add.isPending }}>
-        <Button type="submit" disabled={body.trim().length === 0 || add.isPending}>
-          {t('tasks.comments.add')}
-        </Button>
-      </FormActions>
     </form>
   );
 }

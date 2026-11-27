@@ -1,8 +1,8 @@
 /**
  * TaskStatusBar — a contained strip under the task title, reading left to
- * right: the current state, then the transitions the state machine allows
- * from it. The recommended forward transition is the primary button, the
- * others are outlined buttons, and cancel lives in the "more" menu next
+ * right: the current state (a dot and a label, not a control), then the
+ * transitions the state machine allows from it. The recommended forward
+ * transition is the primary button, the others are quiet ghost buttons, and cancel lives in the "more" menu next
  * to "create calendar event". The mutation lives here; the parent only passes
  * which task and state it renders.
  */
@@ -12,6 +12,7 @@ import Button from '@nodate-flow/ui/primitives/button';
 import Popover from '@nodate-flow/ui/primitives/popover';
 import Spinner from '@nodate-flow/ui/primitives/spinner';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
+import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { BP } from '@nodate-flow/ui/tokens/breakpoints';
 import {
   ArrowRight,
@@ -44,7 +45,7 @@ import {
 } from './api';
 import { STATE_KEY, TRANSITION_KEY } from './constants';
 import EventFromTaskDialog from './event-from-task/event-from-task-dialog';
-import TaskStateBadge from './task-state-badge';
+import StateDot from './state-dot';
 import css from './task-status-bar.module.css';
 
 // The forward action worth nudging toward: first of these that is legal from the current state.
@@ -140,6 +141,8 @@ export default function TaskStatusBar({
   const actedRef = useRef(false);
   const [stuck, setStuck] = useState(false);
   const narrow = useSyncExternalStore(subscribeNarrow, readNarrow, () => false);
+  // The state label settles when it changes after mount, so a transition reads as the click's result.
+  const [initialState] = useState(state);
 
   // The strip sticks at -1px, so once it is stuck its box is clipped and no longer fully visible.
   useEffect(() => {
@@ -243,7 +246,10 @@ export default function TaskStatusBar({
           {title}
         </span>
       ) : null}
-      <TaskStateBadge state={state} />
+      <span key={state} className={cx(css.state, state !== initialState && motion.settle)}>
+        <StateDot state={state} />
+        {t(STATE_KEY[state])}
+      </span>
       <span className={css.divider} aria-hidden />
       <div className={css.actions} aria-busy={pending ? true : undefined}>
         {shown.map(({ name, landing }) => {
@@ -254,7 +260,7 @@ export default function TaskStatusBar({
             <Button
               key={name}
               type="button"
-              variant={isRecommended ? 'primary' : 'default'}
+              variant={isRecommended ? 'primary' : 'ghost'}
               size="sm"
               className={css.action}
               ref={(node: HTMLButtonElement | null) => {

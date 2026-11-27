@@ -56,6 +56,18 @@
   background: conic-gradient(var(--nf-color-accent) var(--progress), var(--nf-color-border) 0);
 }
 
+/* The current state reads as a status, not as one more button. */
+.state {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-1-5);
+  padding-inline: var(--nf-space-1);
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-semibold);
+  color: var(--nf-color-fg);
+  white-space: nowrap;
+}
+
 .divider {
   inline-size: var(--nf-space-px);
   block-size: 1.25em;

@@ -12,7 +12,6 @@ import type { components } from '@nodate-flow/sdk';
 import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
 import Card from '@nodate-flow/ui/primitives/card';
 import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
-import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { useQuery } from '@tanstack/react-query';
 import { Calendar as CalendarIcon, Clock, MapPin } from 'lucide-react';
@@ -168,20 +167,14 @@ function PanelHeader({ count }: { count: number | null }): ReactElement {
  * compact vertical list. Intended to sit beside the month grid on the
  * /calendar route.
  */
-export default function PendingInvitesPanel(): ReactElement {
+export default function PendingInvitesPanel(): ReactElement | null {
   const { t } = useTranslation('common');
   const { data, isLoading, error } = useMyInvitesQuery();
   const { entries, onExited } = usePresenceList(data ?? [], (invite) => invite.id);
 
-  if (isLoading) {
-    return (
-      <aside aria-label={t('invites.inbox.title')} className={styles.panel}>
-        <PanelHeader count={null} />
-        <Skeleton className={styles.loadingSkeleton} />
-        <Skeleton className={styles.loadingSkeleton} />
-      </aside>
-    );
-  }
+  // Invites are occasional: the panel takes no room until one exists, and a
+  // loading placeholder would only flash before collapsing to nothing.
+  if (isLoading) return null;
 
   if (error) {
     const message = formatApiError(error, t, 'invites.inbox.load_error');
@@ -198,33 +191,27 @@ export default function PendingInvitesPanel(): ReactElement {
   }
 
   const invites = data ?? [];
+  // `entries` keeps the last invite mounted through its exit, so the panel
+  // closes only after that row has left.
+  if (entries.length === 0) return null;
 
   return (
     <aside aria-label={t('invites.inbox.title')} className={styles.panel}>
       <PanelHeader count={invites.length} />
-
-      {entries.length === 0 ? (
-        <Card>
-          <p className={styles.emptyMessage}>{t('invites.inbox.empty')}</p>
-        </Card>
-      ) : (
-        <>
-          <p className={styles.rsvpHint}>{t('invites.inbox.rsvp_hint')}</p>
-          <ul className={styles.inviteList}>
-            {entries.map(({ key, item, present }) => (
-              <PresenceItem
-                key={key}
-                as="li"
-                present={present}
-                onExited={() => onExited(key)}
-                className={motion.enter}
-              >
-                <InviteRow invite={item} />
-              </PresenceItem>
-            ))}
-          </ul>
-        </>
-      )}
+      <p className={styles.rsvpHint}>{t('invites.inbox.rsvp_hint')}</p>
+      <ul className={styles.inviteList}>
+        {entries.map(({ key, item, present }) => (
+          <PresenceItem
+            key={key}
+            as="li"
+            present={present}
+            onExited={() => onExited(key)}
+            className={motion.enter}
+          >
+            <InviteRow invite={item} />
+          </PresenceItem>
+        ))}
+      </ul>
     </aside>
   );
 }

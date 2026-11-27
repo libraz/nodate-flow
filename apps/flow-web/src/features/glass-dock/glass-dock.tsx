@@ -1,11 +1,10 @@
 /**
- * GlassDock — fixed bottom-right pill that surfaces pending AI suggestions.
- *
- * Collapsed: a small button showing the Sparkles icon + a count badge.
- * Expanded: a ~360px panel listing recent suggestions across the active
- * workspace, sourced from `useAiSuggestionsQuery` which polls the backend
- * every 30s. Apply / dismiss persist via the AI suggestions endpoints so
- * the dock reflects cross-device activity.
+ * AI suggestions panel — opened from the glass dock's AI button
+ * (`components/layout/glass-dock.tsx`) through `useAiPanelStore`, and
+ * anchored just above the dock so the bottom edge carries one floating
+ * layer. Lists recent suggestions across the active workspace, sourced
+ * from `useAiSuggestionsQuery`. Apply / dismiss persist via the AI
+ * suggestions endpoints so the panel reflects cross-device activity.
  */
 
 import { useFocusTrap } from '@nodate-flow/ui/hooks/use-focus-trap';
@@ -44,6 +43,7 @@ import { useWorkspaceStream } from '../realtime/use-workspace-stream';
 import { type TaskReminder, useRemindersQuery } from '../reminders/api';
 import type { TaskDerivedState, TaskPriority } from '../tasks/api';
 import { setTaskFilters } from '../tasks/use-task-filters';
+import { AI_PANEL_ID, useAiPanelStore } from './ai-panel-store';
 import styles from './glass-dock.module.css';
 
 const NL_UNPARSEABLE = 'AI.NL_QUERY.UNPARSEABLE';
@@ -610,12 +610,13 @@ function AutoActionsPanel({
   );
 }
 
-function GlassDockImpl(): ReactElement {
+function GlassDockImpl(): ReactElement | null {
   const { t } = useTranslation('ai-suggestions');
   const { t: tCommon } = useTranslation('common');
   const { t: tInbox } = useTranslation('inbox');
   const navigate = useNavigate();
-  const [open, setOpen] = useState(false);
+  const open = useAiPanelStore((state) => state.open);
+  const closePanel = useAiPanelStore((state) => state.close);
   const [editingSuggestion, setEditingSuggestion] = useState<Suggestion | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const panelPresence = usePresence<HTMLDivElement>(open);
@@ -642,13 +643,9 @@ function GlassDockImpl(): ReactElement {
 
   useFocusTrap(panelRef, open);
 
-  // Set when the panel closes so the pill that replaces it takes focus back.
-  const restoreFocusRef = useRef(false);
-
-  const handleToggle = (): void => {
-    restoreFocusRef.current = open;
-    if (open) setEditingSuggestion(null);
-    setOpen((prev) => !prev);
+  const handleClose = (): void => {
+    setEditingSuggestion(null);
+    closePanel();
   };
 
   const handleApply = (suggestion: Suggestion): void => {
@@ -684,26 +681,6 @@ function GlassDockImpl(): ReactElement {
       </span>
     ) : null;
 
-  const pill = open ? null : (
-    <button
-      ref={(el) => {
-        if (el && restoreFocusRef.current) {
-          restoreFocusRef.current = false;
-          el.focus();
-        }
-      }}
-      type="button"
-      onClick={handleToggle}
-      aria-expanded={false}
-      aria-label={t('glass_dock.expand')}
-      className={cx(styles.pill, 'nf-focus-ring')}
-    >
-      <Icon icon={Sparkles} decorative />
-      <span className={styles.pillLabel}>{t('glass_dock.title')}</span>
-      {countBadge}
-    </button>
-  );
-
   const panel = (
     <div
       ref={(node) => {
@@ -711,6 +688,7 @@ function GlassDockImpl(): ReactElement {
         panelPresence.ref(node);
       }}
       data-state={panelPresence.state}
+      id={AI_PANEL_ID}
       inert={!open}
       role="region"
       aria-label={t('glass_dock.title')}
@@ -718,8 +696,7 @@ function GlassDockImpl(): ReactElement {
       onKeyDown={(e) => {
         if (e.key === 'Escape') {
           e.stopPropagation();
-          restoreFocusRef.current = true;
-          setOpen(false);
+          handleClose();
         }
       }}
     >
@@ -732,8 +709,7 @@ function GlassDockImpl(): ReactElement {
         </div>
         <button
           type="button"
-          onClick={handleToggle}
-          aria-expanded={true}
+          onClick={handleClose}
           aria-label={t('glass_dock.collapse')}
           className={cx(styles.close, 'nf-focus-ring')}
         >
@@ -741,7 +717,6 @@ function GlassDockImpl(): ReactElement {
         </button>
       </div>
       <div className={styles.body}>
-        <p className={styles.description}>{t('glass_dock.description')}</p>
         <NlQueryPanel workspaceId={workspaceId} />
         <AutoActionsPanel workspaceId={workspaceId} />
         <RemindersPanel workspaceId={workspaceId} />
@@ -784,19 +759,14 @@ function GlassDockImpl(): ReactElement {
     </div>
   );
 
-  return (
-    <>
-      {pill}
-      {panelPresence.mounted ? panel : null}
-    </>
-  );
+  return panelPresence.mounted ? panel : null;
 }
 
 /**
  * GlassDock — default export wraps the real implementation in a local
- * ErrorBoundary. The dock is decorative; if anything inside throws
+ * ErrorBoundary. The panel is decorative; if anything inside throws
  * synchronously (a sibling hook blows up, a query escalates past the
- * per-query `throwOnError: false` opt-out, etc.) the dock silently
+ * per-query `throwOnError: false` opt-out, etc.) the panel silently
  * disappears instead of collapsing the entire authenticated route to
  * the root FatalFallback.
  */

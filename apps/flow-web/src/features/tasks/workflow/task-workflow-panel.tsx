@@ -9,7 +9,7 @@ import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import Textarea from '@nodate-flow/ui/primitives/textarea';
 import { QueryErrorResetBoundary, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, UserCheck } from 'lucide-react';
 import { type FormEvent, type ReactElement, Suspense, useEffect, useRef, useState } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { useTranslation } from 'react-i18next';
@@ -102,12 +102,14 @@ function getRoleActors(actors: TaskActor[]): TaskActor[] {
   return actors.filter((actor) => actor.role === 'reviewer' || actor.role === 'approver');
 }
 
+/** Stands in for the compact button most tasks settle on: manual completion, nothing in review. */
 function LoadingCard(): ReactElement {
   return (
-    <section className={css.card}>
-      <Skeleton style={{ blockSize: 'var(--nf-space-5)', inlineSize: '65%' }} />
-      <Skeleton style={{ blockSize: 'var(--nf-space-4)', inlineSize: '45%' }} />
-    </section>
+    <div data-compact="">
+      <Skeleton
+        style={{ blockSize: 'var(--nf-space-8)', inlineSize: 'calc(var(--nf-space-8) * 4)' }}
+      />
+    </div>
   );
 }
 
@@ -222,6 +224,12 @@ function TaskWorkflowPanelContent({
   const handoffDecisionMutation = useDecideHandoff();
   const evaluateConstraints = useEvaluateConstraints();
   const [expanded, setExpanded] = useState(false);
+  // Set once the user toggles, so the control that replaces the clicked one takes focus.
+  const [toggled, setToggled] = useState(false);
+  const toggleExpanded = (): void => {
+    setToggled(true);
+    setExpanded((value) => !value);
+  };
   const [criteriaText, setCriteriaText] = useState('');
   const [evidenceText, setEvidenceText] = useState('');
   const [selectedReviewerId, setSelectedReviewerId] = useState('');
@@ -322,12 +330,11 @@ function TaskWorkflowPanelContent({
   }
   if (workflowQuery.isPending || !snapshot) {
     return (
-      <section className={css.card}>
-        <TaskSectionHeading title={t('taskWorkflow.title')} />
-        <p role="status" className={css.muted}>
-          {t('taskWorkflow.loading')}
-        </p>
-      </section>
+      <div data-compact="" role="status" aria-label={t('taskWorkflow.loading')}>
+        <Skeleton
+          style={{ blockSize: 'var(--nf-space-8)', inlineSize: 'calc(var(--nf-space-8) * 4)' }}
+        />
+      </div>
     );
   }
 
@@ -346,6 +353,25 @@ function TaskWorkflowPanelContent({
     snapshot.capabilities.canDecideCurrentSubmission;
   const hasActiveReview =
     snapshot.completionPolicy === 'review_required' || Boolean(submission) || submissionIsStale;
+  const hasPendingHandoff = (snapshot.handoffs ?? []).some(
+    (handoff) => handoff.status === 'pending',
+  );
+
+  // Manual completion with nothing in flight: one button in the page's "Add to this task" row.
+  if (!expanded && !hasActiveReview && !hasPendingHandoff) {
+    return (
+      <div data-compact="">
+        <TaskActionButton
+          icon={<UserCheck size={14} aria-hidden />}
+          aria-expanded={false}
+          autoFocus={toggled}
+          onClick={toggleExpanded}
+        >
+          {t('taskWorkflow.title')}
+        </TaskActionButton>
+      </div>
+    );
+  }
 
   const handleSetPolicy = async (policy: 'manual' | 'review_required'): Promise<void> => {
     setActionError(null);
@@ -511,7 +537,8 @@ function TaskWorkflowPanelContent({
               expanded ? <ChevronUp size={14} aria-hidden /> : <ChevronDown size={14} aria-hidden />
             }
             aria-expanded={expanded}
-            onClick={() => setExpanded((value) => !value)}
+            autoFocus={toggled}
+            onClick={toggleExpanded}
           >
             {expanded ? t('taskWorkflow.collapse') : t('taskWorkflow.expand')}
           </TaskActionButton>

@@ -346,30 +346,28 @@ function BoardColumn({
       data-state={list.state}
       data-drop={drop}
     >
-      <Card className={css.headerCard}>
-        <header className={css.columnHeader}>
-          <span className={css.columnHeaderLabel}>{stateLabel}</span>
-          {hoveredVerb ? (
-            <span className={css.dropHint} aria-hidden="true">
-              {t('tasks.board.dnd.drop_hint', { verb: t(TRANSITION_KEY[hoveredVerb]) })}
-            </span>
-          ) : (
-            <span className={css.columnHeaderCount}>{count}</span>
-          )}
-          {onCollapse ? (
-            <button
-              type="button"
-              className={css.railToggle}
-              aria-expanded="true"
-              aria-label={t('tasks.board.rail.collapse', { state: stateLabel })}
-              title={t('tasks.board.rail.collapse', { state: stateLabel })}
-              onClick={onCollapse}
-            >
-              <PanelRightClose size={16} aria-hidden />
-            </button>
-          ) : null}
-        </header>
-      </Card>
+      <header className={css.columnHeader}>
+        <span className={css.columnHeaderLabel}>{stateLabel}</span>
+        {hoveredVerb ? (
+          <span className={css.dropHint} aria-hidden="true">
+            {t('tasks.board.dnd.drop_hint', { verb: t(TRANSITION_KEY[hoveredVerb]) })}
+          </span>
+        ) : (
+          <span className={css.columnHeaderCount}>{count}</span>
+        )}
+        {onCollapse ? (
+          <button
+            type="button"
+            className={css.railToggle}
+            aria-expanded="true"
+            aria-label={t('tasks.board.rail.collapse', { state: stateLabel })}
+            title={t('tasks.board.rail.collapse', { state: stateLabel })}
+            onClick={onCollapse}
+          >
+            <PanelRightClose size={16} aria-hidden />
+          </button>
+        ) : null}
+      </header>
       <div className={css.zone}>
         <BoardColumnList {...list} />
       </div>

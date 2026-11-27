@@ -468,96 +468,92 @@ function GanttView(): ReactElement {
 
   return (
     <section className={styles.root}>
-      <ProjectSectionHeader
-        title={t('gantt.title')}
-        help="project-gantt"
-        description={t('gantt.description')}
-        actions={
-          <div className={styles.controls}>
-            <div className={styles.group}>
-              <Tooltip content={t('gantt.prev')}>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  aria-label={t('gantt.prev')}
-                  onClick={goPrev}
-                  disabled={offsetDays === 0}
-                >
-                  <ChevronLeft size={16} aria-hidden />
-                </Button>
-              </Tooltip>
-              <Button type="button" variant="ghost" onClick={goToday}>
-                {t('gantt.today')}
+      <ProjectSectionHeader title={t('gantt.title')}>
+        <div className={styles.controls}>
+          <div className={styles.group}>
+            <Tooltip content={t('gantt.prev')}>
+              <Button
+                type="button"
+                variant="ghost"
+                aria-label={t('gantt.prev')}
+                onClick={goPrev}
+                disabled={offsetDays === 0}
+              >
+                <ChevronLeft size={16} aria-hidden />
               </Button>
-              <Tooltip content={t('gantt.next')}>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  aria-label={t('gantt.next')}
-                  onClick={goNext}
-                  disabled={offsetDays >= Math.max(0, totalDays - visibleDays)}
-                >
-                  <ChevronRight size={16} aria-hidden />
-                </Button>
-              </Tooltip>
-            </div>
-
-            <div className={styles.group}>
-              <Tooltip content={t('gantt.zoom_out')}>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  aria-label={t('gantt.zoom_out')}
-                  onClick={() => zoomTo(zoomIdx - 1)}
-                  disabled={zoomIdx === 0}
-                >
-                  <Minus size={14} aria-hidden />
-                </Button>
-              </Tooltip>
-              {/*
-               * View selector: Month / Week / Day as a segmented control
-               * (WAI-ARIA radiogroup). After a step zoom no segment is
-               * selected, so every preset stays clickable.
-               */}
-              <SegmentedControl<ZoomPreset>
-                ariaLabel={t('gantt.zoom_preset_aria')}
-                size="sm"
-                value={zoomPresetFromIndex(zoomIdx) ?? null}
-                onChange={(next) => zoomTo(ZOOM_PRESET_INDEX[next])}
-                options={[
-                  { value: 'month', label: t('gantt.zoom_month') },
-                  { value: 'week', label: t('gantt.zoom_week') },
-                  { value: 'day', label: t('gantt.zoom_day') },
-                ]}
-              />
-              <Tooltip content={t('gantt.zoom_in')}>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  aria-label={t('gantt.zoom_in')}
-                  onClick={() => zoomTo(zoomIdx + 1)}
-                  disabled={zoomIdx === ZOOM_LEVELS.length - 1}
-                >
-                  <Plus size={14} aria-hidden />
-                </Button>
-              </Tooltip>
-            </div>
-
-            {/* Critical path toggle (doubles as a legend: accent matches bar stroke). */}
-            <div className={styles.group}>
-              <Tooltip content={t('gantt.critical_path_hint')}>
-                <ToggleChip
-                  pressed={showCriticalPath}
-                  onPressedChange={setShowCriticalPath}
-                  color={CRITICAL_PATH_COLOR}
-                >
-                  {t('gantt.critical_path')}
-                </ToggleChip>
-              </Tooltip>
-            </div>
+            </Tooltip>
+            <Button type="button" variant="ghost" onClick={goToday}>
+              {t('gantt.today')}
+            </Button>
+            <Tooltip content={t('gantt.next')}>
+              <Button
+                type="button"
+                variant="ghost"
+                aria-label={t('gantt.next')}
+                onClick={goNext}
+                disabled={offsetDays >= Math.max(0, totalDays - visibleDays)}
+              >
+                <ChevronRight size={16} aria-hidden />
+              </Button>
+            </Tooltip>
           </div>
-        }
-      />
+
+          <div className={styles.group}>
+            <Tooltip content={t('gantt.zoom_out')}>
+              <Button
+                type="button"
+                variant="ghost"
+                aria-label={t('gantt.zoom_out')}
+                onClick={() => zoomTo(zoomIdx - 1)}
+                disabled={zoomIdx === 0}
+              >
+                <Minus size={14} aria-hidden />
+              </Button>
+            </Tooltip>
+            {/*
+             * View selector: Month / Week / Day as a segmented control
+             * (WAI-ARIA radiogroup). After a step zoom no segment is
+             * selected, so every preset stays clickable.
+             */}
+            <SegmentedControl<ZoomPreset>
+              ariaLabel={t('gantt.zoom_preset_aria')}
+              size="sm"
+              value={zoomPresetFromIndex(zoomIdx) ?? null}
+              onChange={(next) => zoomTo(ZOOM_PRESET_INDEX[next])}
+              options={[
+                { value: 'month', label: t('gantt.zoom_month') },
+                { value: 'week', label: t('gantt.zoom_week') },
+                { value: 'day', label: t('gantt.zoom_day') },
+              ]}
+            />
+            <Tooltip content={t('gantt.zoom_in')}>
+              <Button
+                type="button"
+                variant="ghost"
+                aria-label={t('gantt.zoom_in')}
+                onClick={() => zoomTo(zoomIdx + 1)}
+                disabled={zoomIdx === ZOOM_LEVELS.length - 1}
+              >
+                <Plus size={14} aria-hidden />
+              </Button>
+            </Tooltip>
+          </div>
+
+          {/* Critical path toggle (doubles as a legend: accent matches bar stroke). */}
+          <div className={styles.group}>
+            <Tooltip content={t('gantt.critical_path_hint')}>
+              <ToggleChip
+                pressed={showCriticalPath}
+                onPressedChange={setShowCriticalPath}
+                color={CRITICAL_PATH_COLOR}
+                tone="tint"
+              >
+                {t('gantt.critical_path')}
+              </ToggleChip>
+            </Tooltip>
+          </div>
+        </div>
+      </ProjectSectionHeader>
 
       {scheduled.length === 0 ? (
         <EmptyState titleAs="p" title={t('gantt.empty')} />

@@ -29,17 +29,6 @@
   border-color: var(--nf-color-border);
 }
 
-/* Overdue: full hairline border plus a light tint, never an edge stripe. */
-.itemOverdue,
-.itemOverdue:hover {
-  background: var(--nf-color-danger-subtle);
-  border-color: color-mix(in oklch, var(--nf-color-danger) 30%, transparent);
-}
-
-.itemOverdue:hover {
-  border-color: var(--nf-color-danger);
-}
-
 /* The link covers the title area, so the hit target matches what looks clickable. */
 .row {
   display: flex;

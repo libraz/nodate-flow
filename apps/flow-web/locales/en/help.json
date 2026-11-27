@@ -16,7 +16,7 @@
       "t2": "Suggested actions, Reminders and Suggested next steps list tasks worth a look. Click one to open the task and decide.",
       "t3": "Suggestions come from Triage with AI in the Inbox. Apply opens the task, or snoozes or archives the inbox item, right away.",
       "t4": "Edit changes the action or the reasoning before you apply. Dismiss removes the suggestion.",
-      "t5": "The number on the pill is how many suggestions are waiting. Esc closes the panel."
+      "t5": "The number on the dock's AI button is how many suggestions are waiting. Esc closes the panel."
     }
   },
   "calendar": {

@@ -106,7 +106,6 @@
     "remove": "Remove from favorites",
     "added": "Added to favorites",
     "removed": "Removed from favorites",
-    "empty": "No favorites yet. Select the star on a project or task to pin it to the sidebar.",
     "error_add": "Could not add to favorites. Please try again.",
     "error_remove": "Could not remove from favorites. Please try again.",
     "sidebar_title": "Favorites",

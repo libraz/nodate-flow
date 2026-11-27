@@ -52,9 +52,84 @@
   padding-block-end: 0;
 }
 
-/* A related section with nothing in it is only its heading row: half the padding. */
-.relatedSection:has([data-empty]) {
-  padding-block: var(--nf-space-3);
+/*
+ * Secondary sections share one group. A section with items is a full-width row
+ * (DOM order, hairline between neighbours); an empty one is a `data-compact`
+ * button, and those collect after the full rows into one "Add to this task" line.
+ */
+.section.addGroup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: var(--nf-space-1);
+  padding-block: 0;
+}
+
+.addItem {
+  flex: 1 0 100%;
+  min-inline-size: 0;
+  padding-block: var(--nf-space-6);
+}
+
+.addItem:empty {
+  display: none;
+}
+
+.addItem:has(> :not([data-compact])) ~ .addItem:has(> :not([data-compact])) {
+  border-block-start: var(--nf-space-px) solid var(--nf-color-hairline);
+}
+
+.addItem:has(> [data-compact]) {
+  flex: 0 0 auto;
+  order: 1;
+  padding-block: var(--nf-space-1);
+}
+
+/* The add row's own breathing room, kept out of the items so a wrapped row stays tight. */
+.addGroup:has(> .addItem > [data-compact]) {
+  padding-block-end: var(--nf-space-2);
+}
+
+.addGroup:has(> .addItem > [data-compact]):not(:has(> .addItem > :not([data-compact]))) {
+  padding-block-start: var(--nf-space-2);
+}
+
+/* Quiet: muted until hovered, so the row does not compete with the work above it. */
+.addItem > [data-compact] button {
+  color: var(--nf-color-fg-muted);
+}
+
+.addItem > [data-compact] button:hover:not(:disabled),
+.addItem > [data-compact] button:focus-visible {
+  color: var(--nf-color-fg);
+}
+
+.addLabel,
+.addBreak {
+  display: none;
+  order: 1;
+}
+
+.addGroup:has(> .addItem > [data-compact]) > .addLabel {
+  display: inline-flex;
+  margin-inline-end: var(--nf-space-1);
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+  white-space: nowrap;
+}
+
+/* A hairline starts the add row, but only when full sections sit above it. */
+.addGroup:has(> .addItem > [data-compact]):has(> .addItem > :not([data-compact])) > .addBreak {
+  display: block;
+  flex: 1 0 100%;
+  margin-block-end: var(--nf-space-2);
+  border-block-start: var(--nf-space-px) solid var(--nf-color-hairline);
+}
+
+.addSkeleton {
+  /* nf-token-override: matches one small action button */
+  inline-size: 6rem;
+  block-size: var(--nf-space-8);
 }
 
 .tabCount {
@@ -132,10 +207,11 @@
   line-height: 1.7;
 }
 
-/* Reactions close the card, set off by a hairline. */
+/* Reactions close the card, set off by a hairline; the add button's icon lines up with the body text. */
 .reactions {
-  padding-block-start: var(--nf-space-3);
+  padding-block-start: var(--nf-space-2);
   border-block-start: var(--nf-space-px) solid var(--nf-color-hairline);
+  margin-inline-start: calc(var(--nf-space-2) * -1);
 }
 
 /* The loading shell mirrors the two-column page so arrival does not reflow it. */
@@ -289,8 +365,10 @@
 
 /* ── Sidebar cards ─────────────────────────────────────────────── */
 
+/* The ghost button's icon lines up with the value column's text edge. */
 .startAligned {
   align-self: flex-start;
+  margin-inline-start: calc(var(--nf-space-3) * -1);
 }
 
 /* ── Narrow-screen metadata strip ──────────────────────────────── */
@@ -413,33 +491,13 @@
 
 /* ── Sidebar ───────────────────────────────────────────────────── */
 
+/* Scrolls with the page: a capped sticky column clipped its last card with no visible scroll cue. */
 .aside {
   display: flex;
   flex-direction: column;
   gap: var(--nf-space-4);
-  position: sticky;
-  inset-block-start: var(--nf-space-2);
   align-self: start;
-  max-block-size: calc(
-    100dvh -
-    var(--nf-topbar-height, 3.5rem) -
-    var(--nf-dock-clearance, 0px) -
-    var(--nf-space-page) -
-    3 *
-    var(--nf-space-2)
-  );
-  overflow-y: auto;
-  scrollbar-width: thin;
-}
-
-/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
-@media (max-width: 639px) {
-  /* One column: the sidebar follows the main column instead of floating beside it. */
-  .aside {
-    position: static;
-    max-block-size: none;
-    overflow-y: visible;
-  }
+  min-inline-size: 0;
 }
 
 .propRow {

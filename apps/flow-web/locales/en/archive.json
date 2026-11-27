@@ -1,7 +1,6 @@
 {
   "page": {
     "title": "Archive",
-    "subtitle": "Tasks and projects you've stored away. Nothing is gone.",
     "countWithLast": "{count, plural, one {# task} other {# tasks}} · last archived {ago}"
   },
   "filters": {

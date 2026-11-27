@@ -272,7 +272,18 @@ export default function DashboardView({
           <h2 className={styles.title}>{t('title')}</h2>
           <p className={styles.scope}>{t('scope', { name: workspaceName })}</p>
         </div>
+        {/* Adding a widget is a layout edit, so it only appears in edit mode. */}
         <div className={styles.actions}>
+          {editing ? (
+            <Button
+              onClick={() => {
+                setDialogOpen(true);
+              }}
+            >
+              <Icon icon={Plus} decorative size={14} />
+              {t('add_widget')}
+            </Button>
+          ) : null}
           <Button
             variant={editing ? 'primary' : 'ghost'}
             onClick={() => {
@@ -281,15 +292,6 @@ export default function DashboardView({
           >
             <Icon icon={Pencil} decorative size={14} />
             {editing ? t('done_editing') : t('edit_layout')}
-          </Button>
-          <Button
-            variant="primary"
-            onClick={() => {
-              setDialogOpen(true);
-            }}
-          >
-            <Icon icon={Plus} decorative size={14} />
-            {t('add_widget')}
           </Button>
         </div>
       </div>

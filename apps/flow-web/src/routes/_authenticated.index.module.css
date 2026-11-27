@@ -1,4 +1,4 @@
-/* Authenticated home — greeting, quick actions, task summary, workspaces, widgets. */
+/* Authenticated home — greeting, count strip, task summary, workspaces, widgets. */
 
 .sectionTitle {
   margin: 0 0 var(--nf-space-3);
@@ -9,96 +9,86 @@
   color: var(--nf-color-fg-muted);
 }
 
-/* ── Quick actions ─────────────────────────────── */
+/* ── Count strip ───────────────────────────────── */
 
-.quickActions {
-  display: flex;
-  gap: var(--nf-space-2);
-  flex-wrap: wrap;
-}
-
-/* ── Stats ─────────────────────────────────────── */
-
+/* One bordered strip split into equal cells; each cell links into My tasks. */
 .stats {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
-  gap: var(--nf-space-3);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-lg);
+  background: var(--nf-color-surface);
+  overflow: hidden;
 }
 
-/* Scope note under the stat row: which tasks the four counts cover. */
-.statHint {
-  margin: calc(var(--nf-space-2) * -1) 0 0;
-  font-size: var(--nf-text-supporting);
-  color: var(--nf-color-fg-muted);
-}
-
-/* Replays the swap from the skeleton row to the real cards. */
+/* Replays the swap from the skeleton strip to the real counts. */
 .statsEnter {
   animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
 }
 
 .stat {
   display: flex;
-  align-items: center;
-  gap: var(--nf-space-3);
-  padding-block: var(--nf-space-4);
-  padding-inline: var(--nf-space-5);
-  border-radius: var(--nf-radius-lg);
-  border: var(--nf-space-px) solid var(--nf-color-border);
-  background: var(--nf-color-surface);
-}
-
-/* Full hairline border plus a light tint, in the tone's own colour. */
-.statIcon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  /* nf-token-override: component dimension, not a spacing step */
-  inline-size: 2.5rem;
-  /* nf-token-override: component dimension, not a spacing step */
-  block-size: 2.5rem;
-  flex-shrink: 0;
-  border-radius: var(--nf-radius-md);
-  border: var(--nf-space-px) solid color-mix(in oklch, currentColor 25%, transparent);
-  background: var(--nf-color-accent-subtle);
-  color: var(--nf-color-accent-fg);
-}
-
-.statIconDanger {
-  background: var(--nf-color-danger-subtle);
-  color: var(--nf-color-danger-fg);
-}
-
-.statIconWarning {
-  background: var(--nf-color-warning-subtle);
-  color: var(--nf-color-warning-fg);
-}
-
-.statIconSuccess {
-  background: var(--nf-color-success-subtle);
-  color: var(--nf-color-success-fg);
-}
-
-.statText {
+  align-items: baseline;
+  gap: var(--nf-space-2);
   min-inline-size: 0;
+  padding-block: var(--nf-space-3);
+  padding-inline: var(--nf-space-4);
+  color: var(--nf-color-fg);
+  text-decoration: none;
+  transition: background-color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.stat + .stat {
+  border-inline-start: var(--nf-space-px) solid var(--nf-color-border);
+}
+
+.stat:hover {
+  background: var(--nf-color-surface-hover);
 }
 
 .statValue {
-  font-size: var(--nf-text-2xl);
-  font-weight: var(--nf-weight-bold);
+  font-size: var(--nf-text-xl);
+  font-weight: var(--nf-weight-semibold);
   line-height: var(--nf-leading-tight);
   font-variant-numeric: tabular-nums;
 }
 
+.statValueDanger {
+  color: var(--nf-color-danger-fg);
+}
+
 .statLabel {
-  margin-block-start: var(--nf-space-0-5);
-  font-size: var(--nf-text-xs);
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--nf-text-supporting);
   color: var(--nf-color-fg-muted);
 }
 
+/* Two by two on a phone, so each label keeps room next to its number. */
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
+@media (max-width: 639px) {
+  .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .stat + .stat {
+    border-inline-start: none;
+  }
+
+  .stat:nth-child(even) {
+    border-inline-start: var(--nf-space-px) solid var(--nf-color-border);
+  }
+
+  .stat:nth-child(n + 3) {
+    border-block-start: var(--nf-space-px) solid var(--nf-color-border);
+  }
+}
+
 .statSkeleton {
-  /* nf-token-override: placeholder sized to the stat card it stands in for */
-  block-size: 4.625rem;
+  /* nf-token-override: placeholder sized to the count strip it stands in for */
+  block-size: 3.25rem;
   border-radius: var(--nf-radius-lg);
 }
 
@@ -110,6 +100,11 @@
 }
 
 /* ── Recent tasks ──────────────────────────────── */
+
+/* Scoped under the list so it outranks the shared row's muted due colour. */
+.recentList .dueOverdue {
+  color: var(--nf-color-danger-fg);
+}
 
 .viewAll {
   display: inline-block;
@@ -144,20 +139,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.workspaceSkeleton {
-  block-size: var(--nf-control-height);
-  /* nf-token-override: placeholder sized to the workspace chip it stands in for */
-  inline-size: 9rem;
-  border-radius: var(--nf-radius-md);
-}
-
-.emptyTasks {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--nf-space-3);
 }
 
 .mutedText {

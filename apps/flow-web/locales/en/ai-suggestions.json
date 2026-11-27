@@ -111,8 +111,7 @@
       "dismiss_failed": "Could not dismiss the suggestion",
       "edit_failed": "Could not save the suggestion",
       "identity_changed": "Your account or workspace changed. Reopen the suggestion before trying again."
-    },
-    "description": "Describe tasks in plain language to filter them, and review what AI proposes for this workspace. Nothing changes until you apply a suggestion."
+    }
   },
   "state_suggestions": {
     "title": "Suggested next steps"

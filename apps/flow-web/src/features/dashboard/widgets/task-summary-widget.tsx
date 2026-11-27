@@ -51,7 +51,11 @@ function TaskSummaryBody({ workspaceId }: { workspaceId: string }): ReactElement
           </div>
         ))}
       </dl>
-      <Link to="/workspaces/$id/projects" params={{ id: workspaceId }} className={styles.seeAll}>
+      <Link
+        to="/workspaces/$id/projects"
+        params={{ id: workspaceId }}
+        className={styles.seeAllInline}
+      >
         {t('widgets.see_all')}
       </Link>
     </div>

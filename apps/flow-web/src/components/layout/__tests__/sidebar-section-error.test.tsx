@@ -128,7 +128,7 @@ describe('sidebar workspace section failure', () => {
 
     expect(await screen.findByRole('heading', { name: 'Acme' })).toBeTruthy();
     expect(screen.getByRole('link', { name: /nav\.today/ })).toBeTruthy();
-    expect(screen.getByRole('link', { name: /nav\.members/ })).toBeTruthy();
+    expect(screen.getByRole('link', { name: /nav\.pages/ })).toBeTruthy();
   });
 });
 

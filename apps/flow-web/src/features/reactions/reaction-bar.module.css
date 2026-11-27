@@ -94,7 +94,12 @@
   cursor: progress;
 }
 
-.addIcon {
-  inline-size: var(--nf-space-4);
-  block-size: var(--nf-space-4);
+/* Square icon button in the muted tone, so it reads as a control rather than content. */
+.add {
+  padding-inline: var(--nf-space-2);
+  color: var(--nf-color-fg-muted);
+}
+
+.add:hover:not(:disabled) {
+  color: var(--nf-color-fg);
 }

@@ -4,8 +4,8 @@
   display: grid;
   grid-auto-flow: column;
   /* nf-token-override: column min size keeps Japanese card titles on a readable measure */
-  grid-template-columns: repeat(var(--col-count, 5), minmax(17rem, 1fr));
-  gap: var(--nf-space-4);
+  grid-template-columns: repeat(var(--col-count, 5), minmax(15rem, 1fr));
+  gap: var(--nf-space-3);
   overflow-x: auto;
   scroll-snap-type: inline proximity;
   scroll-padding-inline: var(--nf-space-1);
@@ -23,7 +23,7 @@
 /* The collapsed Cancelled column is a narrow rail after the full columns. */
 .board[data-rail="true"] {
   /* nf-token-override: rail width, wide enough for its icon and a two-digit count */
-  grid-template-columns: repeat(var(--col-count, 4), minmax(17rem, 1fr)) 3.5rem;
+  grid-template-columns: repeat(var(--col-count, 4), minmax(15rem, 1fr)) 3.5rem;
 }
 
 /* The held card's cursor, inherited by the cards and links inside the board. */
@@ -40,19 +40,33 @@
   position: relative;
 }
 
+/* A plain row: the state name with its count beside it, the rail toggle at the end. */
 .columnHeader {
   display: flex;
-  justify-content: space-between;
+  flex-shrink: 0;
   align-items: center;
   gap: var(--nf-space-2);
+  min-block-size: var(--nf-space-8);
+  padding-inline: var(--nf-space-2);
 }
 
 .columnHeaderLabel {
+  font-size: var(--nf-text-sm);
   font-weight: var(--nf-weight-semibold);
 }
 
 .columnHeaderCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: var(--nf-space-5);
+  padding-inline: var(--nf-space-1-5);
+  border-radius: var(--nf-radius-pill);
+  background: var(--nf-color-bg-sunken);
   color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-xs);
+  font-weight: var(--nf-weight-medium);
+  line-height: var(--nf-leading-normal);
   font-variant-numeric: tabular-nums;
 }
 
@@ -128,6 +142,7 @@
 }
 
 .railToggle {
+  margin-inline-start: auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -210,12 +225,6 @@
 /* Inside a highlighted drop zone the zone's own outline is enough. */
 .column[data-drop] .emptyColumn {
   border-color: transparent;
-}
-
-.headerCard {
-  flex-shrink: 0;
-  padding: var(--nf-space-3) var(--nf-space-4);
-  background: var(--nf-color-surface);
 }
 
 /*

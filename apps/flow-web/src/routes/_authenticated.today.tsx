@@ -115,7 +115,7 @@ function TodayList({ items, isOverdue, stagger, locale }: TodayListProps): React
         return (
           <PresenceItem key={key} as="li" present={present} onExited={() => onExited(key)}>
             <div
-              className={cx(motion.enter, rowStyles.item, isOverdue(task) && rowStyles.itemOverdue)}
+              className={cx(motion.enter, rowStyles.item)}
               style={
                 {
                   ...stagger(index),
@@ -147,7 +147,7 @@ function TodayList({ items, isOverdue, stagger, locale }: TodayListProps): React
                 <span className={cx(rowStyles.context, rowStyles.contextHideNarrow)}>
                   {context}
                 </span>
-                <span className={rowStyles.due}>
+                <span className={cx(rowStyles.due, isOverdue(task) && styles.dueOverdue)}>
                   {task.dueOn ? formatDueDate(task.dueOn, locale) : t('today.no_due_label')}
                 </span>
               </Link>
@@ -210,7 +210,7 @@ function TodayRoute(): ReactElement {
 
   return (
     <PageFrame>
-      <PageHeader title={t('today.title')} description={t('today.subtitle')} help="my-tasks" />
+      <PageHeader title={t('today.title')} help="my-tasks" />
       <MyTasksFilterBar />
 
       <div className={styles.list} aria-busy={pending ? 'true' : undefined}>

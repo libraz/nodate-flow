@@ -1,38 +1,28 @@
 /**
- * Heading row for a project tab (Tasks, Gantt, Timeline): an h2 with its
- * help trigger and description on the start side, the tab's controls on the
- * end side. The project name above is the page's h1.
+ * Heading for a project tab (Tasks, Gantt, Timeline). The project name above
+ * is the page's h1 and the tab row already says which tab is open, so the h2
+ * is for assistive technology only; the tab's help lives behind the project
+ * header's "?". Children form the tab's single toolbar row.
  */
 
 import type { ReactElement, ReactNode } from 'react';
 
-import PageHelp from '../../components/page-help';
 import styles from './project-section-header.module.css';
 
 export interface ProjectSectionHeaderProps {
   title: string;
-  /** Topic in the `help` namespace. */
-  help: string;
-  description: string;
-  actions?: ReactNode;
+  /** The tab's toolbar controls; omit when the tab has none. */
+  children?: ReactNode;
 }
 
 export default function ProjectSectionHeader({
   title,
-  help,
-  description,
-  actions,
+  children,
 }: ProjectSectionHeaderProps): ReactElement {
   return (
-    <header className={styles.header}>
-      <div className={styles.heading}>
-        <div className={styles.titleRow}>
-          <h2 className={styles.title}>{title}</h2>
-          <PageHelp topic={help} />
-        </div>
-        <p className={styles.description}>{description}</p>
-      </div>
-      {actions ? <div className={styles.actions}>{actions}</div> : null}
-    </header>
+    <>
+      <h2 className={styles.title}>{title}</h2>
+      {children ? <div className={styles.toolbar}>{children}</div> : null}
+    </>
   );
 }

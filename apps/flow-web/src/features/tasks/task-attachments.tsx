@@ -7,7 +7,7 @@ import Button from '@nodate-flow/ui/primitives/button';
 import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import motion from '@nodate-flow/ui/styles/list-motion.module.css';
-import { Upload } from 'lucide-react';
+import { Paperclip, Upload } from 'lucide-react';
 import { type ChangeEvent, type ReactElement, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatApiError } from '../../lib/api-error';
@@ -139,48 +139,69 @@ export default function TaskAttachments({ taskId }: TaskAttachmentsProps): React
     }
   };
 
+  const fileInput = (
+    <input
+      ref={fileInputRef}
+      type="file"
+      hidden
+      onChange={(e) => {
+        void handleFileChange(e);
+      }}
+    />
+  );
+  const uploadLabel = presignUpload.isPending
+    ? t('tasks.attachments.uploading')
+    : t('tasks.attachments.upload');
+
+  // No files yet: one add button the detail page gathers into its "Add to this task" row.
+  if (entries.length === 0) {
+    return (
+      <div data-compact="">
+        {fileInput}
+        <TaskActionButton
+          icon={<Paperclip size={14} aria-hidden />}
+          aria-label={uploadLabel}
+          onClick={() => fileInputRef.current?.click()}
+          disabled={presignUpload.isPending}
+        >
+          {presignUpload.isPending
+            ? t('tasks.attachments.uploading')
+            : t('tasks.detail.add_to_task.attachment')}
+        </TaskActionButton>
+      </div>
+    );
+  }
+
   return (
-    <section className={css.section} data-empty={entries.length === 0 ? '' : undefined}>
+    <section className={css.section}>
       <TaskSectionHeading
         title={t('tasks.attachments.title')}
-        {...(entries.length === 0 ? { count: 0 } : {})}
         trailing={
           <div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              hidden
-              onChange={(e) => {
-                void handleFileChange(e);
-              }}
-            />
+            {fileInput}
             <TaskActionButton
               icon={<Upload size={14} aria-hidden />}
               onClick={() => fileInputRef.current?.click()}
               disabled={presignUpload.isPending}
             >
-              {presignUpload.isPending
-                ? t('tasks.attachments.uploading')
-                : t('tasks.attachments.upload')}
+              {uploadLabel}
             </TaskActionButton>
           </div>
         }
       />
-      {entries.length === 0 ? null : (
-        <ul className={css.list}>
-          {entries.map(({ key, item: a, present }) => (
-            <PresenceItem
-              key={key}
-              as="li"
-              present={present}
-              onExited={() => onExited(key)}
-              className={motion.enter}
-            >
-              <AttachmentRow attachment={a} taskId={taskId} locale={locale} />
-            </PresenceItem>
-          ))}
-        </ul>
-      )}
+      <ul className={css.list}>
+        {entries.map(({ key, item: a, present }) => (
+          <PresenceItem
+            key={key}
+            as="li"
+            present={present}
+            onExited={() => onExited(key)}
+            className={motion.enter}
+          >
+            <AttachmentRow attachment={a} taskId={taskId} locale={locale} />
+          </PresenceItem>
+        ))}
+      </ul>
     </section>
   );
 }
