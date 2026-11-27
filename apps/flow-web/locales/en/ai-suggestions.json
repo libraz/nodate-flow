@@ -64,6 +64,12 @@
       "systemPrompt_help": "Standing instructions the agent follows on every run, such as its role and the rules it must respect. It cannot be edited on this page after creation.",
       "model_help": "The model this agent runs on. The list comes from the AI providers added to this workspace."
     },
+    "model": {
+      "label": "Model",
+      "option": "{displayName} · {providerName}",
+      "unavailable": "{modelName} (unavailable)",
+      "update_failed": "Failed to change the model"
+    },
     "pause_help": "Pause stops this agent from running on any trigger, including Run now. Resume turns it back on."
   },
   "empty": "No suggestions yet",

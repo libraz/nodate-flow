@@ -119,6 +119,27 @@
     "default_badge": "默认",
     "default_note": "AI 功能使用标记为「默认」的服务商，即最近添加的那个。代理使用其所选模型对应的服务商。",
     "no_key": "无密钥",
-    "ollama_no_key_note": "本地 Ollama 无需 API 密钥。"
+    "ollama_no_key_note": "本地 Ollama 无需 API 密钥。",
+    "models": {
+      "title": "模型",
+      "empty": "尚未注册任何模型。请添加模型以使用此服务商。",
+      "default_badge": "默认",
+      "in_use": "{count, plural, one {# 个代理正在使用} other {# 个代理正在使用}}",
+      "disabled": "已停用",
+      "no_default": "未设置默认模型",
+      "set_default": "设为默认",
+      "enable_toggle": "启用 {name}",
+      "workspace_default_note": "命令解析和建议等 AI 功能使用此服务商的默认模型。",
+      "add": "添加模型",
+      "add_dialog": {
+        "title": "添加模型",
+        "name_label": "模型 ID",
+        "display_name_label": "显示名称（可选）",
+        "suggestions_label": "此密钥可访问的模型",
+        "suggestions_failed": "无法从服务商加载模型列表。仍可手动输入模型 ID。",
+        "suggestions_empty": "暂无建议。仍可手动输入模型 ID。",
+        "submit": "添加"
+      }
+    }
   }
 }

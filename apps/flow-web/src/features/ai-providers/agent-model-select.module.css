@@ -1,0 +1,7 @@
+/* Compact model picker that sits in an agent card header. */
+
+.select {
+  inline-size: auto;
+  max-inline-size: 100%;
+  font-size: var(--nf-text-xs);
+}

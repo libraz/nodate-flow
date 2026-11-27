@@ -29,6 +29,7 @@ import { type FormEvent, type ReactElement, Suspense, useId, useState } from 're
 import { useTranslation } from 'react-i18next';
 import FormActions from '../components/form-actions';
 import PageHeader from '../components/page-header';
+import AgentModelSelect from '../features/ai-providers/agent-model-select';
 import {
   AGENT_SCHEDULE_KINDS,
   type AgentScheduleKind,
@@ -163,7 +164,12 @@ function AgentsList({
                     {agent.paused ? t('agents.status.paused') : t('agents.status.active')}
                   </Badge>
                 </div>
-                <code className={styles.model}>{agent.modelName}</code>
+                <AgentModelSelect
+                  workspaceId={workspaceId}
+                  agentId={agent.id}
+                  modelId={agent.modelId}
+                  modelName={agent.modelName}
+                />
               </header>
               {agent.description ? <p className={styles.description}>{agent.description}</p> : null}
               <div className={styles.controls}>
@@ -443,7 +449,10 @@ function CreateAgentForm({
           >
             {models.models.map((m) => (
               <option key={m.id} value={m.id}>
-                {m.displayName} ({m.providerKind})
+                {t('agents.model.option', {
+                  displayName: m.displayName,
+                  providerName: m.providerName,
+                })}
               </option>
             ))}
           </Select>

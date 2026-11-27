@@ -1,0 +1,135 @@
+/* Models disclosure hanging off a provider row; no card of its own. */
+
+.root {
+  padding-block-start: var(--nf-space-2);
+  padding-inline: var(--nf-space-5);
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-3);
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+  padding: var(--nf-space-1) var(--nf-space-1);
+  border: 0;
+  border-radius: var(--nf-radius-sm);
+  background: transparent;
+  color: var(--nf-color-fg-muted);
+  font: inherit;
+  font-size: var(--nf-text-sm);
+  cursor: pointer;
+  transition: color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.toggle:hover {
+  color: var(--nf-color-fg);
+}
+
+.toggle:focus-visible {
+  outline: var(--nf-focus-ring-width) solid var(--nf-color-focus-ring);
+  outline-offset: var(--nf-focus-ring-offset);
+}
+
+.chevron {
+  transition: transform var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.toggle[aria-expanded="true"] .chevron {
+  transform: rotate(90deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chevron,
+  .toggle {
+    transition: none;
+  }
+}
+
+.count {
+  font-variant-numeric: tabular-nums;
+}
+
+.meta {
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+  padding-block-start: var(--nf-space-2);
+}
+
+.note {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nf-space-4);
+  flex-wrap: wrap;
+  padding-block: var(--nf-space-2);
+  border-block-start: var(--nf-space-px) solid var(--nf-color-hairline);
+}
+
+.item:first-child {
+  border-block-start: 0;
+}
+
+.identity {
+  display: flex;
+  align-items: baseline;
+  gap: var(--nf-space-2);
+  flex-wrap: wrap;
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+}
+
+.displayName {
+  color: var(--nf-color-fg);
+}
+
+.modelName {
+  font-family: var(--nf-font-mono);
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
+.item[data-disabled] .displayName {
+  color: var(--nf-color-fg-muted);
+}
+
+.state {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-3);
+}
+
+.footer {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.skeletonRow {
+  /* nf-token-override: placeholder sized to the row it stands in for, not a spacing step */
+  block-size: 2.25rem;
+  inline-size: 100%;
+}

@@ -119,6 +119,27 @@
     "default_badge": "Default",
     "default_note": "AI features use the provider marked Default, which is the most recently added one. An agent uses the provider of the model it was given.",
     "no_key": "No key",
-    "ollama_no_key_note": "Local Ollama needs no API key."
+    "ollama_no_key_note": "Local Ollama needs no API key.",
+    "models": {
+      "title": "Models",
+      "empty": "No models registered. Add one to use this provider.",
+      "default_badge": "Default",
+      "in_use": "{count, plural, one {Used by # agent} other {Used by # agents}}",
+      "disabled": "Disabled",
+      "no_default": "No default set",
+      "set_default": "Set as default",
+      "enable_toggle": "Enable {name}",
+      "workspace_default_note": "AI features such as command interpretation and suggestions use this provider's default model.",
+      "add": "Add model",
+      "add_dialog": {
+        "title": "Add model",
+        "name_label": "Model ID",
+        "display_name_label": "Display name (optional)",
+        "suggestions_label": "Models this key can see",
+        "suggestions_failed": "Could not load the model list from the provider. You can still type a model ID.",
+        "suggestions_empty": "No suggestions. You can still type a model ID.",
+        "submit": "Add"
+      }
+    }
   }
 }

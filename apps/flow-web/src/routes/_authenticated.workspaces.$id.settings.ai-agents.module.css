@@ -39,12 +39,6 @@
   min-inline-size: 0;
 }
 
-.model {
-  font-family: var(--nf-font-mono);
-  font-size: var(--nf-text-xs);
-  color: var(--nf-color-fg-muted);
-}
-
 .description {
   margin: 0;
   font-size: var(--nf-text-sm);

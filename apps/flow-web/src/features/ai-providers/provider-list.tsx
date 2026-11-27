@@ -28,6 +28,7 @@ import EmbeddingSettingsPanel from './embedding-settings';
 import MaskedKey from './masked-key';
 import ProviderAddDialog from './provider-add-dialog';
 import styles from './provider-list.module.css';
+import ProviderModels from './provider-models';
 import ProviderRotateDialog from './provider-rotate-dialog';
 
 const NO_PROVIDERS: readonly AiProvider[] = [];
@@ -223,6 +224,11 @@ export default function ProviderList({ workspaceId }: ProviderListProps): ReactE
                     </Button>
                   </div>
                 </div>
+                <ProviderModels
+                  workspaceId={workspaceId}
+                  providerId={p.id}
+                  isWorkspaceDefault={p.id === providers[0]?.id}
+                />
               </PresenceItem>
             ))}
           </ul>

@@ -119,6 +119,27 @@
     "default_badge": "既定",
     "default_note": "AI 機能は「既定」の付いたプロバイダ（最後に追加したもの）を使います。エージェントは、設定されたモデルのプロバイダを使います。",
     "no_key": "キーなし",
-    "ollama_no_key_note": "ローカルの Ollama では API キーは不要です。"
+    "ollama_no_key_note": "ローカルの Ollama では API キーは不要です。",
+    "models": {
+      "title": "モデル",
+      "empty": "モデルが登録されていません。このプロバイダを使うにはモデルを追加してください",
+      "default_badge": "既定",
+      "in_use": "{count, plural, one {# 個のエージェントが使用中} other {# 個のエージェントが使用中}}",
+      "disabled": "無効",
+      "no_default": "既定のモデルが未設定です",
+      "set_default": "既定にする",
+      "enable_toggle": "{name} を有効にする",
+      "workspace_default_note": "コマンドの解釈や提案などの AI 機能は、このプロバイダの既定モデルを使います。",
+      "add": "モデルを追加",
+      "add_dialog": {
+        "title": "モデルを追加",
+        "name_label": "モデル ID",
+        "display_name_label": "表示名（任意）",
+        "suggestions_label": "このキーで使えるモデル",
+        "suggestions_failed": "プロバイダからモデル一覧を読み込めませんでした。モデル ID は直接入力できます。",
+        "suggestions_empty": "候補はありません。モデル ID は直接入力できます。",
+        "submit": "追加"
+      }
+    }
   }
 }

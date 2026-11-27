@@ -1,0 +1,50 @@
+/* Add-model dialog: monospace ID field with a scrolling suggestion list beneath it. */
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-4);
+}
+
+.nameInput {
+  font-family: var(--nf-font-mono);
+}
+
+.suggestions {
+  list-style: none;
+  margin: 0;
+  padding: var(--nf-space-1);
+  /* nf-token-override: list height cap, not a spacing step */
+  max-block-size: 16rem;
+  overflow-y: auto;
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-md);
+  background: var(--nf-color-surface);
+}
+
+.option {
+  padding: var(--nf-space-1) var(--nf-space-3);
+  border-radius: var(--nf-radius-xs);
+  font-family: var(--nf-font-mono);
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg);
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.option:hover,
+.option[data-active] {
+  background: var(--nf-color-surface-hover);
+}
+
+.note {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--nf-space-2);
+}

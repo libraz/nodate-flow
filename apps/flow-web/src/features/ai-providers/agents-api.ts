@@ -6,6 +6,7 @@
  * surface instead of the raw fetch escape hatch.
  */
 
+import type { components } from '@nodate-flow/sdk';
 import {
   type UseMutationResult,
   type UseSuspenseQueryResult,
@@ -64,13 +65,7 @@ export function useAgentsQuery(
   });
 }
 
-export interface ModelSummary {
-  id: string;
-  name: string;
-  displayName: string;
-  providerId: string;
-  providerKind: string;
-}
+export type ModelSummary = components['schemas']['ModelSummary'];
 
 /** useModelsQuery lists every enabled ai_models row for a workspace. */
 export function useModelsQuery(
@@ -140,6 +135,7 @@ export function useCreateAgent(): UseMutationResult<AgentSummary, Error, CreateA
     },
     onSuccess: (_res, { workspaceId }) => {
       qc.invalidateQueries({ queryKey: agentsKeys.list(workspaceId) });
+      qc.invalidateQueries({ queryKey: ['ai-provider-models', workspaceId] });
     },
   });
 }

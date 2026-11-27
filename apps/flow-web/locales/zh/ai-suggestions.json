@@ -64,6 +64,12 @@
       "systemPrompt_help": "代理每次运行都遵循的固定指令，例如其角色和必须遵守的规则。创建后无法在此页面编辑。",
       "model_help": "该代理运行所用的模型。列表来自本工作区已添加的 AI 服务商。"
     },
+    "model": {
+      "label": "模型",
+      "option": "{displayName} · {providerName}",
+      "unavailable": "{modelName}（不可用）",
+      "update_failed": "更改模型失败"
+    },
     "pause_help": "暂停后，该代理不会因任何触发方式运行（包括「立即运行」）。点「恢复」重新启用。"
   },
   "empty": "暂无建议",
