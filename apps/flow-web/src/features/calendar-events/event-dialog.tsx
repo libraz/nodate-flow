@@ -18,7 +18,6 @@ import type { components } from '@nodate-flow/sdk';
 import type { RecurrenceRule } from '@nodate-flow/ui/calendar/types';
 import { usePresence } from '@nodate-flow/ui/hooks/use-presence';
 import Button from '@nodate-flow/ui/primitives/button';
-import Collapse from '@nodate-flow/ui/primitives/collapse';
 import Combobox from '@nodate-flow/ui/primitives/combobox';
 import DatePicker from '@nodate-flow/ui/primitives/date-picker';
 import Dialog from '@nodate-flow/ui/primitives/dialog';
@@ -27,13 +26,9 @@ import Input from '@nodate-flow/ui/primitives/input';
 import SegmentedControl, {
   type SegmentedControlOption,
 } from '@nodate-flow/ui/primitives/segmented-control';
-import Select from '@nodate-flow/ui/primitives/select';
 import Switch from '@nodate-flow/ui/primitives/switch';
-import Textarea from '@nodate-flow/ui/primitives/textarea';
 import TimePicker from '@nodate-flow/ui/primitives/time-picker';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
-import { ToggleChip, ToggleChipGroup } from '@nodate-flow/ui/primitives/toggle-chip';
-import Tooltip from '@nodate-flow/ui/primitives/tooltip';
 import type { Zone } from '@nodate-flow/ui/time';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -70,8 +65,7 @@ import { onSubmitShortcut } from '../../lib/submit-shortcut';
 import { useWeekStart } from '../../lib/use-week-start';
 import { selectUser, useAuth } from '../auth/auth-store';
 import { calendarLabelKeys } from '../calendars/labels-api';
-import { TASK_PRIORITIES, type TaskPriority } from '../tasks/api';
-import { PRIORITY_KEY } from '../tasks/constants';
+import type { TaskPriority } from '../tasks/api';
 import {
   type CreateEventInput,
   type PatchEventInput,
@@ -89,15 +83,14 @@ import {
 import AttendeesSection from './attendees-section';
 import CreatorChip from './creator-chip';
 import styles from './event-dialog.module.css';
+import EventDialogBlockFields from './event-dialog-block-fields';
+import EventDialogEventFields from './event-dialog-event-fields';
+import EventDialogMoreOptions from './event-dialog-more-options';
+import EventDialogTaskFields from './event-dialog-task-fields';
 import LabelPicker from './label-picker';
 import { type NotificationPreset, presetToMinutes } from './lib/notification-preset';
 import { displayEndDate, occurrenceRange } from './lib/occurrence-range';
-import {
-  presetToRRule,
-  type RecurrencePreset,
-  rruleToPreset,
-  weekdayName,
-} from './lib/recurrence-preset';
+import { presetToRRule, type RecurrencePreset, rruleToPreset } from './lib/recurrence-preset';
 import { useSlowPending } from './lib/use-slow-pending';
 import RecurringScopeDialog from './recurring-scope-dialog';
 
@@ -334,48 +327,6 @@ const TOAST_DELETED_KEYS = {
   free: 'toast.deleted.free',
   milestone: 'toast.deleted.milestone',
 } as const;
-
-const SHOW_AS_KEYS = {
-  busy: 'showAs.busy',
-  free: 'showAs.free',
-  tentative: 'showAs.tentative',
-  oof: 'showAs.oof',
-} as const satisfies Record<ShowAs, string>;
-
-const FLEXIBILITY_KEYS = {
-  fixed: 'flexibility.fixed',
-  negotiable: 'flexibility.negotiable',
-  conditional: 'flexibility.conditional',
-} as const satisfies Record<Flexibility, string>;
-
-const BLOCK_PRESET_KEYS = {
-  working: 'blockLabel.preset.working',
-  focus: 'blockLabel.preset.focus',
-  oof: 'blockLabel.preset.oof',
-  custom: 'blockLabel.preset.custom',
-} as const satisfies Record<BlockPreset, string>;
-
-const RECURRENCE_PRESET_KEYS = {
-  none: 'recurrence.preset.none',
-  daily: 'recurrence.preset.daily',
-  weekdays: 'recurrence.preset.weekdays',
-  weekly: 'recurrence.preset.weekly',
-  monthly: 'recurrence.preset.monthly',
-  yearly: 'recurrence.preset.yearly',
-  custom: 'recurrence.preset.custom',
-} as const satisfies Record<RecurrencePreset, string>;
-
-const NOTIFICATION_PRESET_KEYS = {
-  none: 'notification.preset.none',
-  // biome-ignore lint/style/useNamingConvention: matches NotificationPreset literal union
-  at_time: 'notification.preset.at_time',
-  '5min': 'notification.preset.5min',
-  '10min': 'notification.preset.10min',
-  '15min': 'notification.preset.15min',
-  '30min': 'notification.preset.30min',
-  '1hour': 'notification.preset.1hour',
-  '1day': 'notification.preset.1day',
-} as const satisfies Record<NotificationPreset, string>;
 
 /* ── dirty tracking ─────────────────────────────────────────────── */
 
@@ -768,7 +719,6 @@ export default function EventDialog({
     createEvent.isPending || updateEvent.isPending || deleteEvent.isPending || createTask.isPending;
   const slow = useSlowPending(isPending);
   const noticePresence = usePresence<HTMLParagraphElement>(slow && scopePrompt === null);
-  const disclosureId = useId();
   const taskDatesHintId = useId();
   const refreshCalendar = useRefreshCalendar();
 
@@ -1450,249 +1400,52 @@ export default function EventDialog({
              */}
             <div className={styles.kindMorphZone}>
               {showTaskFields ? (
-                <div className={styles.kindBlock}>
-                  <div className={styles.inlineRow}>
-                    {projects.length > 0 ? (
-                      <FormField
-                        label={t('field.project')}
-                        description={t('field.projectHint')}
-                        error={projectError ?? undefined}
-                        className={styles.inlineGrow}
-                      >
-                        {(control) => (
-                          <Select
-                            {...control}
-                            value={projectId}
-                            onChange={(e) => {
-                              markDirty('projectId');
-                              setProjectId(e.currentTarget.value);
-                            }}
-                          >
-                            {projects.map((p) => (
-                              <option key={p.id} value={p.id}>
-                                {p.name}
-                              </option>
-                            ))}
-                          </Select>
-                        )}
-                      </FormField>
-                    ) : null}
-                    <FormField label={t('field.priority')} className={styles.inlineGrow}>
-                      {() => (
-                        <SegmentedControl
-                          ariaLabel={t('field.priority')}
-                          options={TASK_PRIORITIES.map((p) => ({
-                            value: String(p) as `${TaskPriority}`,
-                            label: tCommon(PRIORITY_KEY[p]),
-                          }))}
-                          value={String(priority) as `${TaskPriority}`}
-                          onChange={(v) => {
-                            markDirty('priority');
-                            setPriority(Number(v) as TaskPriority);
-                          }}
-                        />
-                      )}
-                    </FormField>
-                  </div>
-                </div>
+                <EventDialogTaskFields
+                  projects={projects}
+                  projectId={projectId}
+                  onProjectChange={editing('projectId', setProjectId)}
+                  projectError={projectError}
+                  priority={priority}
+                  onPriorityChange={editing('priority', setPriority)}
+                />
               ) : null}
 
               {showEventFields ? (
-                <div className={styles.kindBlock}>
-                  <FormField label={t('field.showAs')} description={t('field.showAsHint')}>
-                    {() => (
-                      <SegmentedControl
-                        ariaLabel={t('field.showAs')}
-                        fullWidth
-                        options={(['busy', 'free', 'tentative', 'oof'] as const).map((v) => ({
-                          value: v,
-                          label: t(SHOW_AS_KEYS[v]),
-                        }))}
-                        value={showAs}
-                        onChange={editing('showAs', setShowAs)}
-                      />
-                    )}
-                  </FormField>
-                  <FormField
-                    label={t('field.flexibility')}
-                    description={t('field.flexibilityHint')}
-                  >
-                    {() => (
-                      <SegmentedControl
-                        ariaLabel={t('field.flexibility')}
-                        fullWidth
-                        options={(['fixed', 'negotiable', 'conditional'] as const).map((v) => ({
-                          value: v,
-                          label: t(FLEXIBILITY_KEYS[v]),
-                        }))}
-                        value={flexibility}
-                        onChange={editing('flexibility', setFlexibility)}
-                      />
-                    )}
-                  </FormField>
-                  <FormField label={t('field.location')}>
-                    {(control) => (
-                      <Input
-                        {...control}
-                        value={location}
-                        disabled={detailsHidden}
-                        onChange={(e) => {
-                          markDirty('location');
-                          setLocation(e.currentTarget.value);
-                        }}
-                      />
-                    )}
-                  </FormField>
-                </div>
+                <EventDialogEventFields
+                  showAs={showAs}
+                  onShowAsChange={editing('showAs', setShowAs)}
+                  flexibility={flexibility}
+                  onFlexibilityChange={editing('flexibility', setFlexibility)}
+                  location={location}
+                  onLocationChange={editing('location', setLocation)}
+                  detailsHidden={detailsHidden}
+                />
               ) : null}
 
               {showBlockFields ? (
-                <div className={styles.kindBlock}>
-                  <FormField label={t('field.blockLabel')} description={t('field.blockLabelHint')}>
-                    {() => (
-                      <>
-                        <ToggleChipGroup label={t('field.blockLabel')}>
-                          {(['working', 'focus', 'oof', 'custom'] as const).map((preset) => (
-                            <ToggleChip
-                              key={preset}
-                              pressed={blockPreset === preset}
-                              onPressedChange={(v) => {
-                                if (!v) return;
-                                markDirty('blockPreset');
-                                setBlockPreset(preset);
-                              }}
-                            >
-                              {t(BLOCK_PRESET_KEYS[preset])}
-                            </ToggleChip>
-                          ))}
-                        </ToggleChipGroup>
-                        {blockPreset === 'custom' ? (
-                          <Input
-                            value={blockCustomLabel}
-                            onChange={(e) => {
-                              markDirty('blockCustomLabel');
-                              setBlockCustomLabel(e.currentTarget.value);
-                            }}
-                            className={styles.blockCustomInput}
-                          />
-                        ) : null}
-                      </>
-                    )}
-                  </FormField>
-                </div>
+                <EventDialogBlockFields
+                  blockPreset={blockPreset}
+                  onBlockPresetChange={editing('blockPreset', setBlockPreset)}
+                  blockCustomLabel={blockCustomLabel}
+                  onBlockCustomLabelChange={editing('blockCustomLabel', setBlockCustomLabel)}
+                />
               ) : null}
             </div>
 
-            {/* More options disclosure */}
-            <Tooltip content={t('action.moreOptionsHint')} placement="right">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setExpanded((s) => !s)}
-                className={styles.disclosureToggle}
-                aria-expanded={expanded}
-                aria-controls={disclosureId}
-              >
-                {t('action.moreOptions')}
-              </Button>
-            </Tooltip>
-            <Collapse open={expanded} id={disclosureId}>
-              <div className={styles.disclosurePanel}>
-                <FormField label={t('field.recurrence')} description={t('field.recurrenceHint')}>
-                  {(control) => (
-                    <Select
-                      {...control}
-                      value={recurrence}
-                      onChange={(e) => {
-                        markDirty('recurrence');
-                        setRecurrence(e.currentTarget.value as RecurrencePreset);
-                      }}
-                    >
-                      {/*
-                      `custom` is listed only while it is the current
-                      value: it describes a stored rule rather than a
-                      choice, so offering it on an event that has no
-                      such rule would be an option that does nothing.
-                    */}
-                      {(recurrence === 'custom'
-                        ? ([
-                            'custom',
-                            'none',
-                            'daily',
-                            'weekdays',
-                            'weekly',
-                            'monthly',
-                            'yearly',
-                          ] as const)
-                        : (['none', 'daily', 'weekdays', 'weekly', 'monthly', 'yearly'] as const)
-                      ).map((v) => (
-                        <option key={v} value={v}>
-                          {/*
-                            The weekly option names the day it repeats
-                            on, which is the start date's weekday — the
-                            other presets carry no placeholder and
-                            ignore the value.
-                          */}
-                          {t(RECURRENCE_PRESET_KEYS[v], { day: weekdayName(startDate, locale) })}
-                        </option>
-                      ))}
-                    </Select>
-                  )}
-                </FormField>
-                <FormField
-                  label={t('field.notification')}
-                  description={t('field.notificationHint')}
-                >
-                  {(control) => (
-                    <Select
-                      {...control}
-                      value={notification}
-                      onChange={(e) => {
-                        markDirty('notification');
-                        setNotification(e.currentTarget.value as NotificationPreset);
-                      }}
-                    >
-                      {(
-                        [
-                          'none',
-                          'at_time',
-                          '5min',
-                          '10min',
-                          '15min',
-                          '30min',
-                          '1hour',
-                          '1day',
-                        ] as const
-                      ).map((v) => (
-                        <option key={v} value={v}>
-                          {t(NOTIFICATION_PRESET_KEYS[v])}
-                        </option>
-                      ))}
-                    </Select>
-                  )}
-                </FormField>
-                <FormField label={showTaskFields ? t('field.description') : t('field.memo')}>
-                  {(control) => (
-                    <Textarea
-                      {...control}
-                      value={memo}
-                      onChange={(e) => {
-                        markDirty('memo');
-                        setMemo(e.currentTarget.value);
-                      }}
-                      rows={3}
-                      // Typing into an empty box before the stored memo
-                      // lands would mark the field edited and send that
-                      // fragment over the real one, so the control stays
-                      // inert until it holds the actual value.
-                      disabled={detailLoading || detailsHidden}
-                      aria-busy={detailLoading || undefined}
-                    />
-                  )}
-                </FormField>
-              </div>
-            </Collapse>
+            <EventDialogMoreOptions
+              expanded={expanded}
+              onToggle={() => setExpanded((s) => !s)}
+              recurrence={recurrence}
+              onRecurrenceChange={editing('recurrence', setRecurrence)}
+              notification={notification}
+              onNotificationChange={editing('notification', setNotification)}
+              memo={memo}
+              onMemoChange={editing('memo', setMemo)}
+              startDate={startDate}
+              isTask={showTaskFields}
+              detailLoading={detailLoading}
+              detailsHidden={detailsHidden}
+            />
 
             {mode.kind === 'edit' &&
             (mode.initialKind === 'event' || mode.initialKind === 'milestone') ? (
