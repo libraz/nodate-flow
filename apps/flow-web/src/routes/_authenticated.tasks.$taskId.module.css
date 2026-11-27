@@ -185,6 +185,34 @@
   align-self: flex-start;
 }
 
+/* Current state: anchors where the task is, before the list of where it can go. */
+.currentState {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--nf-space-2);
+  margin-block-end: var(--nf-space-3);
+}
+
+.currentStateLabel {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
+.currentStatePill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-1-5);
+  padding-block: var(--nf-space-0-5);
+  padding-inline: var(--nf-space-2-5);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-pill);
+  background: var(--nf-color-bg-sunken);
+  color: var(--nf-color-fg);
+  font-size: var(--nf-text-xs);
+  font-weight: var(--nf-weight-medium);
+}
+
 /* One full-width row per transition: the action at the start, where it lands at the end. */
 .transitionList {
   display: flex;
@@ -197,8 +225,39 @@
   justify-content: space-between;
 }
 
+.transitionVerb {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-1-5);
+}
+
+.transitionIcon {
+  inline-size: calc(1em * var(--nf-leading-tight));
+  block-size: calc(1em * var(--nf-leading-tight));
+  flex-shrink: 0;
+  color: var(--nf-color-accent);
+}
+
+/* Recommended forward action: accent edge, icon and weight, never a fill. */
+.transitionList > .transitionRecommended {
+  border-inline-start: var(--nf-space-0-5) solid var(--nf-color-accent);
+  font-weight: var(--nf-weight-semibold);
+}
+
+/* Cancel sits apart under a hairline and keeps a neutral surface. */
 .transitionList > .transitionCancel {
   --btn-fg: var(--nf-color-danger-fg);
+  position: relative;
+  margin-block-start: var(--nf-space-3);
+}
+
+.transitionList > .transitionCancel::before {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  inset-block-start: calc(var(--nf-space-3) / -2 - var(--nf-space-px));
+  border-block-start: var(--nf-space-px) solid var(--nf-color-hairline);
+  pointer-events: none;
 }
 
 .transitionLanding {
@@ -207,6 +266,7 @@
   gap: var(--nf-space-1-5);
   font-size: var(--nf-text-xs);
   font-weight: var(--nf-weight-regular);
+  color: var(--nf-color-fg-muted);
 }
 
 .transitionDot {
@@ -216,11 +276,23 @@
   block-size: 0.5rem;
   border-radius: var(--nf-radius-pill);
   flex-shrink: 0;
+  transition: scale var(--nf-duration-fast) var(--nf-ease-out);
 }
 
-/* The filled Complete button would swallow a bare dot; ring it in the label colour. */
-.transitionDot {
-  outline: var(--nf-space-px) solid currentColor;
+.transitionButton:hover .transitionDot,
+.transitionButton:focus-visible .transitionDot {
+  scale: 1.35;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .transitionDot {
+    transition: none;
+  }
+
+  .transitionButton:hover .transitionDot,
+  .transitionButton:focus-visible .transitionDot {
+    scale: 1;
+  }
 }
 
 /* ── Narrow-screen metadata strip ──────────────────────────────── */

@@ -1,0 +1,125 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+  /* nf-token-override: fixed width so the panel does not resize while results shrink */
+  inline-size: 15rem;
+  max-inline-size: 100%;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-px);
+  /* nf-token-override: component dimension, not a spacing step */
+  max-block-size: 14rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  min-block-size: 2rem;
+  padding-inline: var(--nf-space-2);
+  border-radius: var(--nf-radius-sm);
+  font-size: var(--nf-text-sm);
+  cursor: pointer;
+  transition: background-color var(--nf-duration-instant) var(--nf-ease-standard);
+}
+
+.row:hover,
+.row[data-active="true"] {
+  background: var(--nf-color-surface-hover);
+}
+
+.dot {
+  flex: none;
+  inline-size: 0.5rem;
+  block-size: 0.5rem;
+  border-radius: var(--nf-radius-pill);
+  background: var(--dot-color);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--dot-color) 28%, transparent);
+}
+
+.name {
+  flex: 1;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: start;
+}
+
+.check {
+  flex: none;
+  color: var(--nf-color-success-fg);
+}
+
+.create {
+  margin-block-start: var(--nf-space-1);
+  padding-block-start: var(--nf-space-1);
+  border-block-start: var(--nf-space-px) solid var(--nf-color-border);
+}
+
+.createIcon {
+  flex: none;
+  color: var(--nf-color-fg-muted);
+}
+
+.message {
+  margin: 0;
+  padding: var(--nf-space-2);
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+}
+
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+  min-block-size: 1.5rem;
+  padding-inline: var(--nf-space-2);
+  border: var(--nf-space-px) dashed var(--nf-color-border-control);
+  border-radius: var(--nf-radius-pill);
+  background: transparent;
+  color: var(--nf-color-fg-muted);
+  font: inherit;
+  font-size: var(--nf-text-xs);
+  cursor: pointer;
+  transition:
+    color var(--nf-duration-fast) var(--nf-ease-standard),
+    border-color var(--nf-duration-fast) var(--nf-ease-standard),
+    background-color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.trigger:hover:not(:disabled) {
+  color: var(--nf-color-fg);
+  border-color: var(--nf-color-fg-subtle);
+  background: var(--nf-color-surface-hover);
+}
+
+.trigger:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.trigger:disabled {
+  opacity: var(--nf-opacity-disabled);
+  cursor: not-allowed;
+}
+
+.triggerIconOnly {
+  padding-inline: var(--nf-space-1-5);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .row,
+  .trigger {
+    transition: none;
+  }
+}

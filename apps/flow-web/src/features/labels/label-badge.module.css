@@ -1,0 +1,76 @@
+/* --label-color is set inline; fill and edge are mixed from it. */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+  min-block-size: 1.5rem;
+  padding-inline: var(--nf-space-2);
+  border: var(--nf-space-px) solid color-mix(in oklab, var(--label-color) 28%, transparent);
+  border-radius: var(--nf-radius-pill);
+  background: color-mix(in oklab, var(--label-color) 10%, transparent);
+  color: color-mix(in oklab, var(--label-color) 72%, var(--nf-color-fg));
+  font-size: var(--nf-text-xs);
+  font-weight: var(--nf-weight-medium);
+  line-height: var(--nf-leading-tight);
+  max-inline-size: 100%;
+}
+
+.dot {
+  flex: none;
+  inline-size: 0.5rem;
+  block-size: 0.5rem;
+  border-radius: var(--nf-radius-pill);
+  background: var(--label-color);
+}
+
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.remove {
+  display: inline-grid;
+  place-items: center;
+  inline-size: 1rem;
+  block-size: 1rem;
+  margin-inline-end: calc(var(--nf-space-1) * -1);
+  padding: 0;
+  border: 0;
+  border-radius: var(--nf-radius-pill);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity var(--nf-duration-fast) var(--nf-ease-standard),
+    background-color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+/* Hidden at rest, but never out of the tab order: focus reveals it too. */
+.badge:hover .remove,
+.badge:focus-within .remove,
+.remove:focus-visible {
+  opacity: 1;
+}
+
+.remove:hover {
+  background: color-mix(in oklab, var(--label-color) 20%, transparent);
+}
+
+.remove:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+@media (hover: none) {
+  .remove {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .remove {
+    transition: none;
+  }
+}

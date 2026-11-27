@@ -16,7 +16,7 @@ import {
   BreadcrumbItem,
   BreadcrumbSeparator,
 } from '@nodate-flow/ui/primitives/breadcrumb';
-import Button, { type ButtonVariant } from '@nodate-flow/ui/primitives/button';
+import Button from '@nodate-flow/ui/primitives/button';
 import Card from '@nodate-flow/ui/primitives/card';
 import Combobox from '@nodate-flow/ui/primitives/combobox';
 import DatePicker from '@nodate-flow/ui/primitives/date-picker';
@@ -30,18 +30,22 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { BP } from '@nodate-flow/ui/tokens/breakpoints';
 import { createLazyFileRoute, getRouteApi, Link } from '@tanstack/react-router';
-import { History, Pencil, Plus, X } from 'lucide-react';
-import { type FormEvent, type ReactElement, Suspense, useEffect, useId, useState } from 'react';
+import { ArrowRight, Check, History, type LucideIcon, Pencil, Play, Plus, X } from 'lucide-react';
+import { type ReactElement, Suspense, useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import PageFrame from '../components/page-frame';
 import frameStyles from '../components/page-frame.module.css';
 import PageHelp from '../components/page-help';
+import SubmitHint from '../components/submit-hint';
 import AiConsequence from '../features/ai-suggestions/ai-consequence';
 import { selectUser, useAuth } from '../features/auth/auth-store';
 import ConstraintEditor from '../features/constraints/constraint-editor';
 import StateGraph from '../features/constraints/state-graph';
 import { useFavoritesQuery } from '../features/favorites/api';
 import FavoriteButton from '../features/favorites/favorite-button';
+import { useTaskLabelsQuery } from '../features/labels/api';
+import LabelBadge from '../features/labels/label-badge';
+import TaskLabelsField from '../features/labels/task-labels-field';
 import { useProjectQuery } from '../features/projects/api';
 import { useTaskReactionsQuery } from '../features/reactions/api';
 import ReactionBar from '../features/reactions/reaction-bar';
@@ -56,7 +60,6 @@ import {
   TRANSITIONS_BY_STATE,
   type TransitionName,
   useAddTaskActor,
-  useAddTaskComment,
   useRemoveTaskActor,
   useTaskActorsQuery,
   useTaskCommentsQuery,
@@ -66,6 +69,7 @@ import {
   useTransitionTask,
   useUpdateTask,
 } from '../features/tasks/api';
+import CommentForm from '../features/tasks/comment-form';
 import CommentRow from '../features/tasks/comment-row';
 import { PRIORITY_KEY, STATE_COLOR, STATE_KEY, STATE_TONE } from '../features/tasks/constants';
 import DependenciesSection from '../features/tasks/dependencies-section';
@@ -87,6 +91,7 @@ import { useWorkspaceMembersQuery, useWorkspaceQuery } from '../features/workspa
 import { formatApiError } from '../lib/api-error';
 import { formatDate } from '../lib/format';
 import { formatDueDate } from '../lib/format-date';
+import { onSubmitShortcut } from '../lib/submit-shortcut';
 import { useWeekStart } from '../lib/use-week-start';
 import css from './_authenticated.tasks.$taskId.module.css';
 
@@ -102,9 +107,13 @@ const TRANSITION_KEY: Record<TransitionName, string> = {
   cancel: 'tasks.detail.transitions.cancel',
 };
 
-// Cancel stays a bordered button with danger text: as loud as Complete it invites misclicks.
-const TRANSITION_VARIANT: Partial<Record<TransitionName, ButtonVariant>> = {
-  complete: 'primary',
+// The forward action worth nudging toward: first of these that is legal from the current state.
+const RECOMMENDED_PRIORITY: readonly TransitionName[] = ['complete', 'submit', 'start'];
+
+const RECOMMENDED_ICON: Partial<Record<TransitionName, LucideIcon>> = {
+  complete: Check,
+  submit: ArrowRight,
+  start: Play,
 };
 
 /** Sidebar card heading with an optional one-paragraph explanation under it. */
@@ -396,9 +405,14 @@ function DescriptionEditor({
   };
 
   return (
-    <div
+    <form
       className={css.editorEnter}
       style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}
+      onSubmit={(e) => {
+        e.preventDefault();
+        void handleSave();
+      }}
+      onKeyDown={onSubmitShortcut}
     >
       <MarkdownEditor
         value={value}
@@ -408,7 +422,15 @@ function DescriptionEditor({
         workspaceId={workspaceId}
         aria-label={t('tasks.detail.description_edit')}
       />
-      <div style={{ display: 'flex', gap: 'var(--nf-space-2)', justifyContent: 'flex-end' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 'var(--nf-space-2)',
+          justifyContent: 'flex-end',
+        }}
+      >
+        <SubmitHint />
         <Button
           type="button"
           variant="ghost"
@@ -418,16 +440,9 @@ function DescriptionEditor({
         >
           {t('tasks.detail.cancel')}
         </Button>
-        <Button
-          type="button"
-          onClick={() => {
-            void handleSave();
-          }}
-        >
-          {t('tasks.detail.save')}
-        </Button>
+        <Button type="submit">{t('tasks.detail.save')}</Button>
       </div>
-    </div>
+    </form>
   );
 }
 
@@ -527,27 +542,10 @@ function CommentsFeed({
 }): ReactElement {
   const { t, i18n } = useTranslation('common');
   const { data: comments } = useTaskCommentsQuery(taskId);
-  const add = useAddTaskComment();
   const currentUser = useAuth(selectUser);
-  const [body, setBody] = useState('');
   const locale = i18n.resolvedLanguage ?? 'en';
   const { entries, onExited } = usePresenceList(comments, (c) => c.id);
   const staggerFor = useFirstLoadStagger();
-
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
-    e.preventDefault();
-    const trimmed = body.trim();
-    if (trimmed.length === 0) return;
-    try {
-      await add.mutateAsync({ taskId, body: trimmed });
-      setBody('');
-    } catch (err) {
-      toaster.show({
-        tone: 'danger',
-        message: formatApiError(err, t, 'tasks.errors.comment_add_failed'),
-      });
-    }
-  };
 
   return (
     <section style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-4)' }}>
@@ -581,37 +579,7 @@ function CommentsFeed({
           })}
         </ul>
       )}
-      <form
-        onSubmit={(e) => {
-          void handleSubmit(e);
-        }}
-        style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}
-      >
-        {/*
-         * The comment box is the same editor the description uses rather
-         * than a textarea of its own: a comment is markdown, is scanned
-         * for mentions on save exactly like a description, and one editor
-         * means the `@` picker exists in one place instead of two.
-         */}
-        <FormField label={t('tasks.comments.title')}>
-          {(control) => (
-            <MarkdownEditor
-              id={control.id}
-              value={body}
-              onChange={setBody}
-              workspaceId={workspaceId}
-              placeholder={t('tasks.comments.add_placeholder')}
-              aria-label={t('tasks.comments.title')}
-              rows={3}
-            />
-          )}
-        </FormField>
-        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <Button type="submit" disabled={body.trim().length === 0}>
-            {t('tasks.comments.add')}
-          </Button>
-        </div>
-      </form>
+      <CommentForm taskId={taskId} workspaceId={workspaceId} />
     </section>
   );
 }
@@ -749,6 +717,7 @@ function Sidebar({
   const { t, i18n } = useTranslation('common');
   const weekStart = useWeekStart();
   const { t: tAgents } = useTranslation('aiAgents');
+  const { t: tLabels } = useTranslation('labels');
   const locale = i18n.resolvedLanguage ?? 'en';
   const weekdayLabels = t('common.date.weekdays', { returnObjects: true }) as string[];
   const formatMonthYear = (year: number, month: number): string =>
@@ -819,6 +788,7 @@ function Sidebar({
     const landing = landingStateFor(state, name);
     return landing ? [{ name, landing }] : [];
   });
+  const recommended = RECOMMENDED_PRIORITY.find((name) => legal.some((l) => l.name === name));
 
   return (
     <aside className={css.aside}>
@@ -880,6 +850,12 @@ function Sidebar({
             />
           )}
         </FormField>
+        <div className={css.fieldStack}>
+          <span className={css.fieldLabel}>{tLabels('title')}</span>
+          <Suspense fallback={<SectionSkeleton />}>
+            <TaskLabelsField taskId={id} workspaceId={workspaceId} />
+          </Suspense>
+        </div>
       </Card>
 
       <Card className={css.sideCard}>
@@ -887,29 +863,51 @@ function Sidebar({
           title={t('tasks.detail.transitions.title')}
           hint={t('tasks.detail.transitions.hint')}
         />
+        <div className={css.currentState}>
+          <span className={css.currentStateLabel}>{t('tasks.detail.transitions.current')}</span>
+          <span className={css.currentStatePill}>
+            <span
+              aria-hidden="true"
+              className={css.transitionDot}
+              style={{ background: STATE_COLOR[state] }}
+            />
+            {t(STATE_KEY[state])}
+          </span>
+        </div>
         <div className={css.transitionList}>
-          {legal.map(({ name, landing }) => (
-            <Button
-              key={name}
-              type="button"
-              variant={TRANSITION_VARIANT[name] ?? 'default'}
-              className={cx(css.transitionButton, name === 'cancel' && css.transitionCancel)}
-              onClick={() => {
-                handleTransition(name);
-              }}
-            >
-              <span>{t(TRANSITION_KEY[name])}</span>
-              <span className={css.transitionLanding}>
-                <span aria-hidden="true">→</span>
-                <span
-                  aria-hidden="true"
-                  className={css.transitionDot}
-                  style={{ background: STATE_COLOR[landing] }}
-                />
-                {t(STATE_KEY[landing])}
-              </span>
-            </Button>
-          ))}
+          {legal.map(({ name, landing }) => {
+            const RecommendedIcon = name === recommended ? RECOMMENDED_ICON[name] : undefined;
+            return (
+              <Button
+                key={name}
+                type="button"
+                className={cx(
+                  css.transitionButton,
+                  name === recommended && css.transitionRecommended,
+                  name === 'cancel' && css.transitionCancel,
+                )}
+                onClick={() => {
+                  handleTransition(name);
+                }}
+              >
+                <span className={css.transitionVerb}>
+                  {RecommendedIcon ? (
+                    <RecommendedIcon aria-hidden="true" className={css.transitionIcon} />
+                  ) : null}
+                  {t(TRANSITION_KEY[name])}
+                </span>
+                <span className={css.transitionLanding}>
+                  <span aria-hidden="true">→</span>
+                  <span
+                    aria-hidden="true"
+                    className={css.transitionDot}
+                    style={{ background: STATE_COLOR[landing] }}
+                  />
+                  {t(STATE_KEY[landing])}
+                </span>
+              </Button>
+            );
+          })}
         </div>
       </Card>
 
@@ -1000,11 +998,13 @@ function Sidebar({
  * key metadata is repeated read-only under the title.
  */
 function TaskMetaStrip({
+  taskId,
   state,
   priority,
   dueOn,
   locale,
 }: {
+  taskId: string;
   state: TaskDerivedState;
   priority: TaskPriority;
   dueOn: string | undefined;
@@ -1032,7 +1032,27 @@ function TaskMetaStrip({
           <dd className={css.metaValue}>{formatDueDate(dueOn, locale)}</dd>
         </div>
       ) : null}
+      <Suspense fallback={null}>
+        <MetaLabels taskId={taskId} />
+      </Suspense>
     </dl>
+  );
+}
+
+function MetaLabels({ taskId }: { taskId: string }): ReactElement {
+  const { t } = useTranslation('labels');
+  const { data: labels } = useTaskLabelsQuery(taskId);
+  return (
+    <div className={css.metaItem}>
+      <dt className={css.metaLabel}>{t('title')}</dt>
+      <dd className={css.metaValue} style={{ flexWrap: 'wrap' }}>
+        {labels.length === 0 ? (
+          <span style={{ color: 'var(--nf-color-fg-muted)' }}>{t('task.none')}</span>
+        ) : (
+          labels.map((label) => <LabelBadge key={label.id} name={label.name} color={label.color} />)
+        )}
+      </dd>
+    </div>
   );
 }
 
@@ -1232,7 +1252,13 @@ function TaskDetailPanel({ id }: TaskDetailPanelProps): ReactElement {
         </Suspense>
         <TitleEditor id={id} initial={task.title} workspaceId={task.workspaceId} />
         {isNarrow ? (
-          <TaskMetaStrip state={state} priority={priority} dueOn={task.dueOn} locale={locale} />
+          <TaskMetaStrip
+            taskId={id}
+            state={state}
+            priority={priority}
+            dueOn={task.dueOn}
+            locale={locale}
+          />
         ) : null}
         {task.agentContext?.agent ? (
           <AgentPanel taskId={id} agentContext={task.agentContext} locale={locale} />
