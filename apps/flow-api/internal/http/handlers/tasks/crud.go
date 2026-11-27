@@ -145,6 +145,24 @@ func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutpu
 			return nil, translateTaskRuleError(err)
 		}
 
+		// The parent is resolved through the same Layer 3/4 decision the
+		// task routes use, so an id the actor cannot see answers not-found.
+		var parentID sql.NullInt32
+		if in.Body.ParentTaskID != "" {
+			parentPub, perr := types.Parse(in.Body.ParentTaskID)
+			if perr != nil {
+				return nil, httpErr(apierrors.WsTaskNotFound)
+			}
+			access, aerr := acl.AuthorizeTaskAccess(ctx, deps.DB, parentPub.UUID(), actorID, apierrors.WsTaskNotFound)
+			if aerr != nil {
+				return nil, aerr
+			}
+			if access.Task.WorkspaceID != prj.WorkspaceID || access.Task.ProjectID != prj.ID {
+				return nil, httpErr(apierrors.WsTaskParentProjectMismatch)
+			}
+			parentID = sql.NullInt32{Int32: int32(access.Task.ID), Valid: true} //#nosec G115 -- parent task id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
+		}
+
 		var pub types.PublicID
 		desc := sql.NullString{String: in.Body.Description, Valid: in.Body.Description != ""}
 
@@ -213,13 +231,14 @@ func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutpu
 			}
 
 			created, err := taskcreate.New(ctx, tx, attr, taskcreate.Args{
-				WorkspaceID: prj.WorkspaceID,
-				ProjectID:   prj.ID,
-				Title:       title,
-				Description: desc,
-				Priority:    in.Body.Priority,
-				DueOn:       due,
-				StartedOn:   start,
+				WorkspaceID:  prj.WorkspaceID,
+				ProjectID:    prj.ID,
+				ParentTaskID: parentID,
+				Title:        title,
+				Description:  desc,
+				Priority:     in.Body.Priority,
+				DueOn:        due,
+				StartedOn:    start,
 				// Empty body visibility means "workspace default"; taskcreate
 				// substitutes it so the default lives in one place.
 				Visibility: generated.TasksVisibility(in.Body.Visibility),
@@ -355,6 +374,25 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 			v := generated.TasksVisibility(*in.Body.Visibility)
 			patch.Visibility = &v
 		}
+		if in.Body.ParentTaskID != nil {
+			change := &taskupdate.ParentChange{}
+			if *in.Body.ParentTaskID != "" {
+				parentPub, perr := types.Parse(*in.Body.ParentTaskID)
+				if perr != nil {
+					return nil, httpErr(apierrors.WsTaskNotFound)
+				}
+				access, aerr := acl.AuthorizeTaskAccess(ctx, deps.DB, parentPub.UUID(), actorID, apierrors.WsTaskNotFound)
+				if aerr != nil {
+					return nil, aerr
+				}
+				if access.Task.WorkspaceID != ws.ID {
+					return nil, httpErr(apierrors.WsTaskNotFound)
+				}
+				change.ID = sql.NullInt32{Int32: int32(access.Task.ID), Valid: true} //#nosec G115 -- parent task id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
+				change.PublicID = parentPub
+			}
+			patch.Parent = change
+		}
 
 		actor := mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}
 		var (
@@ -447,6 +485,12 @@ func translateTaskUpdateError(err error) error {
 		return httpErr(apierrors.WsTaskNotFound)
 	case errors.Is(err, taskupdate.ErrDueOnConflict):
 		return httpErr(apierrors.WsTaskUpdateConflict)
+	case errors.Is(err, taskupdate.ErrParentCycle):
+		return httpErr(apierrors.WsTaskParentCycle)
+	case errors.Is(err, taskupdate.ErrParentProjectMismatch):
+		return httpErr(apierrors.WsTaskParentProjectMismatch)
+	case errors.Is(err, taskupdate.ErrParentNotFound):
+		return httpErr(apierrors.WsTaskNotFound)
 	case errors.As(err, &ike):
 		return translateItemkitTaskError(ike.Err)
 	case taskrules.Classify(err) != taskrules.ViolationOther:

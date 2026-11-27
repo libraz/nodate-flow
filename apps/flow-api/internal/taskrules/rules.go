@@ -159,8 +159,8 @@ func Classify(err error) Violation {
 }
 
 // IsBlockingDependencyKind reports whether a task_dependencies kind
-// gates the dependent task's progress. "blocks" and "subtask_of" hold
-// work back; "relates", "duplicates" and "retro_of" are informational.
+// gates the dependent task's progress. "blocks" holds work back;
+// "relates", "duplicates" and "retro_of" are informational.
 // An empty kind counts as blocking, so a caller that does not record
 // kinds keeps counting every edge.
 func IsBlockingDependencyKind(kind string) bool {

@@ -614,6 +614,39 @@ func (q *Queries) FindTaskEventLinkByPublicId(ctx context.Context, arg FindTaskE
 	return i, err
 }
 
+const getTaskParentLink = `-- name: GetTaskParentLink :one
+SELECT
+  id,
+  parent_task_id,
+  project_id
+FROM tasks
+WHERE workspace_id = ?
+  AND id = ?
+  AND enabled = TRUE
+LIMIT 1
+`
+
+type GetTaskParentLinkParams struct {
+	WorkspaceID uint32 `json:"-"`
+	ID          uint32 `json:"-"`
+}
+
+type GetTaskParentLinkRow struct {
+	ID           uint32        `json:"-"`
+	ParentTaskID sql.NullInt32 `json:"-"`
+	ProjectID    uint32        `json:"-"`
+}
+
+// Parent link of a task by internal id. Backs the ancestor walk that
+// rejects cycles before SetTaskParent runs. Returns ids only; the caller
+// resolves the task through the shared task ACL first.
+func (q *Queries) GetTaskParentLink(ctx context.Context, arg GetTaskParentLinkParams) (GetTaskParentLinkRow, error) {
+	row := q.db.QueryRowContext(ctx, getTaskParentLink, arg.WorkspaceID, arg.ID)
+	var i GetTaskParentLinkRow
+	err := row.Scan(&i.ID, &i.ParentTaskID, &i.ProjectID)
+	return i, err
+}
+
 const listArchivedTasksForWorkspace = `-- name: ListArchivedTasksForWorkspace :many
 SELECT
   v.public_id,
@@ -2754,6 +2787,39 @@ func (q *Queries) SetTaskNumber(ctx context.Context, arg SetTaskNumberParams) er
 		arg.WorkspaceID,
 	)
 	return err
+}
+
+const setTaskParent = `-- name: SetTaskParent :execrows
+UPDATE tasks
+SET parent_task_id = ?,
+    updated_by_user_id = ?
+WHERE workspace_id = ?
+  AND id = ?
+  AND enabled = TRUE
+`
+
+type SetTaskParentParams struct {
+	ParentTaskID    sql.NullInt32 `json:"-"`
+	UpdatedByUserID sql.NullInt32 `json:"-"`
+	WorkspaceID     uint32        `json:"-"`
+	ID              uint32        `json:"-"`
+}
+
+// Re-parent a task by internal id; a NULL parent_task_id clears the link.
+// updated_by_user_id is appended so the audit field records who moved the
+// row (NULL for system writers). updated_at is maintained by the column's
+// ON UPDATE clause.
+func (q *Queries) SetTaskParent(ctx context.Context, arg SetTaskParentParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, setTaskParent,
+		arg.ParentTaskID,
+		arg.UpdatedByUserID,
+		arg.WorkspaceID,
+		arg.ID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const transitionTaskState = `-- name: TransitionTaskState :execrows

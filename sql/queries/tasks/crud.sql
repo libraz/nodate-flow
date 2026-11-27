@@ -393,6 +393,32 @@ WHERE workspace_id = ?
   AND public_id = ?
   AND enabled = TRUE;
 
+-- name: SetTaskParent :execrows
+-- Re-parent a task by internal id; a NULL parent_task_id clears the link.
+-- updated_by_user_id is appended so the audit field records who moved the
+-- row (NULL for system writers). updated_at is maintained by the column's
+-- ON UPDATE clause.
+UPDATE tasks
+SET parent_task_id = ?,
+    updated_by_user_id = ?
+WHERE workspace_id = ?
+  AND id = ?
+  AND enabled = TRUE;
+
+-- name: GetTaskParentLink :one
+-- Parent link of a task by internal id. Backs the ancestor walk that
+-- rejects cycles before SetTaskParent runs. Returns ids only; the caller
+-- resolves the task through the shared task ACL first.
+SELECT
+  id,
+  parent_task_id,
+  project_id
+FROM tasks
+WHERE workspace_id = ?
+  AND id = ?
+  AND enabled = TRUE
+LIMIT 1;
+
 -- name: UpdateTaskSortWeight :exec
 -- Update only the sort_weight for a single task within a workspace.
 -- Used by the bulk reorder endpoint inside a transaction.

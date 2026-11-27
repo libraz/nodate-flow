@@ -51,11 +51,6 @@ func TestClosesCycle(t *testing.T) {
 			edges: []Edge{{From: 2, To: 1, Kind: "duplicates"}},
 			from:  1, to: 2, kind: "duplicates",
 		},
-		{
-			name:  "subtask_of takes part in the walk",
-			edges: []Edge{{From: 2, To: 1, Kind: "subtask_of"}},
-			from:  1, to: 2, kind: "blocks", want: true,
-		},
 	}
 
 	for _, tc := range cases {

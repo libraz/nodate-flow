@@ -304,6 +304,8 @@
   "WS.TASK.DEPENDENCY_CYCLE": "この依存関係を追加すると循環が発生します",
   "WS.TASK.IDEMPOTENCY_KEY_CONFLICT": "この冪等性キーは別のタスクリクエストで使用済みです",
   "WS.TASK.NOT_FOUND": "タスクが見つかりません",
+  "WS.TASK.PARENT_CYCLE": "タスクを自分自身または自分の子孫の下に置くことはできません",
+  "WS.TASK.PARENT_PROJECT_MISMATCH": "サブタスクは親タスクと同じプロジェクトに属する必要があります",
   "WS.TASK.TRANSITION_REJECTED": "現在の状態からは、この状態の変更はできません",
   "WS.TASK.TRANSITION_UNKNOWN": "不明な状態の変更です",
   "WS.TASK.UPDATE_CONFLICT": "このタスクは他のユーザーに更新されました",

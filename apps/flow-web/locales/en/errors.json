@@ -304,6 +304,8 @@
   "WS.TASK.DEPENDENCY_CYCLE": "Adding this dependency would create a cycle",
   "WS.TASK.IDEMPOTENCY_KEY_CONFLICT": "This idempotency key has already been used for a different task request",
   "WS.TASK.NOT_FOUND": "Task not found",
+  "WS.TASK.PARENT_CYCLE": "A task cannot be its own ancestor",
+  "WS.TASK.PARENT_PROJECT_MISMATCH": "A subtask must belong to the same project as its parent",
   "WS.TASK.TRANSITION_REJECTED": "Task transition not allowed in current state",
   "WS.TASK.TRANSITION_UNKNOWN": "Unknown task transition",
   "WS.TASK.UPDATE_CONFLICT": "Task was modified by someone else",

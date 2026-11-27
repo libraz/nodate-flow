@@ -5411,7 +5411,7 @@ export interface components {
              */
             readonly $schema?: string;
             /** @enum {string} */
-            kind: "blocks" | "relates" | "duplicates" | "subtask_of";
+            kind: "blocks" | "relates" | "duplicates";
             /** @description Target task public id (UUID v7) */
             toTaskId: string;
         };
@@ -6658,6 +6658,8 @@ export interface components {
             description?: string;
             /** @description YYYY-MM-DD */
             dueOn?: string;
+            /** @description Parent task public id (UUID v7). Makes the new task a subtask; the parent must be visible to the caller and in the same project. */
+            parentTaskId?: string;
             /** Format: int32 */
             priority?: number;
             /** @description Project public id (UUID v7) */
@@ -9331,6 +9333,8 @@ export interface components {
             dueOn?: string;
             /** @description Apply only if the current due date matches this YYYY-MM-DD value. Use an empty string to require no due date. */
             expectedDueOn?: string;
+            /** @description Parent task public id (UUID v7) to make this task a subtask, or empty string to clear the parent. The parent must be visible to the caller and in the same project. */
+            parentTaskId?: string;
             /** Format: int32 */
             priority?: number;
             /**
@@ -14593,6 +14597,10 @@ export interface operations {
                 dueFrom?: string;
                 /** @description Inclusive upper bound for dueOn (YYYY-MM-DD). Uses offset pagination. */
                 dueThrough?: string;
+                /** @description Only direct children of this task (task public id, UUID v7). Cannot be combined with topLevel. */
+                parentTaskId?: string;
+                /** @description Only tasks that have no parent. Cannot be combined with parentTaskId. */
+                topLevel?: boolean;
                 /** @description Opaque cursor returned by previous page; pass to fetch next page. Empty when at end. Cannot be combined with dueFrom or dueThrough. */
                 cursor?: string;
                 limit?: number;

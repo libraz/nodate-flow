@@ -96,6 +96,10 @@ var (
 	WsTaskIdempotencyKeyConflict = &Spec{Code: "WS.TASK.IDEMPOTENCY_KEY_CONFLICT", Status: 409, Message: "This idempotency key has already been used for a different task request", Description: "Returned when a task mutation reuses an idempotency key with a different task or request body.", UserAction: "Retry with the original request, or use a new key for a different operation."}
 	// WS.TASK.NOT_FOUND — Task not found
 	WsTaskNotFound = &Spec{Code: "WS.TASK.NOT_FOUND", Status: 404, Message: "Task not found", Description: "Returned when a task with the given public_id does not exist or has been deleted in the current workspace.", UserAction: "Verify the task ID, or refresh the list to see current tasks."}
+	// WS.TASK.PARENT_CYCLE — A task cannot be its own ancestor
+	WsTaskParentCycle = &Spec{Code: "WS.TASK.PARENT_CYCLE", Status: 422, Message: "A task cannot be its own ancestor", Description: "Returned when re-parenting a task would make it its own ancestor: the proposed parent is the task itself, one of its descendants, or sits in a parent chain deeper than the supported depth.", UserAction: "Pick a parent that is not the task itself or one of its subtasks."}
+	// WS.TASK.PARENT_PROJECT_MISMATCH — A subtask must belong to the same project as its parent
+	WsTaskParentProjectMismatch = &Spec{Code: "WS.TASK.PARENT_PROJECT_MISMATCH", Status: 422, Message: "A subtask must belong to the same project as its parent", Description: "Returned when a task is created with a parentTaskId whose task lives in a different project (or workspace) than the new task.", UserAction: "Create the subtask in the parent's project, or pick a parent from the same project."}
 	// WS.TASK.TRANSITION_REJECTED — Task transition not allowed in current state
 	WsTaskTransitionRejected = &Spec{Code: "WS.TASK.TRANSITION_REJECTED", Status: 422, Message: "Task transition not allowed in current state", Description: "Returned by the constraint engine when the requested transition is illegal for the task's current lifecycle state.", UserAction: "Refresh the task to see its current state and choose a valid transition."}
 	// WS.TASK.TRANSITION_UNKNOWN — Unknown task transition

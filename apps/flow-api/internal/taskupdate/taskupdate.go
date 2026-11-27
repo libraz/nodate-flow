@@ -38,6 +38,21 @@ var ErrTaskNotFound = errors.New("taskupdate: task not found")
 // stored due date differs from it.
 var ErrDueOnConflict = errors.New("taskupdate: stored due date differs from the expected one")
 
+// ErrParentCycle is returned when the proposed parent is the task itself,
+// one of its descendants, or sits in a chain deeper than [MaxParentDepth].
+var ErrParentCycle = errors.New("taskupdate: parent would make the task its own ancestor")
+
+// ErrParentProjectMismatch is returned when the proposed parent belongs to
+// another project than the task.
+var ErrParentProjectMismatch = errors.New("taskupdate: parent is in a different project")
+
+// ErrParentNotFound is returned when the proposed parent does not exist in
+// the task's workspace.
+var ErrParentNotFound = errors.New("taskupdate: parent not found")
+
+// MaxParentDepth caps the ancestor walk of the cycle check.
+const MaxParentDepth = 32
+
 // errRestoreShape is returned when a restore carries anything but the
 // description it restores.
 var errRestoreShape = errors.New("taskupdate: a restore patches the description only")
@@ -66,6 +81,40 @@ type Patch struct {
 	// ExpectedDueOn, when non-nil, makes the update conditional on the
 	// stored due date equalling it (invalid = no due date).
 	ExpectedDueOn *sql.NullTime
+	// Parent, when non-nil, re-parents the task; a nil ParentID clears the
+	// link. The caller has already authorized the parent for the actor.
+	Parent *ParentChange
+}
+
+// ParentChange names the new parent of a task.
+type ParentChange struct {
+	// ID is the parent's internal id; invalid clears the parent.
+	ID sql.NullInt32
+	// PublicID is the parent's public id, recorded in the event payload.
+	PublicID types.PublicID
+}
+
+// parentLink is the slice of a task row the ancestor walk reads.
+type parentLink func(id uint32) (parent sql.NullInt32, err error)
+
+// checkParentChain refuses a parent that is the task itself or whose
+// ancestor chain reaches the task, within [MaxParentDepth] hops.
+func checkParentChain(self, proposed uint32, link parentLink) error {
+	cur := proposed
+	for i := 0; i <= MaxParentDepth; i++ {
+		if cur == self {
+			return ErrParentCycle
+		}
+		next, err := link(cur)
+		if err != nil {
+			return err
+		}
+		if !next.Valid {
+			return nil
+		}
+		cur = uint32(next.Int32) //#nosec G115 -- parent_task_id is tasks.id, fits uint32
+	}
+	return ErrParentCycle
 }
 
 // Args identifies the task, the change and who makes it.
@@ -111,7 +160,7 @@ func Apply(ctx context.Context, tx *dbretry.Tx, args Args) (Result, error) {
 	restoring := args.RestoredFrom != (types.PublicID{})
 	p := args.Patch
 	if restoring && (p.Description == nil || p.Title != nil || p.Priority != nil || p.DueOn != nil ||
-		p.StartOn != nil || p.SortWeight != nil || p.Visibility != nil || p.ExpectedDueOn != nil) {
+		p.StartOn != nil || p.SortWeight != nil || p.Visibility != nil || p.ExpectedDueOn != nil || p.Parent != nil) {
 		return Result{}, errRestoreShape
 	}
 	if args.Actor.UserID != 0 && args.Actor.AgentID != 0 {
@@ -197,6 +246,45 @@ func Apply(ctx context.Context, tx *dbretry.Tx, args Args) (Result, error) {
 			return Result{}, err
 		}
 		needsItemkit = linked > 0
+	}
+
+	parentChanged := false
+	if p.Parent != nil {
+		self, err := q.GetTaskParentLink(ctx, generated.GetTaskParentLinkParams{WorkspaceID: args.WorkspaceID, ID: args.TaskID})
+		if err != nil {
+			return Result{}, err
+		}
+		if p.Parent.ID.Valid {
+			proposed := uint32(p.Parent.ID.Int32) //#nosec G115 -- tasks.id fits uint32
+			target, err := q.GetTaskParentLink(ctx, generated.GetTaskParentLinkParams{WorkspaceID: args.WorkspaceID, ID: proposed})
+			if err != nil {
+				if errors.Is(err, sql.ErrNoRows) {
+					return Result{}, ErrParentNotFound
+				}
+				return Result{}, err
+			}
+			if target.ProjectID != self.ProjectID {
+				return Result{}, ErrParentProjectMismatch
+			}
+			if err := checkParentChain(args.TaskID, proposed, func(id uint32) (sql.NullInt32, error) {
+				l, err := q.GetTaskParentLink(ctx, generated.GetTaskParentLinkParams{WorkspaceID: args.WorkspaceID, ID: id})
+				return l.ParentTaskID, err
+			}); err != nil {
+				return Result{}, err
+			}
+		}
+		parentChanged = p.Parent.ID != self.ParentTaskID
+		if parentChanged {
+			updatedBy := sql.NullInt32{Int32: int32(args.Actor.UserID), Valid: args.Actor.UserID != 0} //#nosec G115 -- users.id fits int32 within realistic deployments
+			if _, err := q.SetTaskParent(ctx, generated.SetTaskParentParams{
+				ParentTaskID:    p.Parent.ID,
+				UpdatedByUserID: updatedBy,
+				WorkspaceID:     args.WorkspaceID,
+				ID:              args.TaskID,
+			}); err != nil {
+				return Result{}, err
+			}
+		}
 	}
 
 	updatedBy := sql.NullInt32{Int32: int32(args.Actor.UserID), Valid: args.Actor.UserID != 0} //#nosec G115 -- users.id fits int32 within realistic deployments
@@ -310,6 +398,13 @@ func Apply(ctx context.Context, tx *dbretry.Tx, args Args) (Result, error) {
 		res.Payload["restoredVersionId"] = args.RestoredFrom.String()
 		res.Payload["newVersionId"] = res.Version.PublicID.String()
 		res.Payload["versionNumber"] = res.Version.Number
+	}
+	if parentChanged {
+		if p.Parent.ID.Valid {
+			res.Payload["parentTaskId"] = p.Parent.PublicID.String()
+		} else {
+			res.Payload["parentTaskId"] = nil
+		}
 	}
 	if args.Via != "" {
 		res.Payload["via"] = args.Via

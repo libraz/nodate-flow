@@ -231,6 +231,16 @@ export const WsErrors = {
     status: 404,
     message: "Task not found",
   },
+  WS_TASK_PARENT_CYCLE: {
+    code: "WS.TASK.PARENT_CYCLE",
+    status: 422,
+    message: "A task cannot be its own ancestor",
+  },
+  WS_TASK_PARENT_PROJECT_MISMATCH: {
+    code: "WS.TASK.PARENT_PROJECT_MISMATCH",
+    status: 422,
+    message: "A subtask must belong to the same project as its parent",
+  },
   WS_TASK_TRANSITION_REJECTED: {
     code: "WS.TASK.TRANSITION_REJECTED",
     status: 422,

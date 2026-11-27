@@ -103,15 +103,6 @@ func TestEvaluate_DepOpenAtMost_IgnoresNonBlockingKinds(t *testing.T) {
 		t.Fatal("expected unsatisfied: a blocking open dep must count")
 	}
 
-	// subtask_of is blocking too.
-	ok, _ = Evaluate(c, Facts{
-		DependencyStates: map[string]string{"a": "waiting"},
-		DependencyKinds:  map[string]string{"a": "subtask_of"},
-	})
-	if ok {
-		t.Fatal("expected unsatisfied: subtask_of is a blocking kind")
-	}
-
 	// done / cancelled blocking deps do not count as open.
 	ok, _ = Evaluate(c, Facts{
 		DependencyStates: map[string]string{"a": "done", "b": "cancelled"},

@@ -25,7 +25,7 @@ type Facts struct {
 	DependencyStates map[string]string
 	// DependencyKinds maps a referenced task public_id to its
 	// dependency kind ("blocks" / "relates" / "duplicates" /
-	// "subtask_of" / "retro_of"). dependency.open_at_most only
+	// "retro_of"). dependency.open_at_most only
 	// counts kinds that actually gate progress (see blockingDepKind);
 	// informational links like "relates" / "retro_of" never block.
 	// A public_id absent from this map is treated as blocking so that

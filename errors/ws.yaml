@@ -266,6 +266,24 @@ resources:
         description: "Returned when a new task dependency edge has the same source, target and kind as an edge that already exists."
         userAction: "The dependency is already in place; no change is needed."
 
+      parent_cycle:
+        code: WS.TASK.PARENT_CYCLE
+        status: 422
+        message: "A task cannot be its own ancestor"
+        message_ja: "タスクを自分自身または自分の子孫の下に置くことはできません"
+        message_zh: "任务不能成为其自身或其后代任务的子任务"
+        description: "Returned when re-parenting a task would make it its own ancestor: the proposed parent is the task itself, one of its descendants, or sits in a parent chain deeper than the supported depth."
+        userAction: "Pick a parent that is not the task itself or one of its subtasks."
+
+      parent_project_mismatch:
+        code: WS.TASK.PARENT_PROJECT_MISMATCH
+        status: 422
+        message: "A subtask must belong to the same project as its parent"
+        message_ja: "サブタスクは親タスクと同じプロジェクトに属する必要があります"
+        message_zh: "子任务必须与其父任务属于同一项目"
+        description: "Returned when a task is created with a parentTaskId whose task lives in a different project (or workspace) than the new task."
+        userAction: "Create the subtask in the parent's project, or pick a parent from the same project."
+
   task_agent:
     breadcrumb: "Workspace > Task > Agent"
     errors:

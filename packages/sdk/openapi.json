@@ -319,7 +319,7 @@
             "type": "string"
           },
           "kind": {
-            "enum": ["blocks", "relates", "duplicates", "subtask_of"],
+            "enum": ["blocks", "relates", "duplicates"],
             "type": "string"
           },
           "toTaskId": {
@@ -2998,6 +2998,10 @@
           },
           "dueOn": {
             "description": "YYYY-MM-DD",
+            "type": "string"
+          },
+          "parentTaskId": {
+            "description": "Parent task public id (UUID v7). Makes the new task a subtask; the parent must be visible to the caller and in the same project.",
             "type": "string"
           },
           "priority": {
@@ -8891,6 +8895,10 @@
           },
           "expectedDueOn": {
             "description": "Apply only if the current due date matches this YYYY-MM-DD value. Use an empty string to require no due date.",
+            "type": "string"
+          },
+          "parentTaskId": {
+            "description": "Parent task public id (UUID v7) to make this task a subtask, or empty string to clear the parent. The parent must be visible to the caller and in the same project.",
             "type": "string"
           },
           "priority": {
@@ -18891,6 +18899,26 @@
               "description": "Inclusive upper bound for dueOn (YYYY-MM-DD). Uses offset pagination.",
               "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
               "type": "string"
+            }
+          },
+          {
+            "description": "Only direct children of this task (task public id, UUID v7). Cannot be combined with topLevel.",
+            "explode": false,
+            "in": "query",
+            "name": "parentTaskId",
+            "schema": {
+              "description": "Only direct children of this task (task public id, UUID v7). Cannot be combined with topLevel.",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only tasks that have no parent. Cannot be combined with parentTaskId.",
+            "explode": false,
+            "in": "query",
+            "name": "topLevel",
+            "schema": {
+              "description": "Only tasks that have no parent. Cannot be combined with parentTaskId.",
+              "type": "boolean"
             }
           },
           {

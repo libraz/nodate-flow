@@ -245,14 +245,15 @@ type CreateTaskActorInput struct {
 // quick-create flow. Pass an explicit non-empty Actors array (including
 // the caller if desired) to opt out of the auto-attach.
 type CreateTaskBody struct {
-	ProjectID   string                 `json:"projectId" doc:"Project public id (UUID v7)"`
-	Title       string                 `json:"title" minLength:"1" maxLength:"500"`
-	Description string                 `json:"description,omitempty" maxLength:"50000"`
-	Priority    int32                  `json:"priority,omitempty" minimum:"0" maximum:"4"`
-	DueOn       string                 `json:"dueOn,omitempty" doc:"YYYY-MM-DD"`
-	StartOn     string                 `json:"startOn,omitempty" doc:"YYYY-MM-DD"`
-	Visibility  string                 `json:"visibility,omitempty" enum:"public,project,private" default:"public" doc:"Task visibility: public (workspace), project (project members), or private (task actors only)"`
-	Actors      []CreateTaskActorInput `json:"actors,omitempty" doc:"Optional explicit actor list. When omitted or empty, the caller is auto-attached as the sole assignee."`
+	ProjectID    string                 `json:"projectId" doc:"Project public id (UUID v7)"`
+	ParentTaskID string                 `json:"parentTaskId,omitempty" doc:"Parent task public id (UUID v7). Makes the new task a subtask; the parent must be visible to the caller and in the same project."`
+	Title        string                 `json:"title" minLength:"1" maxLength:"500"`
+	Description  string                 `json:"description,omitempty" maxLength:"50000"`
+	Priority     int32                  `json:"priority,omitempty" minimum:"0" maximum:"4"`
+	DueOn        string                 `json:"dueOn,omitempty" doc:"YYYY-MM-DD"`
+	StartOn      string                 `json:"startOn,omitempty" doc:"YYYY-MM-DD"`
+	Visibility   string                 `json:"visibility,omitempty" enum:"public,project,private" default:"public" doc:"Task visibility: public (workspace), project (project members), or private (task actors only)"`
+	Actors       []CreateTaskActorInput `json:"actors,omitempty" doc:"Optional explicit actor list. When omitted or empty, the caller is auto-attached as the sole assignee."`
 }
 
 // CreateTaskInput is the request for POST /tasks.
@@ -277,17 +278,19 @@ type CreateTaskOutput struct {
 // date filters reject a cursor so callers cannot mistake an offset page
 // for a cursor page.
 type ListTasksInput struct {
-	ProjectID   string   `query:"projectId" doc:"Optional project public id (UUID v7) to scope the list"`
-	WorkspaceID string   `query:"workspaceId" doc:"Workspace public id (UUID v7); required when projectId is not given"`
-	Q           string   `query:"q" doc:"Case-insensitive substring match on title"`
-	State       []string `query:"state" doc:"Filter by derived_state; repeat to OR multiple values"`
-	Assignee    string   `query:"assignee" doc:"Filter to tasks with this user as an assignee (user public id UUID v7)"`
-	Priority    []int32  `query:"priority" minimum:"0" maximum:"4" doc:"Filter by priority level; comma-separate to OR multiple values (priority=4,2)"`
-	DueFrom     string   `query:"dueFrom" pattern:"^\\d{4}-\\d{2}-\\d{2}$" doc:"Inclusive lower bound for dueOn (YYYY-MM-DD). Uses offset pagination."`
-	DueThrough  string   `query:"dueThrough" pattern:"^\\d{4}-\\d{2}-\\d{2}$" doc:"Inclusive upper bound for dueOn (YYYY-MM-DD). Uses offset pagination."`
-	Cursor      string   `query:"cursor" doc:"Opaque cursor returned by previous page; pass to fetch next page. Empty when at end. Cannot be combined with dueFrom or dueThrough."`
-	Limit       int32    `query:"limit" minimum:"1" maximum:"200" default:"50"`
-	Offset      int32    `query:"offset" minimum:"0" default:"0"`
+	ProjectID    string   `query:"projectId" doc:"Optional project public id (UUID v7) to scope the list"`
+	WorkspaceID  string   `query:"workspaceId" doc:"Workspace public id (UUID v7); required when projectId is not given"`
+	Q            string   `query:"q" doc:"Case-insensitive substring match on title"`
+	State        []string `query:"state" doc:"Filter by derived_state; repeat to OR multiple values"`
+	Assignee     string   `query:"assignee" doc:"Filter to tasks with this user as an assignee (user public id UUID v7)"`
+	Priority     []int32  `query:"priority" minimum:"0" maximum:"4" doc:"Filter by priority level; comma-separate to OR multiple values (priority=4,2)"`
+	DueFrom      string   `query:"dueFrom" pattern:"^\\d{4}-\\d{2}-\\d{2}$" doc:"Inclusive lower bound for dueOn (YYYY-MM-DD). Uses offset pagination."`
+	DueThrough   string   `query:"dueThrough" pattern:"^\\d{4}-\\d{2}-\\d{2}$" doc:"Inclusive upper bound for dueOn (YYYY-MM-DD). Uses offset pagination."`
+	ParentTaskID string   `query:"parentTaskId" doc:"Only direct children of this task (task public id, UUID v7). Cannot be combined with topLevel."`
+	TopLevel     bool     `query:"topLevel" doc:"Only tasks that have no parent. Cannot be combined with parentTaskId."`
+	Cursor       string   `query:"cursor" doc:"Opaque cursor returned by previous page; pass to fetch next page. Empty when at end. Cannot be combined with dueFrom or dueThrough."`
+	Limit        int32    `query:"limit" minimum:"1" maximum:"200" default:"50"`
+	Offset       int32    `query:"offset" minimum:"0" default:"0"`
 }
 
 // ListTasksBody is the response payload for GET /tasks.
@@ -395,6 +398,7 @@ type PatchTaskBody struct {
 	DueOn         *string `json:"dueOn,omitempty" doc:"YYYY-MM-DD or empty string to clear"`
 	StartOn       *string `json:"startOn,omitempty" doc:"YYYY-MM-DD or empty string to clear"`
 	SortWeight    *int32  `json:"sortWeight,omitempty" doc:"Display order weight. Lower values sort first."`
+	ParentTaskID  *string `json:"parentTaskId,omitempty" doc:"Parent task public id (UUID v7) to make this task a subtask, or empty string to clear the parent. The parent must be visible to the caller and in the same project."`
 	Visibility    *string `json:"visibility,omitempty" enum:"public,project,private" doc:"Task visibility: public (workspace), project (project members), or private (task actors only)"`
 	ExpectedDueOn *string `json:"expectedDueOn,omitempty" doc:"Apply only if the current due date matches this YYYY-MM-DD value. Use an empty string to require no due date."`
 }
@@ -559,7 +563,7 @@ type ExplainConstraintOutput struct {
 // AddTaskDependencyBody is the JSON body for POST /tasks/{id}/dependencies.
 type AddTaskDependencyBody struct {
 	ToTaskID string `json:"toTaskId" doc:"Target task public id (UUID v7)"`
-	Kind     string `json:"kind" enum:"blocks,relates,duplicates,subtask_of"`
+	Kind     string `json:"kind" enum:"blocks,relates,duplicates"`
 }
 
 // AddTaskDependencyInput is the request for POST /tasks/{id}/dependencies.

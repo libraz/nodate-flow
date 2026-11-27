@@ -304,6 +304,8 @@
   "WS.TASK.DEPENDENCY_CYCLE": "添加此依赖关系会产生循环依赖",
   "WS.TASK.IDEMPOTENCY_KEY_CONFLICT": "此幂等键已用于其他任务请求",
   "WS.TASK.NOT_FOUND": "未找到任务",
+  "WS.TASK.PARENT_CYCLE": "任务不能成为其自身或其后代任务的子任务",
+  "WS.TASK.PARENT_PROJECT_MISMATCH": "子任务必须与其父任务属于同一项目",
   "WS.TASK.TRANSITION_REJECTED": "当前状态不允许进行该状态变更",
   "WS.TASK.TRANSITION_UNKNOWN": "未知的任务状态变更",
   "WS.TASK.UPDATE_CONFLICT": "该任务已被其他用户更新",

@@ -1249,6 +1249,10 @@ type Querier interface {
 	// evaluation's task-row lock. ErrNoRows means the task is disabled or missing
 	// and is not evaluable.
 	GetTaskForEngine(ctx context.Context, arg GetTaskForEngineParams) (GetTaskForEngineRow, error)
+	// Parent link of a task by internal id. Backs the ancestor walk that
+	// rejects cycles before SetTaskParent runs. Returns ids only; the caller
+	// resolves the task through the shared task ACL first.
+	GetTaskParentLink(ctx context.Context, arg GetTaskParentLinkParams) (GetTaskParentLinkRow, error)
 	// Task review and completion policy queries. Every task-side lookup binds
 	// both workspace_id and task_id so a public id or submission id cannot be
 	// replayed under a sibling task's route.
@@ -2462,6 +2466,11 @@ type Querier interface {
 	// workspace_id is required to ensure the update never crosses workspace
 	// boundaries even if the caller passes a foreign tasks.id.
 	SetTaskNumber(ctx context.Context, arg SetTaskNumberParams) error
+	// Re-parent a task by internal id; a NULL parent_task_id clears the link.
+	// updated_by_user_id is appended so the audit field records who moved the
+	// row (NULL for system writers). updated_at is maintained by the column's
+	// ON UPDATE clause.
+	SetTaskParent(ctx context.Context, arg SetTaskParentParams) (int64, error)
 	// Snooze a signal by pushing its received_at forward. Minimal impl;
 	// a dedicated snoozed_until_at column may be added later on.
 	SnoozeInboxItem(ctx context.Context, arg SnoozeInboxItemParams) (int64, error)

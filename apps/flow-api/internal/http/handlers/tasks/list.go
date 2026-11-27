@@ -22,7 +22,7 @@ import (
 // dynamic SQL path.
 func hasListFilters(in *ListTasksInput) bool {
 	return in.Q != "" || len(in.State) > 0 || in.Assignee != "" || len(in.Priority) > 0 ||
-		in.DueFrom != "" || in.DueThrough != ""
+		in.DueFrom != "" || in.DueThrough != "" || in.ParentTaskID != "" || in.TopLevel
 }
 
 // needsDynamicQuery reports whether GET /tasks must use dynamic SQL.
@@ -153,6 +153,19 @@ func listTasksFiltered(
 			where = append(where, "v.priority IN ("+strings.Join(placeholders, ",")+")")
 		}
 	}
+	// parentTaskId was parsed and authorized by the handler before this
+	// runs; the view's parent column is the public id.
+	if in.ParentTaskID != "" {
+		parentPub, err := types.Parse(in.ParentTaskID)
+		if err != nil {
+			return nil, 0, errParentNotFound
+		}
+		where = append(where, "v.parent_task_public_id = ?")
+		args = append(args, parentPub)
+	}
+	if in.TopLevel {
+		where = append(where, "v.parent_task_public_id IS NULL")
+	}
 	if in.Assignee != "" {
 		assigneePub, err := types.Parse(in.Assignee)
 		if err != nil {
@@ -258,6 +271,37 @@ LIMIT ? OFFSET ?`, strings.Join(where, " AND "))
 // this code path swallows the error and returns 200 with zero items.
 var errInvalidAssignee = apierr.New(apierrors.ValidationQueryFieldInvalid)
 
+var errParentNotFound = apierr.New(apierrors.WsTaskNotFound)
+
+// checkParentFilter validates the parentTaskId / topLevel pair and, when a
+// parent is named, confirms it exists in the workspace and is visible to
+// the actor, answering the same not-found an unknown task id gets.
+func checkParentFilter(ctx context.Context, db *sql.DB, workspaceID, actorID uint32, wsRole middleware.WorkspaceRole, in *ListTasksInput) error {
+	if in.ParentTaskID != "" && in.TopLevel {
+		return httpErr(apierrors.ValidationQueryFieldInvalid)
+	}
+	if in.ParentTaskID == "" {
+		return nil
+	}
+	parentPub, err := types.Parse(in.ParentTaskID)
+	if err != nil {
+		return httpErr(apierrors.WsTaskNotFound)
+	}
+	where := "v.workspace_id = ? AND v.public_id = ?"
+	args := []any{workspaceID, parentPub}
+	if visFrag, visArgs := middleware.TaskVisibilityFilter(actorID, wsRole); visFrag != "" {
+		where += " AND " + visFrag
+		args = append(args, visArgs...)
+	}
+	var one int
+	//#nosec G201 -- the fragments are static literals; user values are bound.
+	q := fmt.Sprintf("SELECT 1 FROM v_task_list v WHERE %s LIMIT 1", where)
+	if err := db.QueryRowContext(ctx, q, args...).Scan(&one); err != nil {
+		return httpErr(apierr.SpecForErrNoRows(err, apierrors.WsTaskNotFound, apierrors.InternalUnexpected))
+	}
+	return nil
+}
+
 func parseTaskDueRange(from, through string) (sql.NullTime, sql.NullTime, error) {
 	dueFrom, err := parseDateOrNullTime(from)
 	if err != nil {
@@ -331,6 +375,9 @@ func listPage(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutpu
 				return nil, 0, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsProjectAccessDenied, apierrors.InternalUnexpected))
 			}
 			wsRole := middleware.WorkspaceRole(wsRoleStr)
+			if err := checkParentFilter(ctx, deps.DB, prj.WorkspaceID, actorID, wsRole, in); err != nil {
+				return nil, 0, err
+			}
 			prjVis := acl.ListVisibilityArgs(actorID, acl.WorkspaceRole(wsRole))
 			pubBytes := prjPub.UUID()
 			if needsDynamicQuery(in, wsRole) {
@@ -441,6 +488,9 @@ func listPage(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutpu
 			return nil, 0, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsWorkspaceAccessDenied, apierrors.InternalUnexpected))
 		}
 		wsRole2 := middleware.WorkspaceRole(wsRoleStr2)
+		if err := checkParentFilter(ctx, deps.DB, wsInternal, actorID, wsRole2, in); err != nil {
+			return nil, 0, err
+		}
 		vis := acl.ListVisibilityArgs(actorID, acl.WorkspaceRole(wsRole2))
 		if needsDynamicQuery(in, wsRole2) {
 			in.Limit = limit
