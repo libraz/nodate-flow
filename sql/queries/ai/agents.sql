@@ -24,6 +24,7 @@ SELECT
   a.system_prompt,
   a.temperature,
   a.max_output_tokens,
+  a.kind,
   a.tools_json,
   a.schedule_kind,
   a.paused,
@@ -98,6 +99,30 @@ LIMIT ? OFFSET ?;
 UPDATE ai_agents
 SET schedule_kind = ?
 WHERE workspace_id = ? AND public_id = ? AND enabled = TRUE;
+
+-- name: UpdateAgentTools :execrows
+-- Replace a task agent's per-operation grants. signal_judge rows carry no
+-- grants and are never touched.
+UPDATE ai_agents
+SET tools_json = ?
+WHERE workspace_id = ?
+  AND public_id = ?
+  AND kind = 'task_agent'
+  AND enabled = TRUE;
+
+-- name: GetAgentKindByPublicID :one
+-- Kind, state and grants of an agent by public id. enabled is projected, not
+-- filtered, so callers can tell a deleted agent from an unknown one.
+SELECT
+  id,
+  kind,
+  paused,
+  enabled,
+  tools_json
+FROM ai_agents
+WHERE workspace_id = ?
+  AND public_id = ?
+LIMIT 1;
 
 -- name: ListOnEventAgents :many
 -- List every enabled non-paused agent whose event_trigger_types

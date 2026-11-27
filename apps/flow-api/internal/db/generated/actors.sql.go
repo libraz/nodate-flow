@@ -8,6 +8,7 @@ package generated
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"time"
 
 	types "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
@@ -58,24 +59,28 @@ INSERT INTO task_actors (
   task_id,
   agent_id,
   kind,
-  role
-) VALUES (?, ?, ?, ?, 'agent', ?)
+  role,
+  delegated_by_user_id
+) VALUES (?, ?, ?, ?, 'agent', ?, ?)
 ON DUPLICATE KEY UPDATE
   enabled = TRUE,
-  public_id = VALUES(public_id)
+  public_id = VALUES(public_id),
+  delegated_by_user_id = VALUES(delegated_by_user_id)
 `
 
 type AddAgentActorParams struct {
-	PublicID    types.PublicID `json:"publicId"`
-	WorkspaceID uint32         `json:"-"`
-	TaskID      uint32         `json:"-"`
-	AgentID     sql.NullInt32  `json:"-"`
-	Role        TaskActorsRole `json:"role"`
+	PublicID          types.PublicID `json:"publicId"`
+	WorkspaceID       uint32         `json:"-"`
+	TaskID            uint32         `json:"-"`
+	AgentID           sql.NullInt32  `json:"-"`
+	Role              TaskActorsRole `json:"role"`
+	DelegatedByUserID sql.NullInt32  `json:"-"`
 }
 
 // Attach an AI agent to a task in the given role.
 // Idempotent: if a soft-deleted row already exists for this (task, agent, role),
-// re-enable it and adopt the newly supplied public_id.
+// re-enable it and adopt the newly supplied public_id. delegated_by_user_id is
+// the human making the assignment; re-assigning replaces the delegator.
 func (q *Queries) AddAgentActor(ctx context.Context, arg AddAgentActorParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, addAgentActor,
 		arg.PublicID,
@@ -83,6 +88,7 @@ func (q *Queries) AddAgentActor(ctx context.Context, arg AddAgentActorParams) (i
 		arg.TaskID,
 		arg.AgentID,
 		arg.Role,
+		arg.DelegatedByUserID,
 	)
 	if err != nil {
 		return 0, err
@@ -232,6 +238,9 @@ SELECT
   ta.public_id,
   a.public_id AS agent_public_id,
   a.name      AS agent_name,
+  a.paused,
+  a.kind,
+  a.tools_json,
   ta.role,
   ta.updated_at,
   ta.created_at,
@@ -255,13 +264,16 @@ type ListAgentActorsForTaskParams struct {
 }
 
 type ListAgentActorsForTaskRow struct {
-	PublicID      types.PublicID `json:"publicId"`
-	AgentPublicID types.PublicID `json:"agentPublicId"`
-	AgentName     string         `json:"agentName"`
-	Role          TaskActorsRole `json:"role"`
-	UpdatedAt     sql.NullTime   `json:"updatedAt"`
-	CreatedAt     time.Time      `json:"createdAt"`
-	Total         interface{}    `json:"total"`
+	PublicID      types.PublicID  `json:"publicId"`
+	AgentPublicID types.PublicID  `json:"agentPublicId"`
+	AgentName     string          `json:"agentName"`
+	Paused        bool            `json:"paused"`
+	Kind          AiAgentsKind    `json:"kind"`
+	ToolsJson     json.RawMessage `json:"toolsJson"`
+	Role          TaskActorsRole  `json:"role"`
+	UpdatedAt     sql.NullTime    `json:"updatedAt"`
+	CreatedAt     time.Time       `json:"createdAt"`
+	Total         interface{}     `json:"total"`
 }
 
 // List AI agent actors on a task joined with the agent definition.
@@ -283,6 +295,9 @@ func (q *Queries) ListAgentActorsForTask(ctx context.Context, arg ListAgentActor
 			&i.PublicID,
 			&i.AgentPublicID,
 			&i.AgentName,
+			&i.Paused,
+			&i.Kind,
+			&i.ToolsJson,
 			&i.Role,
 			&i.UpdatedAt,
 			&i.CreatedAt,

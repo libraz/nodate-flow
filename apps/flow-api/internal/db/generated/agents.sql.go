@@ -198,6 +198,47 @@ func (q *Queries) GetAgentGuardSnapshot(ctx context.Context, id uint32) (GetAgen
 	return i, err
 }
 
+const getAgentKindByPublicID = `-- name: GetAgentKindByPublicID :one
+SELECT
+  id,
+  kind,
+  paused,
+  enabled,
+  tools_json
+FROM ai_agents
+WHERE workspace_id = ?
+  AND public_id = ?
+LIMIT 1
+`
+
+type GetAgentKindByPublicIDParams struct {
+	WorkspaceID uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+}
+
+type GetAgentKindByPublicIDRow struct {
+	ID        uint32          `json:"-"`
+	Kind      AiAgentsKind    `json:"kind"`
+	Paused    bool            `json:"paused"`
+	Enabled   bool            `json:"enabled"`
+	ToolsJson json.RawMessage `json:"toolsJson"`
+}
+
+// Kind, state and grants of an agent by public id. enabled is projected, not
+// filtered, so callers can tell a deleted agent from an unknown one.
+func (q *Queries) GetAgentKindByPublicID(ctx context.Context, arg GetAgentKindByPublicIDParams) (GetAgentKindByPublicIDRow, error) {
+	row := q.db.QueryRowContext(ctx, getAgentKindByPublicID, arg.WorkspaceID, arg.PublicID)
+	var i GetAgentKindByPublicIDRow
+	err := row.Scan(
+		&i.ID,
+		&i.Kind,
+		&i.Paused,
+		&i.Enabled,
+		&i.ToolsJson,
+	)
+	return i, err
+}
+
 const getEnabledModelForAgentForShare = `-- name: GetEnabledModelForAgentForShare :one
 SELECT
   m.id,
@@ -243,6 +284,7 @@ SELECT
   a.system_prompt,
   a.temperature,
   a.max_output_tokens,
+  a.kind,
   a.tools_json,
   a.schedule_kind,
   a.paused,
@@ -272,6 +314,7 @@ type ListAgentsForWorkspaceRow struct {
 	SystemPrompt    string               `json:"systemPrompt"`
 	Temperature     uint16               `json:"temperature"`
 	MaxOutputTokens sql.NullInt32        `json:"maxOutputTokens"`
+	Kind            AiAgentsKind         `json:"kind"`
 	ToolsJson       json.RawMessage      `json:"toolsJson"`
 	ScheduleKind    AiAgentsScheduleKind `json:"scheduleKind"`
 	Paused          bool                 `json:"paused"`
@@ -299,6 +342,7 @@ func (q *Queries) ListAgentsForWorkspace(ctx context.Context, arg ListAgentsForW
 			&i.SystemPrompt,
 			&i.Temperature,
 			&i.MaxOutputTokens,
+			&i.Kind,
 			&i.ToolsJson,
 			&i.ScheduleKind,
 			&i.Paused,
@@ -545,6 +589,31 @@ type UpdateAgentScheduleKindParams struct {
 // Update the schedule_kind on an existing agent.
 func (q *Queries) UpdateAgentScheduleKind(ctx context.Context, arg UpdateAgentScheduleKindParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, updateAgentScheduleKind, arg.ScheduleKind, arg.WorkspaceID, arg.PublicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const updateAgentTools = `-- name: UpdateAgentTools :execrows
+UPDATE ai_agents
+SET tools_json = ?
+WHERE workspace_id = ?
+  AND public_id = ?
+  AND kind = 'task_agent'
+  AND enabled = TRUE
+`
+
+type UpdateAgentToolsParams struct {
+	ToolsJson   json.RawMessage `json:"toolsJson"`
+	WorkspaceID uint32          `json:"-"`
+	PublicID    types.PublicID  `json:"publicId"`
+}
+
+// Replace a task agent's per-operation grants. signal_judge rows carry no
+// grants and are never touched.
+func (q *Queries) UpdateAgentTools(ctx context.Context, arg UpdateAgentToolsParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateAgentTools, arg.ToolsJson, arg.WorkspaceID, arg.PublicID)
 	if err != nil {
 		return 0, err
 	}

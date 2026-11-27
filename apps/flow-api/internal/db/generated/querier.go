@@ -22,7 +22,8 @@ type Querier interface {
 	AddActor(ctx context.Context, arg AddActorParams) (int64, error)
 	// Attach an AI agent to a task in the given role.
 	// Idempotent: if a soft-deleted row already exists for this (task, agent, role),
-	// re-enable it and adopt the newly supplied public_id.
+	// re-enable it and adopt the newly supplied public_id. delegated_by_user_id is
+	// the human making the assignment; re-assigning replaces the delegator.
 	AddAgentActor(ctx context.Context, arg AddAgentActorParams) (int64, error)
 	// Record one canonical task public ID included in the provider input. The
 	// caller inserts the invocation and all of its inputs in one transaction.
@@ -376,6 +377,9 @@ type Querier interface {
 	CountActiveUsers(ctx context.Context) (int64, error)
 	// Count all active (non-disabled) workspaces.
 	CountActiveWorkspaces(ctx context.Context) (int64, error)
+	// Live child tasks of a parent created without a user (the agent path), for
+	// the cumulative create_subtask cap.
+	CountAgentCreatedChildren(ctx context.Context, arg CountAgentCreatedChildrenParams) (int64, error)
 	// Count ai.suggestion.{proposed,applied,dismissed} events for a workspace
 	// within the given time window. Used by the AI metrics endpoint
 	// to compute acceptance rate.
@@ -414,11 +418,16 @@ type Querier interface {
 	// Count of the actor's cross-workspace inbox, the total ListInboxForUser
 	// pages through.
 	CountInboxForUser(ctx context.Context, userID uint32) (int64, error)
+	// Live pending proposals of one agent on one task (expired ones do not count).
+	CountPendingProposalsForTaskAgent(ctx context.Context, arg CountPendingProposalsForTaskAgentParams) (int64, error)
 	// How many storage_objects rows hold a key: confirmed ones vouch for the
 	// bytes there, and a referenced reservation is an upload in flight. A
 	// reservation nothing references -- one whose bytes failed their digest --
 	// holds nothing. A drainer that finds a holder leaves the blob to it.
 	CountStorageObjectsHoldingKey(ctx context.Context, storageKey string) (int64, error)
+	// task_work runs an agent started on a task at or after a time (the rate
+	// limit window).
+	CountTaskWorkRunsSince(ctx context.Context, arg CountTaskWorkRunsSinceParams) (int64, error)
 	// Row count behind ListTasksForProject. Filters must stay identical to
 	// that query's WHERE clause or the pager reports a total the list can
 	// never reach -- including the Layer-4 visibility predicate, whose
@@ -914,6 +923,9 @@ type Querier interface {
 	// Find deliveries ready for (re)delivery. Used by the background worker.
 	// d.id is required: used by MarkDeliveryDelivered/Failed/Dead (WHERE id = ?).
 	FindPendingDeliveries(ctx context.Context, limit int32) ([]FindPendingDeliveriesRow, error)
+	// A live pending proposal with the same kind and normalized args. JSON equality
+	// is key-order independent.
+	FindPendingDuplicateProposal(ctx context.Context, arg FindPendingDuplicateProposalParams) (types.PublicID, error)
 	FindPendingTaskHandoffForRole(ctx context.Context, arg FindPendingTaskHandoffForRoleParams) (uint32, error)
 	FindPendingTaskHandoffFromHolderForUpdate(ctx context.Context, arg FindPendingTaskHandoffFromHolderForUpdateParams) (FindPendingTaskHandoffFromHolderForUpdateRow, error)
 	// Resolve a project by its human-readable identifier within a workspace.
@@ -1109,6 +1121,11 @@ type Querier interface {
 	// Lock the row that collides on (provider_id, name) after a duplicate-key
 	// insert. Name matching is case-insensitive (column collation).
 	GetAIModelByNameForUpdate(ctx context.Context, arg GetAIModelByNameForUpdateParams) (GetAIModelByNameForUpdateRow, error)
+	// Lock one proposal of a task by its public id, with the proposing agent's
+	// current state. The agent's enabled and paused flags are projected rather
+	// than filtered: a deleted agent must reach the caller so the proposal can be
+	// marked stale instead of vanishing.
+	GetAgentActionProposalForUpdate(ctx context.Context, arg GetAgentActionProposalForUpdateParams) (GetAgentActionProposalForUpdateRow, error)
 	// Fetch the minimal fields an agent runner needs to invoke an LLM, including
 	// the provider that owns the agent's model.
 	GetAgentForExec(ctx context.Context, arg GetAgentForExecParams) (GetAgentForExecRow, error)
@@ -1122,6 +1139,9 @@ type Querier interface {
 	// the documented "inherit from the token" case, which carries no scope
 	// restriction, and it has to reach the guard as a scannable JSON value.
 	GetAgentGuardSnapshot(ctx context.Context, id uint32) (GetAgentGuardSnapshotRow, error)
+	// Kind, state and grants of an agent by public id. enabled is projected, not
+	// filtered, so callers can tell a deleted agent from an unknown one.
+	GetAgentKindByPublicID(ctx context.Context, arg GetAgentKindByPublicIDParams) (GetAgentKindByPublicIDRow, error)
 	// ============================================================================
 	// ai_settings queries
 	// Per-workspace AI knobs: embed model, daily embed budget, the
@@ -1132,6 +1152,9 @@ type Querier interface {
 	// workspace has never written a row; the caller should fall back to the
 	// column defaults (mock-768 / 100 cents/day / 0.870 / 0.750).
 	GetAiSettings(ctx context.Context, workspaceID uint32) (GetAiSettingsRow, error)
+	// The enabled assignee row of an agent on a task. No row means the agent is
+	// not assigned; a NULL delegated_by_user_id means no delegator is recorded.
+	GetAssigneeDelegator(ctx context.Context, arg GetAssigneeDelegatorParams) (sql.NullInt32, error)
 	// Fetch a single attachment by its public id within a workspace, with the
 	// backing storage_objects metadata. Used by download / detail handlers.
 	// The task_id predicate binds the attachment to the task whose ACL the
@@ -1182,8 +1205,17 @@ type Querier interface {
 	// while holding the task row lock. The newest event distinguishes blocked
 	// waiting work from legacy waiting work that remains submit-capable.
 	GetLatestTaskTransitionForSubmission(ctx context.Context, arg GetLatestTaskTransitionForSubmissionParams) (string, error)
+	// Highest contextEventId among an agent's finished task_work runs on a task
+	// whose endedReason is one of the given values; 0 when none. Only the run
+	// completed event type is read; failed runs never coalesce later events.
+	GetLatestTaskWorkContextEventID(ctx context.Context, arg GetLatestTaskWorkContextEventIDParams) (int64, error)
+	// Highest events.id of a task among the given transition event types; 0 when
+	// the task has none. Types are passed in so no event kind is written here.
+	GetLatestTransitionEventID(ctx context.Context, arg GetLatestTransitionEventIDParams) (int64, error)
 	// Fetch a single lens by its public_id.
 	GetLensByPublicID(ctx context.Context, arg GetLensByPublicIDParams) (GetLensByPublicIDRow, error)
+	// Highest events.id recorded on a task; 0 when it has none.
+	GetMaxTaskEventID(ctx context.Context, arg GetMaxTaskEventIDParams) (int64, error)
 	// The agent byline a mention snapshots so it survives the agent's deletion.
 	GetMentionActorAgentByline(ctx context.Context, arg GetMentionActorAgentBylineParams) (GetMentionActorAgentBylineRow, error)
 	// Load, for a set of recipients in one workspace, every stored
@@ -1364,6 +1396,9 @@ type Querier interface {
 	// Register a model under a provider. Duplicate (provider_id, name) raises a
 	// duplicate-key error for the caller to handle.
 	InsertAIModel(ctx context.Context, arg InsertAIModelParams) (int64, error)
+	// Record a task operation an agent chose but did not apply. status defaults to
+	// 'pending'; (run_key, step) is unique so a retried step cannot double-insert.
+	InsertAgentActionProposal(ctx context.Context, arg InsertAgentActionProposalParams) (int64, error)
 	// Insert a hashed recovery code for a user.
 	InsertRecoveryCode(ctx context.Context, arg InsertRecoveryCodeParams) error
 	// Insert an inbound signal (manual or webhook).
@@ -1407,6 +1442,14 @@ type Querier interface {
 	ListActorsForTask(ctx context.Context, arg ListActorsForTaskParams) ([]ListActorsForTaskRow, error)
 	// List AI agent actors on a task joined with the agent definition.
 	ListAgentActorsForTask(ctx context.Context, arg ListAgentActorsForTaskParams) ([]ListAgentActorsForTaskRow, error)
+	// task-visibility: not-applicable — agent reader; the query requires t.visibility = 'public'
+	// Public child tasks of a task for an agent's prompt: title and state only.
+	ListAgentContextChildTasks(ctx context.Context, arg ListAgentContextChildTasksParams) ([]ListAgentContextChildTasksRow, error)
+	// The newest comments of a public task for an agent's prompt, newest first.
+	// author_kind says human or agent; the display name is the user's for a human
+	// and the retained byline for an agent. The task join carries the visibility
+	// gate: a task that is not public yields nothing.
+	ListAgentContextComments(ctx context.Context, arg ListAgentContextCommentsParams) ([]ListAgentContextCommentsRow, error)
 	// List recent agent run events scoped to a single task. The append-only
 	// events table is the source of truth for run history; agent_runs rows are
 	// a transient scheduler queue and the orchestrator does not stamp a back-
@@ -1432,6 +1475,9 @@ type Querier interface {
 	// alias `e_chk` (reverse check), backed by idx_events_reverses
 	// (workspace_id, reverses_event_id) so the per-row scan stays bounded.
 	ListAgentRunsByTask(ctx context.Context, arg ListAgentRunsByTaskParams) ([]ListAgentRunsByTaskRow, error)
+	// The recorded steps of one task_work run, in step order. The step event type
+	// is passed in so no event kind is written here; runKey is compared as text.
+	ListAgentTaskSteps(ctx context.Context, arg ListAgentTaskStepsParams) ([]ListAgentTaskStepsRow, error)
 	// List the AI agents currently attached to a task as enabled actors. Used
 	// by the agent runtime's scoped event fan-out (schedule_scope =
 	// 'assigned_tasks') to enumerate the candidate agents for a given task
@@ -1932,6 +1978,8 @@ type Querier interface {
 	// conditional UPDATE, so this read takes no locks: a row listed here may
 	// already have been taken by another replica by the time it is claimed.
 	ListPendingImportJobs(ctx context.Context, limit int32) ([]ListPendingImportJobsRow, error)
+	// Live pending proposals of one agent on one task, oldest first.
+	ListPendingProposalsForTaskAgent(ctx context.Context, arg ListPendingProposalsForTaskAgentParams) ([]ListPendingProposalsForTaskAgentRow, error)
 	// List pending suggestions where a task is either the source or target.
 	// Joins tasks for human-readable titles and public IDs.
 	ListPendingSuggestionsForTask(ctx context.Context, arg ListPendingSuggestionsForTaskParams) ([]ListPendingSuggestionsForTaskRow, error)
@@ -1957,6 +2005,10 @@ type Querier interface {
 	// The primary assignee rule of v_task_list_all: the first assignee in
 	// display order, with no name when that actor is an agent or disabled.
 	ListProposalCacheTaskInputs(ctx context.Context, arg ListProposalCacheTaskInputsParams) ([]ListProposalCacheTaskInputsRow, error)
+	// Proposals of every agent on a task, newest first. A NULL status returns all
+	// statuses. user_public_id / decided_by_display_name come from a LEFT JOIN and
+	// are the decider (zero UUID / NULL while undecided or if the user is gone).
+	ListProposalsForTask(ctx context.Context, arg ListProposalsForTaskParams) ([]ListProposalsForTaskRow, error)
 	// Every model (enabled and disabled) registered under a provider, with the
 	// enabled-agent count for display only (unlocked). is_default is NULL-safe.
 	ListProviderModels(ctx context.Context, arg ListProviderModelsParams) ([]ListProviderModelsRow, error)
@@ -1997,6 +2049,9 @@ type Querier interface {
 	ListReactionsForTask(ctx context.Context, arg ListReactionsForTaskParams) ([]ListReactionsForTaskRow, error)
 	// List recent audit log entries for a workspace via v_audit_recent.
 	ListRecentAudit(ctx context.Context, arg ListRecentAuditParams) ([]ListRecentAuditRow, error)
+	// The newest rejected proposals of one agent on one task, with the reason the
+	// human gave; shown to the agent on its next run.
+	ListRecentRejectedProposals(ctx context.Context, arg ListRecentRejectedProposalsParams) ([]ListRecentRejectedProposalsRow, error)
 	// A task reader gets a bounded immutable history. CurrentSubmission is
 	// derived by the handler from the row matching the task's current revision.
 	ListRecentTaskSubmissionsForWorkflow(ctx context.Context, arg ListRecentTaskSubmissionsForWorkflowParams) ([]ListRecentTaskSubmissionsForWorkflowRow, error)
@@ -2547,10 +2602,16 @@ type Querier interface {
 	UnarchiveTask(ctx context.Context, arg UnarchiveTaskParams) (int64, error)
 	// Change the display label of a model row the caller already holds locked.
 	UpdateAIModelDisplayName(ctx context.Context, arg UpdateAIModelDisplayNameParams) error
+	// Move a pending proposal to a terminal status. The status = 'pending' guard
+	// makes this a claim: 0 rows means another decision already won.
+	UpdateAgentActionProposalStatus(ctx context.Context, arg UpdateAgentActionProposalStatusParams) (int64, error)
 	// Re-point an agent at a model with its (possibly clamped) temperature.
 	UpdateAgentModel(ctx context.Context, arg UpdateAgentModelParams) error
 	// Update the schedule_kind on an existing agent.
 	UpdateAgentScheduleKind(ctx context.Context, arg UpdateAgentScheduleKindParams) (int64, error)
+	// Replace a task agent's per-operation grants. signal_judge rows carry no
+	// grants and are never touched.
+	UpdateAgentTools(ctx context.Context, arg UpdateAgentToolsParams) (int64, error)
 	// Replace stored tokens after a successful refresh.
 	UpdateConnectionTokens(ctx context.Context, arg UpdateConnectionTokensParams) error
 	// Record the highest TOTP time-step that has been accepted for this

@@ -55,3 +55,19 @@ WHERE e.workspace_id = ?
   AND e.type LIKE 'ai.agent.run.%'
 ORDER BY e.occurred_at DESC, e.id DESC
 LIMIT ?;
+
+-- name: ListAgentTaskSteps :many
+-- The recorded steps of one task_work run, in step order. The step event type
+-- is passed in so no event kind is written here; runKey is compared as text.
+SELECT
+  e.public_id,
+  e.payload_json,
+  e.occurred_at
+FROM events e
+WHERE e.workspace_id = sqlc.arg('workspace_id')
+  AND e.task_id = sqlc.arg('task_id')
+  AND e.type = sqlc.arg('step_type')
+  AND e.enabled = TRUE
+  AND JSON_UNQUOTE(JSON_EXTRACT(e.payload_json, '$.runKey')) = CAST(sqlc.arg('run_key') AS CHAR)
+ORDER BY CAST(JSON_UNQUOTE(JSON_EXTRACT(e.payload_json, '$.step')) AS UNSIGNED) ASC, e.id ASC
+LIMIT 64;

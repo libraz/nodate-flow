@@ -315,6 +315,64 @@ func (q *Queries) ListAgentRunsByTask(ctx context.Context, arg ListAgentRunsByTa
 	return items, nil
 }
 
+const listAgentTaskSteps = `-- name: ListAgentTaskSteps :many
+SELECT
+  e.public_id,
+  e.payload_json,
+  e.occurred_at
+FROM events e
+WHERE e.workspace_id = ?
+  AND e.task_id = ?
+  AND e.type = ?
+  AND e.enabled = TRUE
+  AND JSON_UNQUOTE(JSON_EXTRACT(e.payload_json, '$.runKey')) = CAST(? AS CHAR)
+ORDER BY CAST(JSON_UNQUOTE(JSON_EXTRACT(e.payload_json, '$.step')) AS UNSIGNED) ASC, e.id ASC
+LIMIT 64
+`
+
+type ListAgentTaskStepsParams struct {
+	WorkspaceID uint32        `json:"-"`
+	TaskID      sql.NullInt32 `json:"-"`
+	StepType    string        `json:"stepType"`
+	RunKey      interface{}   `json:"runKey"`
+}
+
+type ListAgentTaskStepsRow struct {
+	PublicID    types.PublicID  `json:"publicId"`
+	PayloadJson json.RawMessage `json:"payloadJson"`
+	OccurredAt  time.Time       `json:"occurredAt"`
+}
+
+// The recorded steps of one task_work run, in step order. The step event type
+// is passed in so no event kind is written here; runKey is compared as text.
+func (q *Queries) ListAgentTaskSteps(ctx context.Context, arg ListAgentTaskStepsParams) ([]ListAgentTaskStepsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listAgentTaskSteps,
+		arg.WorkspaceID,
+		arg.TaskID,
+		arg.StepType,
+		arg.RunKey,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAgentTaskStepsRow{}
+	for rows.Next() {
+		var i ListAgentTaskStepsRow
+		if err := rows.Scan(&i.PublicID, &i.PayloadJson, &i.OccurredAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const markAgentRunClaimed = `-- name: MarkAgentRunClaimed :exec
 UPDATE agent_runs
 SET status = 'claimed',

@@ -38,18 +38,21 @@ LIMIT ? OFFSET ?;
 -- name: AddAgentActor :execlastid
 -- Attach an AI agent to a task in the given role.
 -- Idempotent: if a soft-deleted row already exists for this (task, agent, role),
--- re-enable it and adopt the newly supplied public_id.
+-- re-enable it and adopt the newly supplied public_id. delegated_by_user_id is
+-- the human making the assignment; re-assigning replaces the delegator.
 INSERT INTO task_actors (
   public_id,
   workspace_id,
   task_id,
   agent_id,
   kind,
-  role
-) VALUES (?, ?, ?, ?, 'agent', ?)
+  role,
+  delegated_by_user_id
+) VALUES (?, ?, ?, ?, 'agent', ?, ?)
 ON DUPLICATE KEY UPDATE
   enabled = TRUE,
-  public_id = VALUES(public_id);
+  public_id = VALUES(public_id),
+  delegated_by_user_id = VALUES(delegated_by_user_id);
 
 -- name: ListAgentActorsForTask :many
 -- List AI agent actors on a task joined with the agent definition.
@@ -57,6 +60,9 @@ SELECT
   ta.public_id,
   a.public_id AS agent_public_id,
   a.name      AS agent_name,
+  a.paused,
+  a.kind,
+  a.tools_json,
   ta.role,
   ta.updated_at,
   ta.created_at,
