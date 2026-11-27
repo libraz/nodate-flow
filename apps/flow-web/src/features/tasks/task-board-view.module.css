@@ -11,6 +11,23 @@
   scroll-padding-inline: var(--nf-space-1);
   padding-block-end: var(--nf-space-4);
   max-inline-size: 100%;
+  /*
+   * Fills the viewport below the shell's top bar and above the dock: scroll the
+   * page once and the board spans the screen, each column scrolling inside it.
+   */
+  grid-template-rows: minmax(0, 1fr);
+  block-size: max(24rem, calc(100dvh - var(--nf-topbar-height) - var(--nf-dock-clearance)));
+}
+
+/* The collapsed Cancelled column is a narrow rail after the full columns. */
+.board[data-rail="true"] {
+  /* nf-token-override: rail width, wide enough for its icon and a two-digit count */
+  grid-template-columns: repeat(var(--col-count, 4), minmax(17rem, 1fr)) 3.5rem;
+}
+
+/* The held card's cursor, inherited by the cards and links inside the board. */
+.board[data-drag-active="true"] {
+  --nf-board-card-cursor: grabbing;
 }
 
 .column {
@@ -18,8 +35,8 @@
   flex-direction: column;
   gap: var(--nf-space-3);
   scroll-snap-align: start;
-  /* nf-token-override: component dimension, not a spacing step */
-  min-block-size: 24rem;
+  min-block-size: 0;
+  position: relative;
 }
 
 .columnHeader {
@@ -38,15 +55,143 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Wraps the scrolling list so the drop hint can sit over it without scrolling away. */
+.zone {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-block-size: 0;
+}
+
 .dropZone {
   --presence-gap: var(--nf-space-3);
   display: flex;
   flex-direction: column;
   gap: var(--presence-gap);
   padding: var(--nf-space-1);
-  border-radius: var(--nf-radius-md);
-  /* nf-token-override: component dimension, not a spacing step */
-  min-block-size: 6rem;
+  border: var(--nf-space-px) dashed transparent;
+  /* Concentric with the cards inside: card radius plus the gap around them. */
+  border-radius: calc(var(--nf-radius-lg) + var(--nf-space-1) + var(--nf-space-px));
+  flex: 1 1 auto;
+  min-block-size: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--nf-color-border) transparent;
+  scrollbar-gutter: stable;
+  transition:
+    background-color var(--nf-duration-base) var(--nf-ease-standard),
+    border-color var(--nf-duration-base) var(--nf-ease-standard);
+}
+
+/*
+ * While a card is held: legal targets invite with a dashed outline, the hovered
+ * one commits with a solid outline and the accent wash, the rest recede.
+ */
+.column[data-drop="legal"] .dropZone {
+  border-color: color-mix(in oklab, var(--nf-color-accent) 28%, transparent);
+}
+
+.column[data-drop="over"] .dropZone {
+  border-style: solid;
+  border-color: color-mix(in oklab, var(--nf-color-accent) 28%, transparent);
+  background: var(--nf-color-accent-subtle);
+}
+
+/* A veil rather than opacity/filter, which would flatten the glass behind the cards. */
+.column[data-drop="illegal"],
+.column[data-drop="illegal"] *,
+.rail[data-drop="illegal"],
+.rail[data-drop="illegal"] * {
+  --nf-board-card-cursor: not-allowed;
+  cursor: not-allowed;
+}
+
+.column[data-drop="illegal"]::after,
+.rail[data-drop="illegal"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--nf-radius-lg);
+  background: color-mix(in oklab, var(--nf-color-bg) 55%, transparent);
+  pointer-events: none;
+  transition: opacity var(--nf-duration-base) var(--nf-ease-standard);
+}
+
+/* The verb a drop would fire, in the header where the count normally sits. */
+.dropHint {
+  color: var(--nf-color-accent-fg);
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-medium);
+  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
+}
+
+.railToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--nf-space-1);
+  border: 0;
+  border-radius: var(--nf-radius-sm);
+  background: none;
+  color: var(--nf-color-fg-muted);
+  cursor: pointer;
+}
+
+.railToggle:hover {
+  color: var(--nf-color-fg);
+  background: var(--nf-color-bg-sunken);
+}
+
+.railToggle:focus-visible,
+.railButton:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.rail {
+  position: relative;
+  display: flex;
+  min-block-size: 0;
+  scroll-snap-align: start;
+}
+
+.railCard {
+  display: flex;
+  flex: 1 1 auto;
+  min-block-size: 0;
+  padding: 0;
+  background: var(--nf-color-surface);
+}
+
+.rail[data-drop="legal"] .railCard {
+  border-style: dashed;
+  border-color: color-mix(in oklab, var(--nf-color-accent) 28%, transparent);
+}
+
+.rail[data-drop="over"] .railCard {
+  border-color: color-mix(in oklab, var(--nf-color-accent) 28%, transparent);
+  background: var(--nf-color-accent-subtle);
+}
+
+.railButton {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--nf-space-3);
+  padding: var(--nf-space-3) var(--nf-space-1);
+  border: 0;
+  border-radius: inherit;
+  background: none;
+  color: var(--nf-color-fg);
+  font: inherit;
+  cursor: pointer;
+}
+
+.railLabel {
+  writing-mode: vertical-rl;
+  font-weight: var(--nf-weight-semibold);
 }
 
 .emptyColumn {
@@ -57,11 +202,17 @@
   color: var(--nf-color-fg-muted);
   font-size: var(--nf-text-sm);
   border: var(--nf-space-px) dashed var(--nf-color-border);
-  border-radius: var(--nf-radius-md);
+  border-radius: var(--nf-radius-lg);
   background: var(--nf-color-bg-sunken);
 }
 
+/* Inside a highlighted drop zone the zone's own outline is enough. */
+.column[data-drop] .emptyColumn {
+  border-color: transparent;
+}
+
 .headerCard {
+  flex-shrink: 0;
   padding: var(--nf-space-3) var(--nf-space-4);
   background: var(--nf-color-surface);
 }
@@ -127,6 +278,61 @@
   }
 }
 
+/* Same fade as the board's sideways edge, on each column's vertical scroll. */
+@property --list-fade-start {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --list-fade-end {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@keyframes list-edge-fade {
+  from {
+    --list-fade-start: 0px;
+    --list-fade-end: var(--nf-space-6);
+  }
+
+  10%,
+  90% {
+    --list-fade-start: var(--nf-space-6);
+    --list-fade-end: var(--nf-space-6);
+  }
+
+  to {
+    --list-fade-start: var(--nf-space-6);
+    --list-fade-end: 0px;
+  }
+}
+
+@supports (animation-timeline: scroll()) {
+  .dropZone {
+    mask-image: linear-gradient(
+      to bottom,
+      transparent,
+      var(--nf-color-fg) var(--list-fade-start),
+      var(--nf-color-fg) calc(100% - var(--list-fade-end)),
+      transparent
+    );
+    animation: list-edge-fade linear both;
+    animation-timeline: scroll(self block);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dropZone {
+    transition: none;
+  }
+
+  .dropHint {
+    animation: none;
+  }
+}
+
 .limitNotice {
   margin: 0 0 var(--nf-space-3);
   color: var(--nf-color-fg-muted);
@@ -142,7 +348,33 @@
     scroll-snap-type: none;
   }
 
+  .board,
+  .board[data-rail="true"] {
+    block-size: auto;
+    grid-template-rows: none;
+    grid-template-columns: 1fr;
+  }
+
+  .railButton {
+    flex-direction: row;
+    justify-content: space-between;
+    padding: var(--nf-space-3) var(--nf-space-4);
+  }
+
+  .railLabel {
+    writing-mode: horizontal-tb;
+    margin-inline-end: auto;
+  }
+
   .column {
     min-block-size: auto;
+  }
+
+  .dropZone {
+    overflow-y: visible;
+    mask-image: none;
+    animation: none;
+    /* nf-token-override: component dimension, not a spacing step */
+    min-block-size: 6rem;
   }
 }

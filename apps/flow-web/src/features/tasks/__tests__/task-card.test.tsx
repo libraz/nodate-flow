@@ -119,13 +119,30 @@ describe('<TaskCard>', () => {
     }
   });
 
-  it('is not draggable while D&D is disabled', () => {
+  it('keeps native HTML5 drag off', () => {
     renderWithProviders(<TaskCard {...defaultProps()} />);
     const card = screen
       .getByRole('link', { name: 'Design auth flow' })
       .closest('[draggable="false"]');
     expect(card).not.toBeNull();
-    expect(card?.getAttribute('draggable')).toBe('false');
+  });
+
+  it('renders up to three label chips and a +N overflow', () => {
+    const labels = ['A', 'B', 'C', 'D', 'E'].map((name) => ({
+      id: `l-${name}`,
+      name,
+      color: '#336699',
+    }));
+    renderWithProviders(<TaskCard {...defaultProps({ labels })} />);
+
+    for (const name of ['A', 'B', 'C']) expect(screen.getByText(name)).toBeDefined();
+    expect(screen.queryByText('D')).toBeNull();
+    expect(screen.getAllByText('tasks.card.labels_more').length).toBeGreaterThan(0);
+  });
+
+  it('renders no label row without labels', () => {
+    renderWithProviders(<TaskCard {...defaultProps()} />);
+    expect(screen.queryByText('tasks.card.labels_more')).toBeNull();
   });
 
   it('has no a11y violations', async () => {
@@ -134,5 +151,62 @@ describe('<TaskCard>', () => {
     );
     const results = await axe(container);
     expect(results).toHaveNoViolations();
+  });
+
+  it('shows a muted parent line linking to the parent for a subtask', async () => {
+    const onSelect = vi.fn();
+    renderWithProviders(
+      <TaskCard
+        {...defaultProps({
+          onSelect,
+          task: aTaskItem({ parentTaskId: 'task-parent', parentTaskTitle: 'Ship v1' }),
+        })}
+      />,
+    );
+
+    const parent = screen.getByRole('link', { name: 'Ship v1' });
+    expect(parent.getAttribute('href')).toContain('task-parent');
+    expect(parent.getAttribute('title')).toBe('Ship v1');
+    await userEvent.setup().click(parent);
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('falls back to a generic parent label when the title is missing', () => {
+    renderWithProviders(
+      <TaskCard {...defaultProps({ task: aTaskItem({ parentTaskId: 'task-parent' }) })} />,
+    );
+    expect(screen.getByText('tasks.hierarchy.parent_fallback')).toBeDefined();
+  });
+
+  it('shows a subtask count badge only for a parent', () => {
+    const { unmount } = renderWithProviders(
+      <TaskCard {...defaultProps({ task: aTaskItem({ subtaskCount: 3 }) })} />,
+    );
+    expect(screen.getByLabelText('tasks.hierarchy.subtasks')).toBeDefined();
+    unmount();
+    renderWithProviders(<TaskCard {...defaultProps({ task: aTaskItem({ subtaskCount: 0 }) })} />);
+    expect(screen.queryByLabelText('tasks.hierarchy.subtasks')).toBeNull();
+  });
+
+  it('shows a comment count chip only above zero', () => {
+    const { unmount } = renderWithProviders(
+      <TaskCard {...defaultProps({ task: aTaskItem({ commentCount: 4 }) })} />,
+    );
+    expect(screen.getByLabelText('tasks.card.comments')).toBeDefined();
+    unmount();
+    renderWithProviders(<TaskCard {...defaultProps({ task: aTaskItem({ commentCount: 0 }) })} />);
+    expect(screen.queryByLabelText('tasks.card.comments')).toBeNull();
+  });
+
+  it('stacks at most three assignee avatars and names them all', () => {
+    const assignees = ['Ann', 'Bob', 'Cy', 'Di', 'Eve'].map((displayName) => ({
+      id: `u-${displayName}`,
+      displayName,
+    }));
+    renderWithProviders(<TaskCard {...defaultProps({ task: aTaskItem({ assignees }) })} />);
+
+    const stack = screen.getByRole('img', { name: /Ann.*Eve/ });
+    expect(stack.getAttribute('title')).toContain('Di');
+    expect(screen.getByText('tasks.assignee.plus_n')).toBeDefined();
   });
 });

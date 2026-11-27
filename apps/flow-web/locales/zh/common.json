@@ -827,7 +827,12 @@
     "card": {
       "blockedBy": "{count, plural, other {被 # 个任务阻塞}}",
       "labels_more": "+{count}",
-      "labels_more_aria": "另外还有 {count} 个标签"
+      "labels_more_aria": "另外还有 {count} 个标签：{names}",
+      "comments": "{count} 条评论"
+    },
+    "hierarchy": {
+      "parent_fallback": "父任务",
+      "subtasks": "{count} 个子任务"
     },
     "form": {
       "title": "标题",
@@ -901,7 +906,12 @@
       "moved_to": "已移至 {state}",
       "move_menu": "移动任务",
       "move_to": "移至 {state}",
+      "rail": {
+        "expand": "显示“{state}”（{count}）",
+        "collapse": "折叠“{state}”"
+      },
       "dnd": {
+        "drop_hint": "→ {verb}",
         "instructions": "按空格键拾起任务，用左右方向键选择列，再按空格键放下，按 Esc 取消。",
         "lifted": "已拾起“{title}”。当前状态：{state}",
         "over": "“{title}”可以移动到“{state}”",

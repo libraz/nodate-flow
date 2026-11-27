@@ -1,30 +1,62 @@
 /**
  * TaskCard — compact card used inside the board columns.
  *
- * Shows title, priority badge, and due date pill. Drag-and-drop is
- * currently disabled (`draggable=false`); state changes happen through
- * the keyboard-accessible move menu. When D&D is re-enabled in the
- * future, accept `onDragStart` / `onDragEnd` props again and pass
- * `draggable` back to the underlying Card.
+ * Shows title, priority, due date, count badges, label chips and assignees. On
+ * the board it is the drag source: `dragHandle` wires pointer, touch and
+ * keyboard dragging. The title link is the card's keyboard handle (Space lifts,
+ * Enter opens), so a card costs two tab stops: the link and the move menu.
+ * Native HTML5 drag stays off.
  */
 
 import { cx } from '@nodate-flow/ui/lib/cx';
 import Badge from '@nodate-flow/ui/primitives/badge';
 import Card from '@nodate-flow/ui/primitives/card';
 import { Link } from '@tanstack/react-router';
-import { Lock, Tag } from 'lucide-react';
-import type { CSSProperties, ReactElement } from 'react';
+import type { CSSProperties, DOMAttributes, ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatDate, isOverdue } from '../../lib/format';
 import { useEffectiveZone } from '../../lib/use-effective-timezone';
+import type { Label } from '../labels/api';
+import LabelBadge from '../labels/label-badge';
 import type { TaskDerivedState, TaskListItem, TaskPriority, TransitionName } from './api';
 import { PRIORITY_KEY, PRIORITY_TONE } from './constants';
 import css from './task-card.module.css';
+import {
+  AssigneeStack,
+  BlockedCountBadge,
+  CommentCountBadge,
+  OverflowCount,
+  ParentTaskLine,
+  SubtaskCountBadge,
+} from './task-marks';
 import TaskMoveMenu from './task-move-menu';
+
+/** The dnd-kit draggable wiring handed to the card. */
+export interface TaskCardDragHandle {
+  setNodeRef: (node: HTMLElement | null) => void;
+  /** The title link: the element the keyboard sensor listens on. */
+  setActivatorNodeRef: (node: HTMLElement | null) => void;
+  describedBy: string | undefined;
+  roleDescription: string | undefined;
+  listeners: DOMAttributes<HTMLDivElement> | undefined;
+}
+
+/** Most label chips shown before the rest collapse into "+N". */
+const MAX_LABEL_CHIPS = 3;
 
 export interface TaskCardProps {
   task: TaskListItem;
+  /** Workspace labels already resolved for this task. */
+  labels?: readonly Label[];
+  /** Makes the card a dnd-kit drag source. */
+  dragHandle?: TaskCardDragHandle;
+  /** This card is the source of the drag in flight: shown as a placeholder. */
+  dragging?: boolean;
+  /** A touch is held on the card, waiting out the lift delay. */
+  holding?: boolean;
+  /** Rendered inside the DragOverlay: lifted, inert. */
+  overlay?: boolean;
   /** Count of open `blocks` edges pointing AT this task. 0 hides the badge. */
   blockedByOpenCount?: number;
   onSelect: (taskId: string) => void;
@@ -41,6 +73,11 @@ export interface TaskCardProps {
 
 export default function TaskCard({
   task,
+  labels = [],
+  dragHandle,
+  dragging = false,
+  holding = false,
+  overlay = false,
   blockedByOpenCount = 0,
   onSelect,
   onTransition,
@@ -50,20 +87,26 @@ export default function TaskCard({
   const { t, i18n } = useTranslation('common');
   const zone = useEffectiveZone();
   const locale = i18n.resolvedLanguage ?? 'en';
-  // Defensive cast for fields not yet in the regenerated SDK types.
-  const ext = task as TaskListItem & {
-    projectIdentifier?: string;
-    taskNumber?: number;
-    labelCount?: number;
-  };
   const priority = (task.priority as TaskPriority) ?? 0;
   const tone = PRIORITY_TONE[priority] ?? 'neutral';
   const priorityLabel = t(PRIORITY_KEY[priority] ?? 'tasks.priority.none');
+  const hiddenLabels = labels.slice(MAX_LABEL_CHIPS);
+  const listFormat = new Intl.ListFormat(locale, { type: 'conjunction' });
+  const hiddenNames = listFormat.format(hiddenLabels.map((label) => label.name));
   const closed = task.derivedState === 'done' || task.derivedState === 'cancelled';
 
   return (
     <Card
+      {...dragHandle?.listeners}
+      {...(dragHandle
+        ? { ref: dragHandle.setNodeRef, role: 'group', 'aria-label': task.title }
+        : {})}
       draggable={false}
+      inert={overlay || undefined}
+      data-task-id={task.id}
+      data-dragging={dragging || undefined}
+      data-holding={holding || undefined}
+      data-overlay={overlay || undefined}
       onClick={() => {
         // Title <Link> handles its own navigation and stops propagation;
         // clicks that reach here come from the card's padding / badges.
@@ -73,16 +116,25 @@ export default function TaskCard({
       className={cx(css.card, className)}
       style={style}
     >
+      <ParentTaskLine task={task} />
       <div className={css.top}>
-        {ext.projectIdentifier && ext.taskNumber ? (
+        {task.projectIdentifier && task.taskNumber ? (
           <span className={css.ref}>
-            {ext.projectIdentifier}-{ext.taskNumber}
+            {task.projectIdentifier}-{task.taskNumber}
           </span>
         ) : null}
         <Link
           to="/tasks/$taskId"
           params={{ taskId: task.id }}
           draggable={false}
+          data-task-handle={task.id}
+          {...(dragHandle
+            ? {
+                ref: dragHandle.setActivatorNodeRef,
+                'aria-describedby': dragHandle.describedBy,
+                'aria-roledescription': dragHandle.roleDescription,
+              }
+            : {})}
           onClick={(e) => {
             // Let modifier-click / middle-click go through natively so
             // the user can open the task in a new tab. Plain click is
@@ -110,38 +162,31 @@ export default function TaskCard({
         {priority > 0 ? <Badge tone={tone}>{priorityLabel}</Badge> : null}
         {task.dueOn ? (
           <Badge
-            tone={
-              isOverdue(task.dueOn, zone) &&
-              task.derivedState !== 'done' &&
-              task.derivedState !== 'cancelled'
-                ? 'danger'
-                : 'neutral'
-            }
+            tone={isOverdue(task.dueOn, zone) && !closed ? 'danger' : 'neutral'}
             aria-label={`${t('tasks.columns.due')}: ${formatDate(task.dueOn, locale)}`}
           >
             {formatDate(task.dueOn, locale)}
           </Badge>
         ) : null}
-        {blockedByOpenCount > 0 ? (
-          <Badge
-            tone="danger"
-            aria-label={t('tasks.card.blockedBy', { count: blockedByOpenCount })}
-            title={t('tasks.card.blockedBy', { count: blockedByOpenCount })}
-          >
-            <span className={css.metaIcon}>
-              <Lock size={12} aria-hidden />
-              {blockedByOpenCount}
-            </span>
-          </Badge>
+        <BlockedCountBadge count={blockedByOpenCount} />
+        <SubtaskCountBadge task={task} />
+        <CommentCountBadge task={task} />
+        {labels.slice(0, MAX_LABEL_CHIPS).map((label) => (
+          <span key={label.id} className={css.labelChip} title={label.name}>
+            <LabelBadge size="sm" name={label.name} color={label.color} />
+          </span>
+        ))}
+        {hiddenLabels.length > 0 ? (
+          <OverflowCount
+            text={t('tasks.card.labels_more', { count: hiddenLabels.length })}
+            srText={t('tasks.card.labels_more_aria', {
+              count: hiddenLabels.length,
+              names: hiddenNames,
+            })}
+            title={hiddenNames}
+          />
         ) : null}
-        {ext.labelCount && ext.labelCount > 0 ? (
-          <Badge tone="neutral" aria-label={t('labels:task.count', { count: ext.labelCount })}>
-            <span className={css.metaIcon}>
-              <Tag size={12} aria-hidden />
-              {ext.labelCount}
-            </span>
-          </Badge>
-        ) : null}
+        <AssigneeStack task={task} />
       </div>
     </Card>
   );

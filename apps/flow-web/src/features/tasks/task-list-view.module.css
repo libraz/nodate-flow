@@ -154,6 +154,15 @@
   min-inline-size: 0;
 }
 
+/* A subtask names its parent ahead of its own title, capped so the title keeps the room. */
+.parentPrefix {
+  display: flex;
+  flex: 0 1 auto;
+  /* nf-token-override: keeps a few characters of the parent legible */
+  min-inline-size: 4em;
+  max-inline-size: 40%;
+}
+
 /* Rename entry for pointer users: revealed with the row, always on touch. */
 .renameTrigger {
   flex-shrink: 0;

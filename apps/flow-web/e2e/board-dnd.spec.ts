@@ -1,23 +1,75 @@
 /**
  * Board view E2E.
  *
- * Happy path:
- *   1. Create a fresh tenant via REST and seed a task via REST.
- *   2. Inject auth, navigate to the project board view.
- *   3. Verify the task card appears in the "Open" column.
+ * Cards are dragged between columns with @dnd-kit/core (pointer sensor with a
+ * 5px activation distance, keyboard sensor: Space lifts, Left/Right pick a
+ * column, Space drops, Escape cancels). The column under the drop picks the
+ * transition; illegal and same-column drops are no-ops.
  *
- * D&D regression:
- *   While the constraint engine does not yet support board-level
- *   drag-and-drop transitions, cards must render with `draggable=false`
- *   so users aren't given a non-functional drag affordance. The
- *   keyboard-accessible move menu remains the supported path.
+ * Each test owns a tenant so moving cards never touches shared seeds.
  */
 
-import { expect, test } from '@playwright/test';
+import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { loadTenants } from './fixtures/load-tenants';
-import { injectAuth } from './fixtures/tenant';
+import {
+  API_BASE_URL,
+  cleanupTenant,
+  createTask,
+  createTestTenant,
+  injectAuth,
+  type TestTenant,
+} from './fixtures/tenant';
 import { checkA11y } from './helpers/a11y';
+
+const TRANSITIONS_URL = /\/tasks\/[^/]+\/transitions$/;
+
+async function transitionTask(tenant: TestTenant, taskId: string, name: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/tasks/${taskId}/transitions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      accept: 'application/json',
+      authorization: `Bearer ${tenant.accessToken}`,
+    },
+    body: JSON.stringify({ transition: name }),
+  });
+  expect(res.ok).toBe(true);
+}
+
+function column(page: Page, name: string): Locator {
+  return page.getByRole('region', { name, exact: true });
+}
+
+function card(page: Page, title: string): Locator {
+  return page.getByRole('group', { name: title, exact: true });
+}
+
+async function center(locator: Locator): Promise<{ x: number; y: number }> {
+  const box = await locator.boundingBox();
+  if (!box) throw new Error('element has no bounding box');
+  return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+}
+
+/**
+ * Presses on `source`, crosses the activation distance, then walks to the
+ * centre of `target` in small steps: dnd-kit needs intermediate pointermove
+ * events to register the hover.
+ */
+async function dragTo(page: Page, source: Locator, target: Locator): Promise<void> {
+  const from = await center(source);
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  await page.mouse.move(from.x + 10, from.y + 10, { steps: 5 });
+  await expect(page.getByRole('region', { name: 'Board' })).toHaveAttribute(
+    'data-drag-active',
+    'true',
+  );
+  const to = await center(target);
+  await page.mouse.move(to.x, to.y, { steps: 25 });
+  await expect(target).toHaveAttribute('data-drop', 'over');
+  await page.mouse.up();
+}
 
 test.describe('board view', () => {
   test('task card appears in open column on board view', async ({ page }) => {
@@ -34,25 +86,121 @@ test.describe('board view', () => {
     // Accessibility check on the board view
     await checkA11y(page, ['color-contrast', 'region', 'aria-required-children']);
   });
+});
 
-  test('cards are not draggable while D&D is disabled', async ({ page }) => {
-    const { user: tenant, seededTasks } = loadTenants();
+test.describe('board drag and drop', () => {
+  let tenant: TestTenant;
 
+  test.beforeEach(async ({ page }) => {
+    tenant = await createTestTenant();
     await injectAuth(page.context(), tenant);
+  });
+
+  test.afterEach(async () => {
+    await cleanupTenant(tenant);
+  });
+
+  test('pointer drag from Open to Done moves the card and persists after reload', async ({
+    page,
+  }) => {
+    const title = `E2E DnD Done ${Date.now().toString(36)}`;
+    await createTask(tenant, title);
     await page.goto(`/projects/${tenant.projectId}/tasks`);
+    await expect(column(page, 'Open').getByRole('group', { name: title })).toBeVisible({
+      timeout: 10_000,
+    });
 
-    // Wait for at least one card to render before asserting attributes.
-    const seededCardText = page.getByText(seededTasks.board).first();
-    await expect(seededCardText).toBeVisible({ timeout: 10_000 });
+    const transition = page.waitForResponse(
+      (res) => res.request().method() === 'POST' && TRANSITIONS_URL.test(res.url()),
+    );
+    await dragTo(page, card(page, title), column(page, 'Done'));
+    expect((await transition).ok()).toBe(true);
 
-    // The board card is the closest ancestor element carrying a
-    // `draggable` attribute. While D&D is disabled the value must be
-    // the string "false" — never absent and never "true".
-    const card = seededCardText.locator('xpath=ancestor::*[@draggable][1]');
-    await expect(card).toHaveAttribute('draggable', 'false');
+    await expect(column(page, 'Done').getByRole('group', { name: title })).toBeVisible();
+    await expect(column(page, 'Open').getByRole('group', { name: title })).toHaveCount(0);
 
-    // The hint copy for the disabled D&D state is rendered once near
-    // the first column header.
-    await expect(page.getByText("Use the state dropdown to change a task's state.")).toBeVisible();
+    await page.reload();
+    await expect(column(page, 'Done').getByRole('group', { name: title })).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect(column(page, 'Open').getByRole('group', { name: title })).toHaveCount(0);
+  });
+
+  test('dropping on an illegal column leaves the card in place and sends no transition', async ({
+    page,
+  }) => {
+    // Done only allows `reopen` (back to Open), so Review is unreachable.
+    const title = `E2E DnD Illegal ${Date.now().toString(36)}`;
+    const { id } = await createTask(tenant, title);
+    await transitionTask(tenant, id, 'complete');
+
+    const transitionRequests: string[] = [];
+    page.on('request', (req) => {
+      if (req.method() === 'POST' && TRANSITIONS_URL.test(req.url())) {
+        transitionRequests.push(req.url());
+      }
+    });
+
+    await page.goto(`/projects/${tenant.projectId}/tasks`);
+    await expect(column(page, 'Done').getByRole('group', { name: title })).toBeVisible({
+      timeout: 10_000,
+    });
+
+    const from = await center(card(page, title));
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    await page.mouse.move(from.x + 10, from.y + 10, { steps: 5 });
+    const to = await center(column(page, 'Review'));
+    await page.mouse.move(to.x, to.y, { steps: 25 });
+    await expect(column(page, 'Review')).toHaveAttribute('data-drop', 'illegal');
+    await page.mouse.up();
+
+    // The drag is over once the board stops flagging it.
+    await expect(page.getByRole('region', { name: 'Board' })).not.toHaveAttribute(
+      'data-drag-active',
+      'true',
+    );
+    await expect(column(page, 'Done').getByRole('group', { name: title })).toBeVisible();
+    await expect(column(page, 'Review').getByRole('group', { name: title })).toHaveCount(0);
+    expect(transitionRequests).toEqual([]);
+  });
+
+  test('keyboard drag moves a card one column to the right', async ({ page }) => {
+    const title = `E2E DnD Keyboard ${Date.now().toString(36)}`;
+    await createTask(tenant, title);
+    await page.goto(`/projects/${tenant.projectId}/tasks`);
+    const openCard = column(page, 'Open').getByRole('group', { name: title });
+    await expect(openCard).toBeVisible({ timeout: 10_000 });
+
+    await openCard.focus();
+    await page.keyboard.press('Space');
+    await expect(page.getByRole('region', { name: 'Board' })).toHaveAttribute(
+      'data-drag-active',
+      'true',
+    );
+    await page.keyboard.press('ArrowRight');
+    await expect(column(page, 'Waiting')).toHaveAttribute('data-drop', 'over');
+
+    const transition = page.waitForResponse(
+      (res) => res.request().method() === 'POST' && TRANSITIONS_URL.test(res.url()),
+    );
+    await page.keyboard.press('Space');
+    expect((await transition).ok()).toBe(true);
+
+    await expect(column(page, 'Waiting').getByRole('group', { name: title })).toBeVisible();
+    await expect(column(page, 'Open').getByRole('group', { name: title })).toHaveCount(0);
+  });
+
+  test('a plain click on the card opens the task detail', async ({ page }) => {
+    const title = `E2E DnD Click ${Date.now().toString(36)}`;
+    const { id } = await createTask(tenant, title);
+    await page.goto(`/projects/${tenant.projectId}/tasks`);
+    const openCard = column(page, 'Open').getByRole('group', { name: title });
+    await expect(openCard).toBeVisible({ timeout: 10_000 });
+
+    await openCard.getByRole('link', { name: title }).click();
+
+    await expect(page).toHaveURL(new RegExp(`/tasks/${id}$`));
+    await expect(page.getByRole('heading', { name: title })).toBeVisible({ timeout: 10_000 });
   });
 });

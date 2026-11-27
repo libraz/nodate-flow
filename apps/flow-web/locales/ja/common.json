@@ -827,7 +827,12 @@
     "card": {
       "blockedBy": "{count, plural, other {# 件のタスクにブロックされています}}",
       "labels_more": "+{count}",
-      "labels_more_aria": "ほか{count}件のラベル"
+      "labels_more_aria": "ほか{count}件のラベル: {names}",
+      "comments": "コメント {count} 件"
+    },
+    "hierarchy": {
+      "parent_fallback": "親タスク",
+      "subtasks": "サブタスク {count} 件"
     },
     "form": {
       "title": "タイトル",
@@ -901,7 +906,12 @@
       "moved_to": "{state} に移動しました",
       "move_menu": "タスクを移動",
       "move_to": "{state} に移動",
+      "rail": {
+        "expand": "「{state}」を表示（{count}件）",
+        "collapse": "「{state}」を折りたたむ"
+      },
       "dnd": {
+        "drop_hint": "→ {verb}",
         "instructions": "スペースキーでタスクを持ち上げ、左右の矢印キーで列を選び、スペースキーで置きます。Escapeでキャンセルします。",
         "lifted": "「{title}」を持ち上げました。現在の状態: {state}",
         "over": "「{title}」を「{state}」に移動できます",

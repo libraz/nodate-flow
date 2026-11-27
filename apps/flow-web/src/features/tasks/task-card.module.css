@@ -1,16 +1,24 @@
-/* Board card — the whole card is the target; the title link carries keyboard focus. */
+/* Board card — the whole card is the drag source; the title link carries keyboard focus. */
 
 .card {
   display: flex;
   flex-direction: column;
   gap: var(--nf-space-2);
   padding: var(--nf-space-3) var(--nf-space-3-5);
-  cursor: pointer;
+  /* The board swaps this for grabbing / not-allowed while a card is held. */
+  cursor: var(--nf-board-card-cursor, grab);
+  /* The touch sensor owns long-press; taps and scrolls keep their native behaviour. */
+  touch-action: manipulation;
   transition:
+    scale var(--nf-duration-slow) var(--nf-ease-standard),
     border-color var(--nf-duration-fast) var(--nf-ease-standard),
     background-color var(--nf-duration-fast) var(--nf-ease-standard),
-    box-shadow var(--nf-duration-fast) var(--nf-ease-standard),
-    opacity var(--nf-duration-base) var(--nf-ease-standard);
+    box-shadow var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+/* Press-in while the touch delay runs: the same cue as the calendar pills. */
+.card[data-holding="true"] {
+  scale: var(--nf-motion-scale);
 }
 
 .card:hover {
@@ -24,15 +32,6 @@
 
 .card:has(.title:focus-visible) {
   box-shadow: var(--nf-shadow-focus);
-}
-
-.card[data-closed="true"] {
-  opacity: 0.72;
-}
-
-.card[data-closed="true"]:hover,
-.card[data-closed="true"]:focus-within {
-  opacity: 1;
 }
 
 .top {
@@ -53,6 +52,7 @@
 }
 
 .title {
+  cursor: var(--nf-board-card-cursor, pointer);
   flex: 1;
   min-inline-size: 0;
   color: var(--nf-color-fg);
@@ -83,8 +83,41 @@
   font-variant-numeric: tabular-nums;
 }
 
-.metaIcon {
+/* Long label names stop at 10em. */
+.labelChip {
   display: inline-flex;
-  align-items: center;
-  gap: var(--nf-space-1);
+  min-inline-size: 0;
+  max-inline-size: 10em;
+}
+
+/* The source keeps its exact footprint; only its content steps aside. */
+.card[data-dragging="true"] {
+  border-style: dashed;
+  border-color: var(--nf-color-border-strong);
+  background: var(--nf-color-bg-sunken);
+  box-shadow: none;
+  opacity: 1;
+}
+
+.card[data-dragging="true"] > * {
+  visibility: hidden;
+}
+
+.card[data-overlay="true"] {
+  cursor: grabbing;
+  pointer-events: none;
+  box-shadow: var(--nf-shadow-elevated);
+  border-color: var(--nf-color-border-strong);
+  /* Opaque: the translucent card surface would show the columns through it. */
+  background: var(--nf-color-bg-elevated);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    transition: none;
+  }
+
+  .card[data-holding="true"] {
+    scale: none;
+  }
 }

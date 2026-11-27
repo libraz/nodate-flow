@@ -2,10 +2,10 @@
  * TaskMoveMenu — accessible menu that lists legal state transitions for a
  * task card on the board view, plus archive/unarchive actions.
  *
- * This provides a keyboard-accessible alternative to the HTML5 drag-and-drop
- * interaction. The trigger button opens a popover with one item per legal
- * transition; selecting an item fires the same `useTransitionTask` mutation
- * that D&D uses.
+ * This is the keyboard- and screen-reader-accessible alternative to dragging
+ * a card between columns. The trigger button opens a popover with one item per
+ * legal transition; selecting an item fires the same `useTransitionTask`
+ * mutation that a drop does.
  */
 
 import Popover from '@nodate-flow/ui/primitives/popover';
@@ -23,19 +23,9 @@ import {
   useArchiveTask,
   useUnarchiveTask,
 } from './api';
-import { STATE_KEY } from './constants';
+import { STATE_KEY, TRANSITION_KEY } from './constants';
 import StateDot from './state-dot';
 import styles from './task-move-menu.module.css';
-
-const TRANSITION_LABEL_KEY: Record<TransitionName, string> = {
-  start: 'tasks.detail.transitions.start',
-  block: 'tasks.detail.transitions.block',
-  unblock: 'tasks.detail.transitions.unblock',
-  submit: 'tasks.detail.transitions.submit',
-  complete: 'tasks.detail.transitions.complete',
-  reopen: 'tasks.detail.transitions.reopen',
-  cancel: 'tasks.detail.transitions.cancel',
-};
 
 export interface TaskMoveMenuProps {
   /** Current derived state of the task. */
@@ -174,7 +164,7 @@ export default function TaskMoveMenu({
                 onClick={() => handleSelect(name, landing)}
                 onKeyDown={(e) => handleKeyDown(e, idx)}
               >
-                <span>{t(TRANSITION_LABEL_KEY[name])}</span>
+                <span>{t(TRANSITION_KEY[name])}</span>
                 <span className={styles.menuItemLanding}>
                   <span aria-hidden="true">→</span>
                   <StateDot state={landing} />

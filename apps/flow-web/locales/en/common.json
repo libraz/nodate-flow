@@ -827,7 +827,12 @@
     "card": {
       "blockedBy": "{count, plural, one {Blocked by # task} other {Blocked by # tasks}}",
       "labels_more": "+{count}",
-      "labels_more_aria": "{count, plural, one {# more label} other {# more labels}}"
+      "labels_more_aria": "{count, plural, one {# more label} other {# more labels}}: {names}",
+      "comments": "{count, plural, one {# comment} other {# comments}}"
+    },
+    "hierarchy": {
+      "parent_fallback": "Parent task",
+      "subtasks": "{count, plural, one {# subtask} other {# subtasks}}"
     },
     "form": {
       "title": "Title",
@@ -901,7 +906,12 @@
       "moved_to": "Moved to {state}",
       "move_menu": "Move task",
       "move_to": "Move to {state}",
+      "rail": {
+        "expand": "Show {state} ({count})",
+        "collapse": "Collapse {state}"
+      },
       "dnd": {
+        "drop_hint": "→ {verb}",
         "instructions": "Press space to pick up the task, the left and right arrow keys to choose a column, space to drop, and escape to cancel.",
         "lifted": "Picked up \"{title}\". Current state: {state}.",
         "over": "\"{title}\" can move to {state}.",

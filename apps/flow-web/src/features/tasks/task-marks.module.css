@@ -19,3 +19,73 @@
   block-size: 0.75rem;
   border-radius: var(--nf-radius-xs);
 }
+
+/* Parent line: only the text is the click target, padded up to a ~20px hit height. */
+.parentLine {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: var(--nf-space-1);
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  padding-block: var(--nf-space-0-5);
+  margin-block: calc(var(--nf-space-0-5) * -1);
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-xs);
+  line-height: var(--nf-leading-tight);
+  text-decoration: none;
+}
+
+.parentLine:hover {
+  color: var(--nf-color-fg);
+  text-decoration: underline;
+}
+
+.parentLine:focus-visible {
+  outline: none;
+  border-radius: var(--nf-radius-xs);
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.parentIcon {
+  flex-shrink: 0;
+}
+
+.parentTitle {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Icon + count inside a badge. */
+.countMark {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Muted "+N" after a capped list of labels or avatars. */
+.overflowCount {
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-xs);
+  font-variant-numeric: tabular-nums;
+  cursor: default;
+}
+
+.avatars {
+  display: inline-flex;
+  align-items: center;
+  margin-inline-start: auto;
+  gap: var(--nf-space-1);
+}
+
+/* Overlap with a surface-coloured ring so each avatar reads against its neighbour. */
+.avatar {
+  box-shadow: 0 0 0 var(--nf-space-0-5) var(--nf-color-surface);
+}
+
+.avatar + .avatar {
+  margin-inline-start: calc(var(--nf-space-1) * -2);
+}

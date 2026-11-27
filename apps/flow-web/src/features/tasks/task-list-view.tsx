@@ -53,6 +53,7 @@ import { PRIORITY_KEY, STATE_KEY, STATE_TONE } from './constants';
 import PriorityMark from './priority-mark';
 import StateDot from './state-dot';
 import css from './task-list-view.module.css';
+import { CommentCountBadge, ParentTaskLine, SubtaskCountBadge } from './task-marks';
 import { useInlineEdit } from './use-inline-edit';
 import { resetTaskFilters, useTaskFilters } from './use-task-filters';
 
@@ -273,6 +274,11 @@ function InlineTitleCell({
 
   return (
     <span className={css.titleCell}>
+      {task.parentTaskId ? (
+        <span className={css.parentPrefix}>
+          <ParentTaskLine task={task} />
+        </span>
+      ) : null}
       <Link
         to="/tasks/$taskId"
         params={{ taskId: task.id }}
@@ -282,6 +288,8 @@ function InlineTitleCell({
       >
         {task.title}
       </Link>
+      <SubtaskCountBadge task={task} />
+      <CommentCountBadge task={task} />
       <button
         type="button"
         aria-label={t('tasks.inline.edit_title')}
