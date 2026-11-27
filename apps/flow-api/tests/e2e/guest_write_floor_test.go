@@ -10,25 +10,31 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/tests/helpers"
 )
 
-// seedGuestMember invites a fresh user into the owner's workspace at the
-// guest role and returns their tenant handle. The returned tenant's own
-// workspace fields are left untouched; only AccessToken is meaningful for
+// seedInvitedMember invites a fresh user into the owner's workspace at the
+// given workspace role and returns their tenant handle. The returned tenant's
+// own workspace fields are left untouched; only AccessToken is meaningful for
 // requests against the owner's workspace.
-func seedGuestMember(t *testing.T, owner *helpers.TestTenant) *helpers.TestTenant {
+func seedInvitedMember(t *testing.T, owner *helpers.TestTenant, role string) *helpers.TestTenant {
 	t.Helper()
-	guest := newTenant(t)
+	member := newTenant(t)
 
 	var invite struct {
 		Token string `json:"token"`
 	}
 	doJSON(t, http.MethodPost,
 		testServerURL+"/workspaces/"+owner.WorkspacePublicID+"/invites",
-		owner.AccessToken, map[string]any{"role": "guest"}, &invite)
+		owner.AccessToken, map[string]any{"role": role}, &invite)
 	doJSON(t, http.MethodPost,
 		testServerURL+"/invites/"+invite.Token+"/accept",
-		guest.AccessToken, nil, nil)
+		member.AccessToken, nil, nil)
 
-	return guest
+	return member
+}
+
+// seedGuestMember seeds a workspace member at the guest role.
+func seedGuestMember(t *testing.T, owner *helpers.TestTenant) *helpers.TestTenant {
+	t.Helper()
+	return seedInvitedMember(t, owner, "guest")
 }
 
 // TestGuestIsReadOnlyOnWorkspaceResources locks in the guest contract: a
