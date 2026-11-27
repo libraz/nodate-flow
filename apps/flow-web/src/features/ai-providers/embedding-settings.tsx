@@ -63,9 +63,9 @@ export default function EmbeddingSettingsPanel({
   return (
     <section className={ui.section} aria-labelledby="embedding-settings-title">
       <div className={ui.sectionHeader}>
-        <h2 id="embedding-settings-title" className={ui.sectionTitle}>
+        <h3 id="embedding-settings-title" className={ui.sectionTitle}>
           {t('providers.embedding.title')}
-        </h2>
+        </h3>
         <p className={ui.sectionDescription}>{t('providers.embedding.description')}</p>
       </div>
 

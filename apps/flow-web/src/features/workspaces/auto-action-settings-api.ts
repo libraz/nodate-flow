@@ -11,6 +11,7 @@ import {
 } from '@tanstack/react-query';
 
 import { apiRequest } from '../../lib/api';
+import { aiStatusKeys } from '../ai-providers/ai-status-api';
 
 /** Shape returned by GET and PATCH auto-action-settings. */
 export interface AutoActionSettings {
@@ -80,6 +81,7 @@ export function useUpdateAutoActionSettings(): UseMutationResult<
       void qc.invalidateQueries({
         queryKey: autoActionSettingsKeys.settings(vars.workspaceId),
       });
+      void qc.invalidateQueries({ queryKey: aiStatusKeys.detail(vars.workspaceId) });
     },
   });
 }

@@ -1,5 +1,5 @@
 /**
- * /workspaces/$id/settings/ai-agents — workspace AI agent management (lazy).
+ * Agents tab of the workspace AI settings: workspace AI agent management.
  *
  * The page lists every ai_agents row for the workspace and exposes
  * inline controls per agent:
@@ -8,7 +8,8 @@
  *   - manual trigger       (POST  /ai/agents/{id}/trigger)
  *
  * Creation goes through an inline form that reads the workspace model
- * inventory from GET /ai/models and POSTs /ai/agents.
+ * inventory from GET /ai/models and POSTs /ai/agents. Guests see the list
+ * read-only: every control above is a member-floor write.
  */
 
 import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
@@ -24,12 +25,17 @@ import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import Textarea from '@nodate-flow/ui/primitives/textarea';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import Tooltip from '@nodate-flow/ui/primitives/tooltip';
-import { createLazyFileRoute, getRouteApi, Link } from '@tanstack/react-router';
+import { Link } from '@tanstack/react-router';
 import { type FormEvent, type ReactElement, Suspense, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import FormActions from '../components/form-actions';
-import PageHeader from '../components/page-header';
-import AgentModelSelect from '../features/ai-providers/agent-model-select';
+import FormActions from '../../components/form-actions';
+import SectionHeader from '../../components/section-header';
+import { formatApiError } from '../../lib/api-error';
+import { onSubmitShortcut } from '../../lib/submit-shortcut';
+import { isWorkspaceAdmin, useCurrentWorkspaceRole } from '../../lib/use-current-workspace-role';
+import SaveStatus, { useSaveStatus } from '../settings/save-status';
+import ui from '../settings/settings-ui.module.css';
+import AgentModelSelect from './agent-model-select';
 import {
   AGENT_SCHEDULE_KINDS,
   type AgentScheduleKind,
@@ -40,14 +46,8 @@ import {
   useTriggerAgent,
   useUpdateAgentEventTriggers,
   useUpdateAgentSchedule,
-} from '../features/ai-providers/agents-api';
-import SaveStatus, { useSaveStatus } from '../features/settings/save-status';
-import ui from '../features/settings/settings-ui.module.css';
-import { formatApiError } from '../lib/api-error';
-import { onSubmitShortcut } from '../lib/submit-shortcut';
-import styles from './_authenticated.workspaces.$id.settings.ai-agents.module.css';
-
-const routeApi = getRouteApi('/_authenticated/workspaces/$id/settings/ai-agents');
+} from './agents-api';
+import styles from './agents-page.module.css';
 
 /** One-line description of when an agent with this trigger runs. */
 function scheduleHintKey(kind: AgentScheduleKind): string {
@@ -63,15 +63,30 @@ function scheduleHintKey(kind: AgentScheduleKind): string {
   }
 }
 
+function ConnectionLink({ workspaceId }: { workspaceId: string }): ReactElement {
+  const { t } = useTranslation('settings');
+  return (
+    <Link to="/workspaces/$id/settings/ai/connection" params={{ id: workspaceId }}>
+      {t('ai_page.tabs.connection')}
+    </Link>
+  );
+}
+
 function AgentsList({
   workspaceId,
+  admin,
+  canWrite,
   onCreate,
 }: {
   workspaceId: string;
+  admin: boolean;
+  /** False for guests (and while the role is unknown): the list is read-only. */
+  canWrite: boolean;
   onCreate: () => void;
 }): ReactElement {
   const { t } = useTranslation('ai-suggestions');
   const { data } = useAgentsQuery(workspaceId);
+  const { data: models } = useModelsQuery(workspaceId);
   const pauseMut = usePauseAgent();
   const scheduleMut = useUpdateAgentSchedule();
   const triggerMut = useTriggerAgent();
@@ -89,17 +104,31 @@ function AgentsList({
   const savingEventsId = eventMut.isPending ? eventMut.variables?.agentId : undefined;
 
   if (data.agents.length === 0) {
-    return (
+    if (models.models.length > 0) {
+      return (
+        <EmptyState
+          titleAs="p"
+          title={t('agents.empty_ready')}
+          className={ui.empty}
+          action={
+            canWrite ? (
+              <Button type="button" onClick={onCreate}>
+                {t('agents.create.open')}
+              </Button>
+            ) : undefined
+          }
+        />
+      );
+    }
+    return admin ? (
       <EmptyState
         titleAs="p"
         title={t('agents.empty')}
         className={ui.empty}
-        action={
-          <Button type="button" onClick={onCreate}>
-            {t('agents.create.open')}
-          </Button>
-        }
+        action={<ConnectionLink workspaceId={workspaceId} />}
       />
+    ) : (
+      <EmptyState titleAs="p" title={t('agents.empty_member')} className={ui.empty} />
     );
   }
 
@@ -164,74 +193,88 @@ function AgentsList({
                     {agent.paused ? t('agents.status.paused') : t('agents.status.active')}
                   </Badge>
                 </div>
-                <AgentModelSelect
-                  workspaceId={workspaceId}
-                  agentId={agent.id}
-                  modelId={agent.modelId}
-                  modelName={agent.modelName}
-                />
+                {canWrite ? (
+                  <AgentModelSelect
+                    workspaceId={workspaceId}
+                    agentId={agent.id}
+                    modelId={agent.modelId}
+                    modelName={agent.modelName}
+                  />
+                ) : (
+                  <span className={styles.inlineHint}>{agent.modelName}</span>
+                )}
               </header>
               {agent.description ? <p className={styles.description}>{agent.description}</p> : null}
-              <div className={styles.controls}>
-                <div className={styles.inlineField}>
-                  <label htmlFor={scheduleId} className={styles.inlineLabel}>
-                    {t('agents.scheduleKind.label')}
-                  </label>
-                  <Select
-                    id={scheduleId}
-                    aria-describedby={`${scheduleId}-hint`}
-                    value={agent.scheduleKind}
-                    onChange={(e) => {
-                      void handleScheduleChange(e.target.value as AgentScheduleKind);
-                    }}
-                    disabled={schedulingId === agent.id}
-                    aria-busy={schedulingId === agent.id}
-                  >
-                    {AGENT_SCHEDULE_KINDS.map((kind) => (
-                      <option key={kind} value={kind}>
-                        {t(`agents.scheduleKind.options.${kind}`)}
-                      </option>
-                    ))}
-                  </Select>
-                  <span id={`${scheduleId}-hint`} className={styles.inlineHint}>
-                    {t(scheduleHintKey(agent.scheduleKind))}
-                  </span>
-                </div>
-                <div className={styles.controlActions}>
-                  <Tooltip content={t('agents.pause_help')}>
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={() => {
-                        void handleTogglePause();
+              {canWrite ? (
+                <div className={styles.controls}>
+                  <div className={styles.inlineField}>
+                    <label htmlFor={scheduleId} className={styles.inlineLabel}>
+                      {t('agents.scheduleKind.label')}
+                    </label>
+                    <Select
+                      id={scheduleId}
+                      aria-describedby={`${scheduleId}-hint`}
+                      value={agent.scheduleKind}
+                      onChange={(e) => {
+                        void handleScheduleChange(e.target.value as AgentScheduleKind);
                       }}
-                      disabled={pausingId === agent.id}
-                      aria-busy={pausingId === agent.id}
-                      aria-pressed={agent.paused}
+                      disabled={schedulingId === agent.id}
+                      aria-busy={schedulingId === agent.id}
                     >
-                      {agent.paused ? t('agents.resume') : t('agents.pause')}
-                    </Button>
-                  </Tooltip>
-                  {/* A disabled button gets no hover, so the tooltip anchors on a wrapper. */}
-                  <Tooltip content={t('agents.trigger.help')}>
-                    <span className={styles.tooltipAnchor}>
+                      {AGENT_SCHEDULE_KINDS.map((kind) => (
+                        <option key={kind} value={kind}>
+                          {t(`agents.scheduleKind.options.${kind}`)}
+                        </option>
+                      ))}
+                    </Select>
+                    <span id={`${scheduleId}-hint`} className={styles.inlineHint}>
+                      {t(scheduleHintKey(agent.scheduleKind))}
+                    </span>
+                  </div>
+                  <div className={styles.controlActions}>
+                    <Tooltip content={t('agents.pause_help')}>
                       <Button
                         type="button"
                         size="sm"
-                        variant="primary"
                         onClick={() => {
-                          void handleTrigger();
+                          void handleTogglePause();
                         }}
-                        disabled={triggeringId === agent.id || agent.paused}
-                        aria-busy={triggeringId === agent.id}
+                        disabled={pausingId === agent.id}
+                        aria-busy={pausingId === agent.id}
+                        aria-pressed={agent.paused}
                       >
-                        {t('agents.trigger.label')}
+                        {agent.paused ? t('agents.resume') : t('agents.pause')}
                       </Button>
-                    </span>
-                  </Tooltip>
+                    </Tooltip>
+                    {/* A disabled button gets no hover, so the tooltip anchors on a wrapper. */}
+                    <Tooltip content={t('agents.trigger.help')}>
+                      <span className={styles.tooltipAnchor}>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="primary"
+                          onClick={() => {
+                            void handleTrigger();
+                          }}
+                          disabled={triggeringId === agent.id || agent.paused}
+                          aria-busy={triggeringId === agent.id}
+                        >
+                          {t('agents.trigger.label')}
+                        </Button>
+                      </span>
+                    </Tooltip>
+                  </div>
                 </div>
-              </div>
-              {agent.scheduleKind === 'on_event' ? (
+              ) : (
+                <div className={styles.inlineField}>
+                  <span className={styles.inlineLabel}>{t('agents.scheduleKind.label')}</span>
+                  <span>{t(`agents.scheduleKind.options.${agent.scheduleKind}`)}</span>
+                  <span className={styles.inlineHint}>
+                    {t(scheduleHintKey(agent.scheduleKind))}
+                  </span>
+                </div>
+              )}
+              {canWrite && agent.scheduleKind === 'on_event' ? (
                 <EventTriggersEditor
                   workspaceId={workspaceId}
                   agentId={agent.id}
@@ -340,13 +383,15 @@ function EventTriggersEditor({
  * clicks "New agent". It reads the workspace model inventory via
  * useModelsQuery so the Select only offers models that exist. A
  * zero-model workspace gets a helpful empty state that links to the
- * ai-providers settings page instead of an unusable form.
+ * Connection tab instead of an unusable form.
  */
 function CreateAgentForm({
   workspaceId,
+  admin,
   onDone,
 }: {
   workspaceId: string;
+  admin: boolean;
   onDone: () => void;
 }): ReactElement {
   const { t } = useTranslation('ai-suggestions');
@@ -364,13 +409,9 @@ function CreateAgentForm({
     return (
       <EmptyState
         titleAs="p"
-        title={t('agents.create.noModels')}
+        title={admin ? t('agents.create.noModels') : t('agents.create.noModels_member')}
         className={ui.empty}
-        action={
-          <Link to="/workspaces/$id/settings/ai-providers" params={{ id: workspaceId }}>
-            {t('settings:nav.ai_providers')}
-          </Link>
-        }
+        {...(admin ? { action: <ConnectionLink workspaceId={workspaceId} /> } : {})}
       />
     );
   }
@@ -414,9 +455,9 @@ function CreateAgentForm({
       }}
       onKeyDown={onSubmitShortcut}
     >
-      <h2 id="agent-create-title" className={ui.sectionTitle}>
+      <h3 id="agent-create-title" className={ui.sectionTitle}>
         {t('agents.create.title')}
-      </h2>
+      </h3>
       <FormField
         label={t('agents.create.name')}
         required
@@ -546,31 +587,34 @@ function CreateAgentForm({
   );
 }
 
-function AiAgentsRoute(): ReactElement {
-  const { id } = routeApi.useParams();
+export default function AgentsPage({ workspaceId }: { workspaceId: string }): ReactElement {
   const { t } = useTranslation('ai-suggestions');
+  const role = useCurrentWorkspaceRole();
+  const admin = isWorkspaceAdmin(role);
+  const canWrite = role !== null && role !== 'guest';
   const [creating, setCreating] = useState(false);
   const openCreate = (): void => {
     setCreating(true);
   };
   return (
     <div className={ui.page}>
-      <PageHeader
+      <SectionHeader
         title={t('agents.title')}
         description={t('agents.subtitle')}
         help="workspace-settings-ai-agents"
         actions={
-          creating ? null : (
+          creating || !canWrite ? null : (
             <Button type="button" variant="primary" onClick={openCreate}>
               {t('agents.create.open')}
             </Button>
           )
         }
       />
-      {creating ? (
+      {creating && canWrite ? (
         <Suspense fallback={<Skeleton className={styles.skeletonForm} />}>
           <CreateAgentForm
-            workspaceId={id}
+            workspaceId={workspaceId}
+            admin={admin}
             onDone={() => {
               setCreating(false);
             }}
@@ -585,12 +629,13 @@ function AiAgentsRoute(): ReactElement {
           </div>
         }
       >
-        <AgentsList workspaceId={id} onCreate={openCreate} />
+        <AgentsList
+          workspaceId={workspaceId}
+          admin={admin}
+          canWrite={canWrite}
+          onCreate={openCreate}
+        />
       </Suspense>
     </div>
   );
 }
-
-export const Route = createLazyFileRoute('/_authenticated/workspaces/$id/settings/ai-agents')({
-  component: AiAgentsRoute,
-});

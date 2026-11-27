@@ -11,6 +11,7 @@ import {
 
 import { apiRequest } from '../../lib/api';
 import { ApiError } from '../../lib/api-error';
+import { aiStatusKeys } from './ai-status-api';
 
 export type EmbeddingSettings = components['schemas']['EmbeddingSettingsBody'];
 export type EmbeddingMode = EmbeddingSettings['mode'];
@@ -81,6 +82,7 @@ export function useUpdateEmbeddingSettings(): UseMutationResult<
     },
     onSuccess: (data, vars) => {
       qc.setQueryData(embeddingSettingsKeys.settings(vars.workspaceId), data);
+      void qc.invalidateQueries({ queryKey: aiStatusKeys.detail(vars.workspaceId) });
     },
   });
 }

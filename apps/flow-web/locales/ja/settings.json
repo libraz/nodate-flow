@@ -7,21 +7,15 @@
     "mcp_tokens": "AI ツール連携トークン（MCP）",
     "webhooks": "Webhook",
     "ai": "AI",
-    "ai_providers": "AI プロバイダ",
-    "ai_agents": "AI エージェント",
-    "ai_activity": "AI アクティビティ",
-    "ai_metrics": "AI メトリクス",
     "weekly_digest": "週次ダイジェスト",
     "audit_log": "監査ログ",
     "integrations": "連携",
-    "auto_actions": "自動アクション",
     "account": "アカウント（プロフィール・セキュリティ）",
     "account_hint": "プロフィール・パスワード・ログイン方法はアカウント画面で変更します。"
   },
   "nav_group": {
     "workspace": "ワークスペース",
     "integrations": "連携",
-    "ai": "AI の設定",
     "reports": "利用状況と記録"
   },
   "save_status": {

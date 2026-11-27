@@ -4,7 +4,8 @@
  * Renders a left sub-nav, grouped by concern, and an <Outlet /> for the
  * active sub-route. Shares the account settings layout styles, so it
  * collapses into the same scrollable tab strip below 768px, and keys the
- * outlet on the path so each sub-page fades in on arrival.
+ * outlet on the first path segment after /settings/ so each sub-page fades in
+ * on arrival while tabs within one page (AI) stay mounted.
  */
 
 import {
@@ -28,11 +29,7 @@ type SubNavKey =
   | 'public_shares'
   | 'mcp_tokens'
   | 'webhooks'
-  | 'ai_providers'
-  | 'ai_agents'
-  | 'auto_actions'
-  | 'ai_activity'
-  | 'ai_metrics'
+  | 'ai'
   | 'weekly_digest'
   | 'audit_log';
 
@@ -48,11 +45,7 @@ interface SubNavItem {
     | '/workspaces/$id/settings/public-shares'
     | '/workspaces/$id/settings/mcp-tokens'
     | '/workspaces/$id/settings/webhooks'
-    | '/workspaces/$id/settings/ai-providers'
-    | '/workspaces/$id/settings/ai-agents'
-    | '/workspaces/$id/settings/auto-actions'
-    | '/workspaces/$id/settings/ai-activity'
-    | '/workspaces/$id/settings/ai/metrics'
+    | '/workspaces/$id/settings/ai'
     | '/workspaces/$id/settings/weekly-digest'
     | '/workspaces/$id/settings/audit-log';
 }
@@ -66,7 +59,7 @@ interface SubNavItem {
  */
 const AUDIT_LOG_ENABLED = (import.meta.env.VITE_NF_FEATURE_AUDIT_LOG as string | undefined) === '1';
 
-type NavGroupKey = 'workspace' | 'integrations' | 'ai' | 'reports';
+type NavGroupKey = 'workspace' | 'integrations' | 'reports';
 
 interface NavGroup {
   key: NavGroupKey;
@@ -80,6 +73,7 @@ const NAV_GROUPS: readonly NavGroup[] = [
       { key: 'general', to: '/workspaces/$id/settings/general' },
       { key: 'data', to: '/workspaces/$id/settings/data' },
       { key: 'public_shares', to: '/workspaces/$id/settings/public-shares', nonGuest: true },
+      { key: 'ai', to: '/workspaces/$id/settings/ai' },
     ],
   },
   {
@@ -90,18 +84,8 @@ const NAV_GROUPS: readonly NavGroup[] = [
     ],
   },
   {
-    key: 'ai',
-    items: [
-      { key: 'ai_providers', to: '/workspaces/$id/settings/ai-providers', adminOnly: true },
-      { key: 'ai_agents', to: '/workspaces/$id/settings/ai-agents' },
-      { key: 'auto_actions', to: '/workspaces/$id/settings/auto-actions', adminOnly: true },
-    ],
-  },
-  {
     key: 'reports',
     items: [
-      { key: 'ai_activity', to: '/workspaces/$id/settings/ai-activity' },
-      { key: 'ai_metrics', to: '/workspaces/$id/settings/ai/metrics' },
       { key: 'weekly_digest', to: '/workspaces/$id/settings/weekly-digest' },
       ...(AUDIT_LOG_ENABLED
         ? [
@@ -118,14 +102,12 @@ const NAV_GROUPS: readonly NavGroup[] = [
 
 function groupLabelKeyFor(
   key: NavGroupKey,
-): 'nav_group.workspace' | 'nav_group.integrations' | 'nav_group.ai' | 'nav_group.reports' {
+): 'nav_group.workspace' | 'nav_group.integrations' | 'nav_group.reports' {
   switch (key) {
     case 'workspace':
       return 'nav_group.workspace';
     case 'integrations':
       return 'nav_group.integrations';
-    case 'ai':
-      return 'nav_group.ai';
     case 'reports':
       return 'nav_group.reports';
   }
@@ -139,11 +121,7 @@ function labelKeyFor(
   | 'nav.public_shares'
   | 'nav.mcp_tokens'
   | 'nav.webhooks'
-  | 'nav.ai_providers'
-  | 'nav.ai_agents'
-  | 'nav.auto_actions'
-  | 'nav.ai_activity'
-  | 'nav.ai_metrics'
+  | 'nav.ai'
   | 'nav.weekly_digest'
   | 'nav.audit_log' {
   switch (key) {
@@ -157,16 +135,8 @@ function labelKeyFor(
       return 'nav.mcp_tokens';
     case 'webhooks':
       return 'nav.webhooks';
-    case 'ai_providers':
-      return 'nav.ai_providers';
-    case 'ai_agents':
-      return 'nav.ai_agents';
-    case 'auto_actions':
-      return 'nav.auto_actions';
-    case 'ai_activity':
-      return 'nav.ai_activity';
-    case 'ai_metrics':
-      return 'nav.ai_metrics';
+    case 'ai':
+      return 'nav.ai';
     case 'weekly_digest':
       return 'nav.weekly_digest';
     case 'audit_log':
@@ -174,10 +144,18 @@ function labelKeyFor(
   }
 }
 
+function outletKeyFor(pathname: string): string {
+  const marker = '/settings/';
+  const at = pathname.indexOf(marker);
+  if (at < 0) return pathname;
+  return pathname.slice(at + marker.length).split('/')[0] ?? '';
+}
+
 function WorkspaceSettingsLayout(): ReactElement {
   const { t } = useTranslation('settings');
   const { id } = routeApi.useParams();
-  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  // First segment after /settings/: tab changes inside one section keep the outlet mounted.
+  const outletKey = useRouterState({ select: (state) => outletKeyFor(state.location.pathname) });
   const role = useCurrentWorkspaceRole();
   const admin = isWorkspaceAdmin(role);
   const visibleGroups = NAV_GROUPS.map((group) => ({
@@ -209,7 +187,7 @@ function WorkspaceSettingsLayout(): ReactElement {
           </div>
         ))}
       </nav>
-      <div key={pathname} className={styles.outlet}>
+      <div key={outletKey} className={styles.outlet}>
         <Outlet />
       </div>
     </section>

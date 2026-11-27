@@ -1,5 +1,7 @@
 /**
- * /workspaces/$id/settings/auto-actions — auto-action executor settings (lazy).
+ * /workspaces/$id/settings/ai/automation — auto-action rules and autonomy
+ * matrix tab (lazy). Admin-only: a 401 / 403 swaps the tab for the
+ * restricted panel.
  */
 
 import { createLazyFileRoute, getRouteApi } from '@tanstack/react-router';
@@ -11,23 +13,23 @@ import AccessRestricted from '../features/workspaces/access-restricted';
 import AutoActionSettingsPage from '../features/workspaces/auto-action-settings';
 import { ApiError } from '../lib/api-error';
 
-const routeApi = getRouteApi('/_authenticated/workspaces/$id/settings/auto-actions');
+const routeApi = getRouteApi('/_authenticated/workspaces/$id/settings/ai/automation');
 
 /**
- * Renders <AccessRestricted> for 401 / 403, rethrows everything else so
- * the root FatalFallback keeps its normal behaviour on unexpected errors.
+ * Renders the tab variant of <AccessRestricted> for 401 / 403, rethrows
+ * everything else so the root FatalFallback keeps its normal behaviour.
  */
-function SettingsErrorFallback({ error }: FallbackProps): ReactElement {
+function TabErrorFallback({ error }: FallbackProps): ReactElement {
   if (error instanceof ApiError && (error.httpStatus === 401 || error.httpStatus === 403)) {
-    return <AccessRestricted sectionTitleKey="nav.auto_actions" />;
+    return <AccessRestricted sectionTitleKey="nav.ai" variant="tab" />;
   }
   throw error;
 }
 
-function AutoActionsRoute(): ReactElement {
+function AiAutomationRoute(): ReactElement {
   const { id } = routeApi.useParams();
   return (
-    <ErrorBoundary FallbackComponent={SettingsErrorFallback}>
+    <ErrorBoundary FallbackComponent={TabErrorFallback}>
       <Suspense fallback={<SettingsListSkeleton />}>
         <AutoActionSettingsPage workspaceId={id} />
       </Suspense>
@@ -35,6 +37,6 @@ function AutoActionsRoute(): ReactElement {
   );
 }
 
-export const Route = createLazyFileRoute('/_authenticated/workspaces/$id/settings/auto-actions')({
-  component: AutoActionsRoute,
+export const Route = createLazyFileRoute('/_authenticated/workspaces/$id/settings/ai/automation')({
+  component: AiAutomationRoute,
 });

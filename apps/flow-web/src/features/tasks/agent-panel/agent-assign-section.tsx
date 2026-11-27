@@ -110,7 +110,7 @@ export default function AgentAssignSection({
         <p className={css.muted}>
           {t('task_detail.agent.assign.none_available')}{' '}
           <Link
-            to="/workspaces/$id/settings/ai-agents"
+            to="/workspaces/$id/settings/ai/agents"
             params={{ id: workspaceId }}
             className={css.link}
           >

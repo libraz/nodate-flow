@@ -13,7 +13,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import Tooltip from '@nodate-flow/ui/primitives/tooltip';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import PageHeader from '../../components/page-header';
+import SectionHeader from '../../components/section-header';
 import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import ui from '../settings/settings-ui.module.css';
@@ -107,7 +107,7 @@ export default function ProviderList({ workspaceId }: ProviderListProps): ReactE
 
   return (
     <div className={ui.page}>
-      <PageHeader
+      <SectionHeader
         title={t('providers.title')}
         description={t('providers.description')}
         help="workspace-settings-ai-providers"

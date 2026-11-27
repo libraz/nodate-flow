@@ -7,21 +7,15 @@
     "mcp_tokens": "AI tool tokens (MCP)",
     "webhooks": "Webhooks",
     "ai": "AI",
-    "ai_providers": "AI providers",
-    "ai_agents": "AI agents",
-    "ai_activity": "AI activity",
-    "ai_metrics": "AI metrics",
     "weekly_digest": "Weekly digest",
     "audit_log": "Audit log",
     "integrations": "Integrations",
-    "auto_actions": "Auto-actions",
     "account": "Account (profile & security)",
     "account_hint": "Profile, password and sign-in are managed on your account page."
   },
   "nav_group": {
     "workspace": "Workspace",
     "integrations": "Integrations",
-    "ai": "AI setup",
     "reports": "Usage & records"
   },
   "save_status": {

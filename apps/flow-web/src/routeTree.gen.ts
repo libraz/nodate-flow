@@ -50,11 +50,8 @@ import { Route as AuthenticatedWorkspacesIdInsightsPriorityRouteImport } from '.
 import { Route as AuthenticatedWorkspacesIdProjectsIndexRouteImport } from './routes/_authenticated.workspaces.$id.projects.index';
 import { Route as AuthenticatedWorkspacesIdProjectsProjectIdRouteImport } from './routes/_authenticated.workspaces.$id.projects.$projectId';
 import { Route as AuthenticatedWorkspacesIdSettingsIndexRouteImport } from './routes/_authenticated.workspaces.$id.settings.index';
-import { Route as AuthenticatedWorkspacesIdSettingsAiActivityRouteImport } from './routes/_authenticated.workspaces.$id.settings.ai-activity';
-import { Route as AuthenticatedWorkspacesIdSettingsAiAgentsRouteImport } from './routes/_authenticated.workspaces.$id.settings.ai-agents';
-import { Route as AuthenticatedWorkspacesIdSettingsAiProvidersRouteImport } from './routes/_authenticated.workspaces.$id.settings.ai-providers';
+import { Route as AuthenticatedWorkspacesIdSettingsAiRouteImport } from './routes/_authenticated.workspaces.$id.settings.ai';
 import { Route as AuthenticatedWorkspacesIdSettingsAuditLogRouteImport } from './routes/_authenticated.workspaces.$id.settings.audit-log';
-import { Route as AuthenticatedWorkspacesIdSettingsAutoActionsRouteImport } from './routes/_authenticated.workspaces.$id.settings.auto-actions';
 import { Route as AuthenticatedWorkspacesIdSettingsDataRouteImport } from './routes/_authenticated.workspaces.$id.settings.data';
 import { Route as AuthenticatedWorkspacesIdSettingsGeneralRouteImport } from './routes/_authenticated.workspaces.$id.settings.general';
 import { Route as AuthenticatedWorkspacesIdSettingsMcpTokensRouteImport } from './routes/_authenticated.workspaces.$id.settings.mcp-tokens';
@@ -69,7 +66,11 @@ import { Route as AuthenticatedWorkspacesIdProjectsProjectIdMembersRouteImport }
 import { Route as AuthenticatedWorkspacesIdProjectsProjectIdSettingsRouteImport } from './routes/_authenticated.workspaces.$id.projects.$projectId.settings';
 import { Route as AuthenticatedWorkspacesIdProjectsProjectIdTasksRouteImport } from './routes/_authenticated.workspaces.$id.projects.$projectId.tasks';
 import { Route as AuthenticatedWorkspacesIdProjectsProjectIdTimelineRouteImport } from './routes/_authenticated.workspaces.$id.projects.$projectId.timeline';
-import { Route as AuthenticatedWorkspacesIdSettingsAiMetricsRouteImport } from './routes/_authenticated.workspaces.$id.settings.ai.metrics';
+import { Route as AuthenticatedWorkspacesIdSettingsAiIndexRouteImport } from './routes/_authenticated.workspaces.$id.settings.ai.index';
+import { Route as AuthenticatedWorkspacesIdSettingsAiAgentsRouteImport } from './routes/_authenticated.workspaces.$id.settings.ai.agents';
+import { Route as AuthenticatedWorkspacesIdSettingsAiAutomationRouteImport } from './routes/_authenticated.workspaces.$id.settings.ai.automation';
+import { Route as AuthenticatedWorkspacesIdSettingsAiConnectionRouteImport } from './routes/_authenticated.workspaces.$id.settings.ai.connection';
+import { Route as AuthenticatedWorkspacesIdSettingsAiUsageRouteImport } from './routes/_authenticated.workspaces.$id.settings.ai.usage';
 import { Route as AuthenticatedWorkspacesIdSettingsPublicSharesIndexRouteImport } from './routes/_authenticated.workspaces.$id.settings.public-shares.index';
 import { Route as AuthenticatedWorkspacesIdSettingsPublicSharesShareIdRouteImport } from './routes/_authenticated.workspaces.$id.settings.public-shares.$shareId';
 import { Route as AuthenticatedWorkspacesIdCalendarsCalIdEventsEvtIdRouteImport } from './routes/_authenticated.workspaces.$id.calendars.$calId.events.$evtId';
@@ -346,33 +347,13 @@ const AuthenticatedWorkspacesIdSettingsIndexRoute =
     path: '/',
     getParentRoute: () => AuthenticatedWorkspacesIdSettingsRoute,
   } as any);
-const AuthenticatedWorkspacesIdSettingsAiActivityRoute =
-  AuthenticatedWorkspacesIdSettingsAiActivityRouteImport.update({
-    id: '/ai-activity',
-    path: '/ai-activity',
+const AuthenticatedWorkspacesIdSettingsAiRoute =
+  AuthenticatedWorkspacesIdSettingsAiRouteImport.update({
+    id: '/ai',
+    path: '/ai',
     getParentRoute: () => AuthenticatedWorkspacesIdSettingsRoute,
   } as any).lazy(() =>
-    import('./routes/_authenticated.workspaces.$id.settings.ai-activity.lazy').then(
-      (d) => d.Route,
-    ),
-  );
-const AuthenticatedWorkspacesIdSettingsAiAgentsRoute =
-  AuthenticatedWorkspacesIdSettingsAiAgentsRouteImport.update({
-    id: '/ai-agents',
-    path: '/ai-agents',
-    getParentRoute: () => AuthenticatedWorkspacesIdSettingsRoute,
-  } as any).lazy(() =>
-    import('./routes/_authenticated.workspaces.$id.settings.ai-agents.lazy').then(
-      (d) => d.Route,
-    ),
-  );
-const AuthenticatedWorkspacesIdSettingsAiProvidersRoute =
-  AuthenticatedWorkspacesIdSettingsAiProvidersRouteImport.update({
-    id: '/ai-providers',
-    path: '/ai-providers',
-    getParentRoute: () => AuthenticatedWorkspacesIdSettingsRoute,
-  } as any).lazy(() =>
-    import('./routes/_authenticated.workspaces.$id.settings.ai-providers.lazy').then(
+    import('./routes/_authenticated.workspaces.$id.settings.ai.lazy').then(
       (d) => d.Route,
     ),
   );
@@ -383,16 +364,6 @@ const AuthenticatedWorkspacesIdSettingsAuditLogRoute =
     getParentRoute: () => AuthenticatedWorkspacesIdSettingsRoute,
   } as any).lazy(() =>
     import('./routes/_authenticated.workspaces.$id.settings.audit-log.lazy').then(
-      (d) => d.Route,
-    ),
-  );
-const AuthenticatedWorkspacesIdSettingsAutoActionsRoute =
-  AuthenticatedWorkspacesIdSettingsAutoActionsRouteImport.update({
-    id: '/auto-actions',
-    path: '/auto-actions',
-    getParentRoute: () => AuthenticatedWorkspacesIdSettingsRoute,
-  } as any).lazy(() =>
-    import('./routes/_authenticated.workspaces.$id.settings.auto-actions.lazy').then(
       (d) => d.Route,
     ),
   );
@@ -524,13 +495,53 @@ const AuthenticatedWorkspacesIdProjectsProjectIdTimelineRoute =
       (d) => d.Route,
     ),
   );
-const AuthenticatedWorkspacesIdSettingsAiMetricsRoute =
-  AuthenticatedWorkspacesIdSettingsAiMetricsRouteImport.update({
-    id: '/ai/metrics',
-    path: '/ai/metrics',
-    getParentRoute: () => AuthenticatedWorkspacesIdSettingsRoute,
+const AuthenticatedWorkspacesIdSettingsAiIndexRoute =
+  AuthenticatedWorkspacesIdSettingsAiIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedWorkspacesIdSettingsAiRoute,
   } as any).lazy(() =>
-    import('./routes/_authenticated.workspaces.$id.settings.ai.metrics.lazy').then(
+    import('./routes/_authenticated.workspaces.$id.settings.ai.index.lazy').then(
+      (d) => d.Route,
+    ),
+  );
+const AuthenticatedWorkspacesIdSettingsAiAgentsRoute =
+  AuthenticatedWorkspacesIdSettingsAiAgentsRouteImport.update({
+    id: '/agents',
+    path: '/agents',
+    getParentRoute: () => AuthenticatedWorkspacesIdSettingsAiRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated.workspaces.$id.settings.ai.agents.lazy').then(
+      (d) => d.Route,
+    ),
+  );
+const AuthenticatedWorkspacesIdSettingsAiAutomationRoute =
+  AuthenticatedWorkspacesIdSettingsAiAutomationRouteImport.update({
+    id: '/automation',
+    path: '/automation',
+    getParentRoute: () => AuthenticatedWorkspacesIdSettingsAiRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated.workspaces.$id.settings.ai.automation.lazy').then(
+      (d) => d.Route,
+    ),
+  );
+const AuthenticatedWorkspacesIdSettingsAiConnectionRoute =
+  AuthenticatedWorkspacesIdSettingsAiConnectionRouteImport.update({
+    id: '/connection',
+    path: '/connection',
+    getParentRoute: () => AuthenticatedWorkspacesIdSettingsAiRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated.workspaces.$id.settings.ai.connection.lazy').then(
+      (d) => d.Route,
+    ),
+  );
+const AuthenticatedWorkspacesIdSettingsAiUsageRoute =
+  AuthenticatedWorkspacesIdSettingsAiUsageRouteImport.update({
+    id: '/usage',
+    path: '/usage',
+    getParentRoute: () => AuthenticatedWorkspacesIdSettingsAiRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated.workspaces.$id.settings.ai.usage.lazy').then(
       (d) => d.Route,
     ),
   );
@@ -613,11 +624,8 @@ export interface FileRoutesByFullPath {
   '/projects/$projectId/': typeof AuthenticatedProjectsProjectIdIndexRoute;
   '/workspaces/$id/insights/priority': typeof AuthenticatedWorkspacesIdInsightsPriorityRoute;
   '/workspaces/$id/projects/$projectId': typeof AuthenticatedWorkspacesIdProjectsProjectIdRouteWithChildren;
-  '/workspaces/$id/settings/ai-activity': typeof AuthenticatedWorkspacesIdSettingsAiActivityRoute;
-  '/workspaces/$id/settings/ai-agents': typeof AuthenticatedWorkspacesIdSettingsAiAgentsRoute;
-  '/workspaces/$id/settings/ai-providers': typeof AuthenticatedWorkspacesIdSettingsAiProvidersRoute;
+  '/workspaces/$id/settings/ai': typeof AuthenticatedWorkspacesIdSettingsAiRouteWithChildren;
   '/workspaces/$id/settings/audit-log': typeof AuthenticatedWorkspacesIdSettingsAuditLogRoute;
-  '/workspaces/$id/settings/auto-actions': typeof AuthenticatedWorkspacesIdSettingsAutoActionsRoute;
   '/workspaces/$id/settings/data': typeof AuthenticatedWorkspacesIdSettingsDataRoute;
   '/workspaces/$id/settings/general': typeof AuthenticatedWorkspacesIdSettingsGeneralRoute;
   '/workspaces/$id/settings/mcp-tokens': typeof AuthenticatedWorkspacesIdSettingsMcpTokensRoute;
@@ -634,9 +642,13 @@ export interface FileRoutesByFullPath {
   '/workspaces/$id/projects/$projectId/settings': typeof AuthenticatedWorkspacesIdProjectsProjectIdSettingsRoute;
   '/workspaces/$id/projects/$projectId/tasks': typeof AuthenticatedWorkspacesIdProjectsProjectIdTasksRouteWithChildren;
   '/workspaces/$id/projects/$projectId/timeline': typeof AuthenticatedWorkspacesIdProjectsProjectIdTimelineRoute;
-  '/workspaces/$id/settings/ai/metrics': typeof AuthenticatedWorkspacesIdSettingsAiMetricsRoute;
+  '/workspaces/$id/settings/ai/agents': typeof AuthenticatedWorkspacesIdSettingsAiAgentsRoute;
+  '/workspaces/$id/settings/ai/automation': typeof AuthenticatedWorkspacesIdSettingsAiAutomationRoute;
+  '/workspaces/$id/settings/ai/connection': typeof AuthenticatedWorkspacesIdSettingsAiConnectionRoute;
+  '/workspaces/$id/settings/ai/usage': typeof AuthenticatedWorkspacesIdSettingsAiUsageRoute;
   '/workspaces/$id/settings/public-shares/$shareId': typeof AuthenticatedWorkspacesIdSettingsPublicSharesShareIdRoute;
   '/workspaces/$id/projects/$projectId/': typeof AuthenticatedWorkspacesIdProjectsProjectIdIndexRoute;
+  '/workspaces/$id/settings/ai/': typeof AuthenticatedWorkspacesIdSettingsAiIndexRoute;
   '/workspaces/$id/settings/public-shares/': typeof AuthenticatedWorkspacesIdSettingsPublicSharesIndexRoute;
   '/workspaces/$id/calendars/$calId/events/$evtId': typeof AuthenticatedWorkspacesIdCalendarsCalIdEventsEvtIdRoute;
   '/workspaces/$id/projects/$projectId/tasks/': typeof AuthenticatedWorkspacesIdProjectsProjectIdTasksIndexRoute;
@@ -672,11 +684,7 @@ export interface FileRoutesByTo {
   '/workspaces/$id/timeline': typeof AuthenticatedWorkspacesIdTimelineRoute;
   '/projects/$projectId': typeof AuthenticatedProjectsProjectIdIndexRoute;
   '/workspaces/$id/insights/priority': typeof AuthenticatedWorkspacesIdInsightsPriorityRoute;
-  '/workspaces/$id/settings/ai-activity': typeof AuthenticatedWorkspacesIdSettingsAiActivityRoute;
-  '/workspaces/$id/settings/ai-agents': typeof AuthenticatedWorkspacesIdSettingsAiAgentsRoute;
-  '/workspaces/$id/settings/ai-providers': typeof AuthenticatedWorkspacesIdSettingsAiProvidersRoute;
   '/workspaces/$id/settings/audit-log': typeof AuthenticatedWorkspacesIdSettingsAuditLogRoute;
-  '/workspaces/$id/settings/auto-actions': typeof AuthenticatedWorkspacesIdSettingsAutoActionsRoute;
   '/workspaces/$id/settings/data': typeof AuthenticatedWorkspacesIdSettingsDataRoute;
   '/workspaces/$id/settings/general': typeof AuthenticatedWorkspacesIdSettingsGeneralRoute;
   '/workspaces/$id/settings/mcp-tokens': typeof AuthenticatedWorkspacesIdSettingsMcpTokensRoute;
@@ -691,9 +699,13 @@ export interface FileRoutesByTo {
   '/workspaces/$id/projects/$projectId/members': typeof AuthenticatedWorkspacesIdProjectsProjectIdMembersRoute;
   '/workspaces/$id/projects/$projectId/settings': typeof AuthenticatedWorkspacesIdProjectsProjectIdSettingsRoute;
   '/workspaces/$id/projects/$projectId/timeline': typeof AuthenticatedWorkspacesIdProjectsProjectIdTimelineRoute;
-  '/workspaces/$id/settings/ai/metrics': typeof AuthenticatedWorkspacesIdSettingsAiMetricsRoute;
+  '/workspaces/$id/settings/ai/agents': typeof AuthenticatedWorkspacesIdSettingsAiAgentsRoute;
+  '/workspaces/$id/settings/ai/automation': typeof AuthenticatedWorkspacesIdSettingsAiAutomationRoute;
+  '/workspaces/$id/settings/ai/connection': typeof AuthenticatedWorkspacesIdSettingsAiConnectionRoute;
+  '/workspaces/$id/settings/ai/usage': typeof AuthenticatedWorkspacesIdSettingsAiUsageRoute;
   '/workspaces/$id/settings/public-shares/$shareId': typeof AuthenticatedWorkspacesIdSettingsPublicSharesShareIdRoute;
   '/workspaces/$id/projects/$projectId': typeof AuthenticatedWorkspacesIdProjectsProjectIdIndexRoute;
+  '/workspaces/$id/settings/ai': typeof AuthenticatedWorkspacesIdSettingsAiIndexRoute;
   '/workspaces/$id/settings/public-shares': typeof AuthenticatedWorkspacesIdSettingsPublicSharesIndexRoute;
   '/workspaces/$id/calendars/$calId/events/$evtId': typeof AuthenticatedWorkspacesIdCalendarsCalIdEventsEvtIdRoute;
   '/workspaces/$id/projects/$projectId/tasks': typeof AuthenticatedWorkspacesIdProjectsProjectIdTasksIndexRoute;
@@ -738,11 +750,8 @@ export interface FileRoutesById {
   '/_authenticated/projects/$projectId/': typeof AuthenticatedProjectsProjectIdIndexRoute;
   '/_authenticated/workspaces/$id/insights/priority': typeof AuthenticatedWorkspacesIdInsightsPriorityRoute;
   '/_authenticated/workspaces/$id/projects/$projectId': typeof AuthenticatedWorkspacesIdProjectsProjectIdRouteWithChildren;
-  '/_authenticated/workspaces/$id/settings/ai-activity': typeof AuthenticatedWorkspacesIdSettingsAiActivityRoute;
-  '/_authenticated/workspaces/$id/settings/ai-agents': typeof AuthenticatedWorkspacesIdSettingsAiAgentsRoute;
-  '/_authenticated/workspaces/$id/settings/ai-providers': typeof AuthenticatedWorkspacesIdSettingsAiProvidersRoute;
+  '/_authenticated/workspaces/$id/settings/ai': typeof AuthenticatedWorkspacesIdSettingsAiRouteWithChildren;
   '/_authenticated/workspaces/$id/settings/audit-log': typeof AuthenticatedWorkspacesIdSettingsAuditLogRoute;
-  '/_authenticated/workspaces/$id/settings/auto-actions': typeof AuthenticatedWorkspacesIdSettingsAutoActionsRoute;
   '/_authenticated/workspaces/$id/settings/data': typeof AuthenticatedWorkspacesIdSettingsDataRoute;
   '/_authenticated/workspaces/$id/settings/general': typeof AuthenticatedWorkspacesIdSettingsGeneralRoute;
   '/_authenticated/workspaces/$id/settings/mcp-tokens': typeof AuthenticatedWorkspacesIdSettingsMcpTokensRoute;
@@ -759,9 +768,13 @@ export interface FileRoutesById {
   '/_authenticated/workspaces/$id/projects/$projectId/settings': typeof AuthenticatedWorkspacesIdProjectsProjectIdSettingsRoute;
   '/_authenticated/workspaces/$id/projects/$projectId/tasks': typeof AuthenticatedWorkspacesIdProjectsProjectIdTasksRouteWithChildren;
   '/_authenticated/workspaces/$id/projects/$projectId/timeline': typeof AuthenticatedWorkspacesIdProjectsProjectIdTimelineRoute;
-  '/_authenticated/workspaces/$id/settings/ai/metrics': typeof AuthenticatedWorkspacesIdSettingsAiMetricsRoute;
+  '/_authenticated/workspaces/$id/settings/ai/agents': typeof AuthenticatedWorkspacesIdSettingsAiAgentsRoute;
+  '/_authenticated/workspaces/$id/settings/ai/automation': typeof AuthenticatedWorkspacesIdSettingsAiAutomationRoute;
+  '/_authenticated/workspaces/$id/settings/ai/connection': typeof AuthenticatedWorkspacesIdSettingsAiConnectionRoute;
+  '/_authenticated/workspaces/$id/settings/ai/usage': typeof AuthenticatedWorkspacesIdSettingsAiUsageRoute;
   '/_authenticated/workspaces/$id/settings/public-shares/$shareId': typeof AuthenticatedWorkspacesIdSettingsPublicSharesShareIdRoute;
   '/_authenticated/workspaces/$id/projects/$projectId/': typeof AuthenticatedWorkspacesIdProjectsProjectIdIndexRoute;
+  '/_authenticated/workspaces/$id/settings/ai/': typeof AuthenticatedWorkspacesIdSettingsAiIndexRoute;
   '/_authenticated/workspaces/$id/settings/public-shares/': typeof AuthenticatedWorkspacesIdSettingsPublicSharesIndexRoute;
   '/_authenticated/workspaces/$id/calendars/$calId/events/$evtId': typeof AuthenticatedWorkspacesIdCalendarsCalIdEventsEvtIdRoute;
   '/_authenticated/workspaces/$id/projects/$projectId/tasks/': typeof AuthenticatedWorkspacesIdProjectsProjectIdTasksIndexRoute;
@@ -806,11 +819,8 @@ export interface FileRouteTypes {
     | '/projects/$projectId/'
     | '/workspaces/$id/insights/priority'
     | '/workspaces/$id/projects/$projectId'
-    | '/workspaces/$id/settings/ai-activity'
-    | '/workspaces/$id/settings/ai-agents'
-    | '/workspaces/$id/settings/ai-providers'
+    | '/workspaces/$id/settings/ai'
     | '/workspaces/$id/settings/audit-log'
-    | '/workspaces/$id/settings/auto-actions'
     | '/workspaces/$id/settings/data'
     | '/workspaces/$id/settings/general'
     | '/workspaces/$id/settings/mcp-tokens'
@@ -827,9 +837,13 @@ export interface FileRouteTypes {
     | '/workspaces/$id/projects/$projectId/settings'
     | '/workspaces/$id/projects/$projectId/tasks'
     | '/workspaces/$id/projects/$projectId/timeline'
-    | '/workspaces/$id/settings/ai/metrics'
+    | '/workspaces/$id/settings/ai/agents'
+    | '/workspaces/$id/settings/ai/automation'
+    | '/workspaces/$id/settings/ai/connection'
+    | '/workspaces/$id/settings/ai/usage'
     | '/workspaces/$id/settings/public-shares/$shareId'
     | '/workspaces/$id/projects/$projectId/'
+    | '/workspaces/$id/settings/ai/'
     | '/workspaces/$id/settings/public-shares/'
     | '/workspaces/$id/calendars/$calId/events/$evtId'
     | '/workspaces/$id/projects/$projectId/tasks/';
@@ -865,11 +879,7 @@ export interface FileRouteTypes {
     | '/workspaces/$id/timeline'
     | '/projects/$projectId'
     | '/workspaces/$id/insights/priority'
-    | '/workspaces/$id/settings/ai-activity'
-    | '/workspaces/$id/settings/ai-agents'
-    | '/workspaces/$id/settings/ai-providers'
     | '/workspaces/$id/settings/audit-log'
-    | '/workspaces/$id/settings/auto-actions'
     | '/workspaces/$id/settings/data'
     | '/workspaces/$id/settings/general'
     | '/workspaces/$id/settings/mcp-tokens'
@@ -884,9 +894,13 @@ export interface FileRouteTypes {
     | '/workspaces/$id/projects/$projectId/members'
     | '/workspaces/$id/projects/$projectId/settings'
     | '/workspaces/$id/projects/$projectId/timeline'
-    | '/workspaces/$id/settings/ai/metrics'
+    | '/workspaces/$id/settings/ai/agents'
+    | '/workspaces/$id/settings/ai/automation'
+    | '/workspaces/$id/settings/ai/connection'
+    | '/workspaces/$id/settings/ai/usage'
     | '/workspaces/$id/settings/public-shares/$shareId'
     | '/workspaces/$id/projects/$projectId'
+    | '/workspaces/$id/settings/ai'
     | '/workspaces/$id/settings/public-shares'
     | '/workspaces/$id/calendars/$calId/events/$evtId'
     | '/workspaces/$id/projects/$projectId/tasks';
@@ -930,11 +944,8 @@ export interface FileRouteTypes {
     | '/_authenticated/projects/$projectId/'
     | '/_authenticated/workspaces/$id/insights/priority'
     | '/_authenticated/workspaces/$id/projects/$projectId'
-    | '/_authenticated/workspaces/$id/settings/ai-activity'
-    | '/_authenticated/workspaces/$id/settings/ai-agents'
-    | '/_authenticated/workspaces/$id/settings/ai-providers'
+    | '/_authenticated/workspaces/$id/settings/ai'
     | '/_authenticated/workspaces/$id/settings/audit-log'
-    | '/_authenticated/workspaces/$id/settings/auto-actions'
     | '/_authenticated/workspaces/$id/settings/data'
     | '/_authenticated/workspaces/$id/settings/general'
     | '/_authenticated/workspaces/$id/settings/mcp-tokens'
@@ -951,9 +962,13 @@ export interface FileRouteTypes {
     | '/_authenticated/workspaces/$id/projects/$projectId/settings'
     | '/_authenticated/workspaces/$id/projects/$projectId/tasks'
     | '/_authenticated/workspaces/$id/projects/$projectId/timeline'
-    | '/_authenticated/workspaces/$id/settings/ai/metrics'
+    | '/_authenticated/workspaces/$id/settings/ai/agents'
+    | '/_authenticated/workspaces/$id/settings/ai/automation'
+    | '/_authenticated/workspaces/$id/settings/ai/connection'
+    | '/_authenticated/workspaces/$id/settings/ai/usage'
     | '/_authenticated/workspaces/$id/settings/public-shares/$shareId'
     | '/_authenticated/workspaces/$id/projects/$projectId/'
+    | '/_authenticated/workspaces/$id/settings/ai/'
     | '/_authenticated/workspaces/$id/settings/public-shares/'
     | '/_authenticated/workspaces/$id/calendars/$calId/events/$evtId'
     | '/_authenticated/workspaces/$id/projects/$projectId/tasks/';
@@ -1259,25 +1274,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedWorkspacesIdSettingsIndexRouteImport;
       parentRoute: typeof AuthenticatedWorkspacesIdSettingsRoute;
     };
-    '/_authenticated/workspaces/$id/settings/ai-activity': {
-      id: '/_authenticated/workspaces/$id/settings/ai-activity';
-      path: '/ai-activity';
-      fullPath: '/workspaces/$id/settings/ai-activity';
-      preLoaderRoute: typeof AuthenticatedWorkspacesIdSettingsAiActivityRouteImport;
-      parentRoute: typeof AuthenticatedWorkspacesIdSettingsRoute;
-    };
-    '/_authenticated/workspaces/$id/settings/ai-agents': {
-      id: '/_authenticated/workspaces/$id/settings/ai-agents';
-      path: '/ai-agents';
-      fullPath: '/workspaces/$id/settings/ai-agents';
-      preLoaderRoute: typeof AuthenticatedWorkspacesIdSettingsAiAgentsRouteImport;
-      parentRoute: typeof AuthenticatedWorkspacesIdSettingsRoute;
-    };
-    '/_authenticated/workspaces/$id/settings/ai-providers': {
-      id: '/_authenticated/workspaces/$id/settings/ai-providers';
-      path: '/ai-providers';
-      fullPath: '/workspaces/$id/settings/ai-providers';
-      preLoaderRoute: typeof AuthenticatedWorkspacesIdSettingsAiProvidersRouteImport;
+    '/_authenticated/workspaces/$id/settings/ai': {
+      id: '/_authenticated/workspaces/$id/settings/ai';
+      path: '/ai';
+      fullPath: '/workspaces/$id/settings/ai';
+      preLoaderRoute: typeof AuthenticatedWorkspacesIdSettingsAiRouteImport;
       parentRoute: typeof AuthenticatedWorkspacesIdSettingsRoute;
     };
     '/_authenticated/workspaces/$id/settings/audit-log': {
@@ -1285,13 +1286,6 @@ declare module '@tanstack/react-router' {
       path: '/audit-log';
       fullPath: '/workspaces/$id/settings/audit-log';
       preLoaderRoute: typeof AuthenticatedWorkspacesIdSettingsAuditLogRouteImport;
-      parentRoute: typeof AuthenticatedWorkspacesIdSettingsRoute;
-    };
-    '/_authenticated/workspaces/$id/settings/auto-actions': {
-      id: '/_authenticated/workspaces/$id/settings/auto-actions';
-      path: '/auto-actions';
-      fullPath: '/workspaces/$id/settings/auto-actions';
-      preLoaderRoute: typeof AuthenticatedWorkspacesIdSettingsAutoActionsRouteImport;
       parentRoute: typeof AuthenticatedWorkspacesIdSettingsRoute;
     };
     '/_authenticated/workspaces/$id/settings/data': {
@@ -1392,12 +1386,40 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedWorkspacesIdProjectsProjectIdTimelineRouteImport;
       parentRoute: typeof AuthenticatedWorkspacesIdProjectsProjectIdRoute;
     };
-    '/_authenticated/workspaces/$id/settings/ai/metrics': {
-      id: '/_authenticated/workspaces/$id/settings/ai/metrics';
-      path: '/ai/metrics';
-      fullPath: '/workspaces/$id/settings/ai/metrics';
-      preLoaderRoute: typeof AuthenticatedWorkspacesIdSettingsAiMetricsRouteImport;
-      parentRoute: typeof AuthenticatedWorkspacesIdSettingsRoute;
+    '/_authenticated/workspaces/$id/settings/ai/': {
+      id: '/_authenticated/workspaces/$id/settings/ai/';
+      path: '/';
+      fullPath: '/workspaces/$id/settings/ai/';
+      preLoaderRoute: typeof AuthenticatedWorkspacesIdSettingsAiIndexRouteImport;
+      parentRoute: typeof AuthenticatedWorkspacesIdSettingsAiRoute;
+    };
+    '/_authenticated/workspaces/$id/settings/ai/agents': {
+      id: '/_authenticated/workspaces/$id/settings/ai/agents';
+      path: '/agents';
+      fullPath: '/workspaces/$id/settings/ai/agents';
+      preLoaderRoute: typeof AuthenticatedWorkspacesIdSettingsAiAgentsRouteImport;
+      parentRoute: typeof AuthenticatedWorkspacesIdSettingsAiRoute;
+    };
+    '/_authenticated/workspaces/$id/settings/ai/automation': {
+      id: '/_authenticated/workspaces/$id/settings/ai/automation';
+      path: '/automation';
+      fullPath: '/workspaces/$id/settings/ai/automation';
+      preLoaderRoute: typeof AuthenticatedWorkspacesIdSettingsAiAutomationRouteImport;
+      parentRoute: typeof AuthenticatedWorkspacesIdSettingsAiRoute;
+    };
+    '/_authenticated/workspaces/$id/settings/ai/connection': {
+      id: '/_authenticated/workspaces/$id/settings/ai/connection';
+      path: '/connection';
+      fullPath: '/workspaces/$id/settings/ai/connection';
+      preLoaderRoute: typeof AuthenticatedWorkspacesIdSettingsAiConnectionRouteImport;
+      parentRoute: typeof AuthenticatedWorkspacesIdSettingsAiRoute;
+    };
+    '/_authenticated/workspaces/$id/settings/ai/usage': {
+      id: '/_authenticated/workspaces/$id/settings/ai/usage';
+      path: '/usage';
+      fullPath: '/workspaces/$id/settings/ai/usage';
+      preLoaderRoute: typeof AuthenticatedWorkspacesIdSettingsAiUsageRouteImport;
+      parentRoute: typeof AuthenticatedWorkspacesIdSettingsAiRoute;
     };
     '/_authenticated/workspaces/$id/settings/public-shares/': {
       id: '/_authenticated/workspaces/$id/settings/public-shares/';
@@ -1523,6 +1545,33 @@ const AuthenticatedWorkspacesIdProjectsRouteWithChildren =
     AuthenticatedWorkspacesIdProjectsRouteChildren,
   );
 
+interface AuthenticatedWorkspacesIdSettingsAiRouteChildren {
+  AuthenticatedWorkspacesIdSettingsAiAgentsRoute: typeof AuthenticatedWorkspacesIdSettingsAiAgentsRoute;
+  AuthenticatedWorkspacesIdSettingsAiAutomationRoute: typeof AuthenticatedWorkspacesIdSettingsAiAutomationRoute;
+  AuthenticatedWorkspacesIdSettingsAiConnectionRoute: typeof AuthenticatedWorkspacesIdSettingsAiConnectionRoute;
+  AuthenticatedWorkspacesIdSettingsAiUsageRoute: typeof AuthenticatedWorkspacesIdSettingsAiUsageRoute;
+  AuthenticatedWorkspacesIdSettingsAiIndexRoute: typeof AuthenticatedWorkspacesIdSettingsAiIndexRoute;
+}
+
+const AuthenticatedWorkspacesIdSettingsAiRouteChildren: AuthenticatedWorkspacesIdSettingsAiRouteChildren =
+  {
+    AuthenticatedWorkspacesIdSettingsAiAgentsRoute:
+      AuthenticatedWorkspacesIdSettingsAiAgentsRoute,
+    AuthenticatedWorkspacesIdSettingsAiAutomationRoute:
+      AuthenticatedWorkspacesIdSettingsAiAutomationRoute,
+    AuthenticatedWorkspacesIdSettingsAiConnectionRoute:
+      AuthenticatedWorkspacesIdSettingsAiConnectionRoute,
+    AuthenticatedWorkspacesIdSettingsAiUsageRoute:
+      AuthenticatedWorkspacesIdSettingsAiUsageRoute,
+    AuthenticatedWorkspacesIdSettingsAiIndexRoute:
+      AuthenticatedWorkspacesIdSettingsAiIndexRoute,
+  };
+
+const AuthenticatedWorkspacesIdSettingsAiRouteWithChildren =
+  AuthenticatedWorkspacesIdSettingsAiRoute._addFileChildren(
+    AuthenticatedWorkspacesIdSettingsAiRouteChildren,
+  );
+
 interface AuthenticatedWorkspacesIdSettingsPublicSharesRouteChildren {
   AuthenticatedWorkspacesIdSettingsPublicSharesShareIdRoute: typeof AuthenticatedWorkspacesIdSettingsPublicSharesShareIdRoute;
   AuthenticatedWorkspacesIdSettingsPublicSharesIndexRoute: typeof AuthenticatedWorkspacesIdSettingsPublicSharesIndexRoute;
@@ -1542,11 +1591,8 @@ const AuthenticatedWorkspacesIdSettingsPublicSharesRouteWithChildren =
   );
 
 interface AuthenticatedWorkspacesIdSettingsRouteChildren {
-  AuthenticatedWorkspacesIdSettingsAiActivityRoute: typeof AuthenticatedWorkspacesIdSettingsAiActivityRoute;
-  AuthenticatedWorkspacesIdSettingsAiAgentsRoute: typeof AuthenticatedWorkspacesIdSettingsAiAgentsRoute;
-  AuthenticatedWorkspacesIdSettingsAiProvidersRoute: typeof AuthenticatedWorkspacesIdSettingsAiProvidersRoute;
+  AuthenticatedWorkspacesIdSettingsAiRoute: typeof AuthenticatedWorkspacesIdSettingsAiRouteWithChildren;
   AuthenticatedWorkspacesIdSettingsAuditLogRoute: typeof AuthenticatedWorkspacesIdSettingsAuditLogRoute;
-  AuthenticatedWorkspacesIdSettingsAutoActionsRoute: typeof AuthenticatedWorkspacesIdSettingsAutoActionsRoute;
   AuthenticatedWorkspacesIdSettingsDataRoute: typeof AuthenticatedWorkspacesIdSettingsDataRoute;
   AuthenticatedWorkspacesIdSettingsGeneralRoute: typeof AuthenticatedWorkspacesIdSettingsGeneralRoute;
   AuthenticatedWorkspacesIdSettingsMcpTokensRoute: typeof AuthenticatedWorkspacesIdSettingsMcpTokensRoute;
@@ -1554,21 +1600,14 @@ interface AuthenticatedWorkspacesIdSettingsRouteChildren {
   AuthenticatedWorkspacesIdSettingsWebhooksRoute: typeof AuthenticatedWorkspacesIdSettingsWebhooksRoute;
   AuthenticatedWorkspacesIdSettingsWeeklyDigestRoute: typeof AuthenticatedWorkspacesIdSettingsWeeklyDigestRoute;
   AuthenticatedWorkspacesIdSettingsIndexRoute: typeof AuthenticatedWorkspacesIdSettingsIndexRoute;
-  AuthenticatedWorkspacesIdSettingsAiMetricsRoute: typeof AuthenticatedWorkspacesIdSettingsAiMetricsRoute;
 }
 
 const AuthenticatedWorkspacesIdSettingsRouteChildren: AuthenticatedWorkspacesIdSettingsRouteChildren =
   {
-    AuthenticatedWorkspacesIdSettingsAiActivityRoute:
-      AuthenticatedWorkspacesIdSettingsAiActivityRoute,
-    AuthenticatedWorkspacesIdSettingsAiAgentsRoute:
-      AuthenticatedWorkspacesIdSettingsAiAgentsRoute,
-    AuthenticatedWorkspacesIdSettingsAiProvidersRoute:
-      AuthenticatedWorkspacesIdSettingsAiProvidersRoute,
+    AuthenticatedWorkspacesIdSettingsAiRoute:
+      AuthenticatedWorkspacesIdSettingsAiRouteWithChildren,
     AuthenticatedWorkspacesIdSettingsAuditLogRoute:
       AuthenticatedWorkspacesIdSettingsAuditLogRoute,
-    AuthenticatedWorkspacesIdSettingsAutoActionsRoute:
-      AuthenticatedWorkspacesIdSettingsAutoActionsRoute,
     AuthenticatedWorkspacesIdSettingsDataRoute:
       AuthenticatedWorkspacesIdSettingsDataRoute,
     AuthenticatedWorkspacesIdSettingsGeneralRoute:
@@ -1583,8 +1622,6 @@ const AuthenticatedWorkspacesIdSettingsRouteChildren: AuthenticatedWorkspacesIdS
       AuthenticatedWorkspacesIdSettingsWeeklyDigestRoute,
     AuthenticatedWorkspacesIdSettingsIndexRoute:
       AuthenticatedWorkspacesIdSettingsIndexRoute,
-    AuthenticatedWorkspacesIdSettingsAiMetricsRoute:
-      AuthenticatedWorkspacesIdSettingsAiMetricsRoute,
   };
 
 const AuthenticatedWorkspacesIdSettingsRouteWithChildren =

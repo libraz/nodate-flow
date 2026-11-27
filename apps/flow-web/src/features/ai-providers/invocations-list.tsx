@@ -12,7 +12,7 @@ import EmptyState from '@nodate-flow/ui/primitives/empty-state';
 import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import type { CSSProperties, ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
-import PageHeader from '../../components/page-header';
+import SectionHeader from '../../components/section-header';
 import { formatEpochDateTime } from '../../lib/format';
 import ui from '../settings/settings-ui.module.css';
 import CostTodaySummary from './cost-today-summary';
@@ -67,7 +67,7 @@ export default function InvocationsList({ workspaceId }: { workspaceId: string }
   const staggerFor = useFirstLoadStagger();
   return (
     <div className={ui.page}>
-      <PageHeader
+      <SectionHeader
         title={t('ai_activity.title')}
         description={t('ai_activity.description')}
         help="workspace-settings-ai-activity"

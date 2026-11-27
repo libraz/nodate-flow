@@ -29,6 +29,7 @@ export const aiProvidersKeys = {
 };
 
 import { ApiError } from '../../lib/api-error';
+import { aiStatusKeys } from './ai-status-api';
 
 export { ApiError as AiProviderApiError };
 
@@ -106,6 +107,7 @@ export function useCreateAiProvider(
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: aiProvidersKeys.list(workspaceId) });
+      void qc.invalidateQueries({ queryKey: aiStatusKeys.detail(workspaceId) });
     },
   });
 }
@@ -133,6 +135,7 @@ export function useUpdateAiProvider(
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: aiProvidersKeys.list(workspaceId) });
+      void qc.invalidateQueries({ queryKey: aiStatusKeys.detail(workspaceId) });
     },
   });
 }
@@ -154,6 +157,7 @@ export function useDeleteAiProvider(
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: aiProvidersKeys.list(workspaceId) });
+      void qc.invalidateQueries({ queryKey: aiStatusKeys.detail(workspaceId) });
     },
   });
 }

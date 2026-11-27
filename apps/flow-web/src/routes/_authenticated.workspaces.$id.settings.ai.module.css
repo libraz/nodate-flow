@@ -1,0 +1,20 @@
+/* AI settings page: vertical rhythm between the status card, the note and the tabs. */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-4);
+  min-inline-size: 0;
+}
+
+.note {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+}
+
+.tabContent {
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 0;
+}

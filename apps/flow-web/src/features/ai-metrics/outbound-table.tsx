@@ -26,9 +26,9 @@ export default function OutboundTable({ rows }: OutboundTableProps): ReactElemen
   return (
     <section className={styles.outboundSection} aria-labelledby="ai-metrics-outbound-title">
       <header className={styles.outboundHeader}>
-        <h2 id="ai-metrics-outbound-title" className={styles.outboundTitle}>
+        <h3 id="ai-metrics-outbound-title" className={styles.outboundTitle}>
           {t('outbound.title')}
-        </h2>
+        </h3>
         <p className={styles.outboundDescription}>{t('outbound.description')}</p>
         {/* Column definitions stay visible: they say which counter signals a problem. */}
         <p className={styles.outboundDescription}>{t('outbound.column.help')}</p>

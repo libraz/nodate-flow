@@ -19,6 +19,7 @@ import {
 import { apiRequest } from '../../lib/api';
 import type { ApiError } from '../../lib/api-error';
 import { agentsKeys } from './agents-api';
+import { aiStatusKeys } from './ai-status-api';
 import { aiProvidersKeys } from './api';
 
 export type ProviderModel = components['schemas']['ProviderModel'];
@@ -43,6 +44,7 @@ function invalidateModelChange(qc: QueryClient, workspaceId: string, providerId:
   void qc.invalidateQueries({ queryKey: providerModelsKeys.list(workspaceId, providerId) });
   void qc.invalidateQueries({ queryKey: ['ai-models', workspaceId] });
   void qc.invalidateQueries({ queryKey: aiProvidersKeys.list(workspaceId) });
+  void qc.invalidateQueries({ queryKey: aiStatusKeys.detail(workspaceId) });
 }
 
 /** GET /workspaces/{wsId}/ai/providers/{providerId}/models — enabled and disabled rows. */

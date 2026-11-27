@@ -1,0 +1,112 @@
+/* Quiet status surface: three rows, hairline dividers, stacked on narrow widths. */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+  padding: var(--nf-space-4) var(--nf-space-5);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-lg);
+  background: var(--nf-color-surface);
+  min-inline-size: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-semibold);
+  color: var(--nf-color-fg-muted);
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  gap: var(--nf-space-2) var(--nf-space-4);
+  padding-block: var(--nf-space-3);
+  border-block-start: var(--nf-space-px) solid var(--nf-color-border);
+}
+
+.row:first-child {
+  border-block-start: 0;
+  padding-block-start: 0;
+}
+
+.row:last-child {
+  padding-block-end: 0;
+}
+
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
+@media (min-width: 768px) {
+  .row {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr) minmax(0, 3fr);
+  }
+
+  .action {
+    justify-self: end;
+    text-align: end;
+  }
+}
+
+.label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-0-5);
+  min-inline-size: 0;
+}
+
+.labelText {
+  font-weight: var(--nf-weight-medium);
+  color: var(--nf-color-fg);
+}
+
+.hint {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
+.state {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nf-space-2);
+  min-inline-size: 0;
+}
+
+.stateText {
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg);
+  overflow-wrap: anywhere;
+}
+
+.action {
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+}
+
+.link {
+  color: var(--nf-color-accent-fg);
+  text-decoration: none;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.link:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+  border-radius: var(--nf-radius-sm);
+}
+
+.skeletonRow {
+  block-size: var(--nf-space-10);
+}

@@ -149,7 +149,7 @@ describe('AgentAssignSection', () => {
     renderSection();
 
     const link = await screen.findByRole('link', { name: 'task_detail.agent.assign.create_link' });
-    expect(link.getAttribute('href')).toBe('/workspaces/ws-1/settings/ai-agents');
+    expect(link.getAttribute('href')).toBe('/workspaces/ws-1/settings/ai/agents');
     expect(screen.getByText(/task_detail\.agent\.assign\.none_available/)).toBeDefined();
     expect(screen.queryByText('task_detail.agent.assign.empty')).toBeNull();
     expect(screen.queryByRole('button', { name: 'task_detail.agent.assign.add' })).toBeNull();

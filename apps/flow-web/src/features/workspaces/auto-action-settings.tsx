@@ -19,7 +19,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import PageHeader from '../../components/page-header';
+import SectionHeader from '../../components/section-header';
 import { formatApiError } from '../../lib/api-error';
 import { APP_NAME } from '../../lib/brand';
 import AutonomyMatrix from '../ai/autonomy/autonomy-matrix';
@@ -107,7 +107,7 @@ export default function AutoActionSettingsPage({
 
   return (
     <div className={ui.page}>
-      <PageHeader
+      <SectionHeader
         title={t('workspace.auto_actions.title')}
         description={t('workspace.auto_actions.description', { appName: APP_NAME })}
         help="workspace-settings-auto-actions"
@@ -393,9 +393,9 @@ function AutoActionRulesSection({
       }}
     >
       <div className={ui.sectionHeader}>
-        <h2 id="auto-action-rules-title" className={ui.sectionTitle}>
+        <h3 id="auto-action-rules-title" className={ui.sectionTitle}>
           {t('workspace.auto_actions.rules.title')}
-        </h2>
+        </h3>
         <p className={ui.sectionDescription}>{t('workspace.auto_actions.rules.description')}</p>
       </div>
 

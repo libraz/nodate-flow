@@ -1,0 +1,47 @@
+/* Section heading inside a tabbed page: the page header's h2-level sibling. */
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--nf-space-3) var(--nf-space-4);
+}
+
+.heading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+  /* nf-token-override: basis at which actions wrap under the title, not a spacing step */
+  flex: 1 1 16rem;
+  min-inline-size: 0;
+}
+
+.titleRow {
+  min-inline-size: 0;
+}
+
+.title {
+  display: inline;
+  margin: 0;
+  font-family: var(--nf-font-display);
+  font-size: var(--nf-text-section-title);
+  font-weight: var(--nf-weight-semibold);
+  line-height: var(--nf-leading-tight);
+  color: var(--nf-color-fg);
+  overflow-wrap: anywhere;
+}
+
+.description {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nf-space-2);
+  margin-inline-start: auto;
+}

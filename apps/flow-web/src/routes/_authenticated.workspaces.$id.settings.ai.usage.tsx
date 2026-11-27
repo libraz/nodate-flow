@@ -1,6 +1,5 @@
 /**
- * /workspaces/$id/settings/ai/metrics — route stub. See sibling
- * `.lazy.tsx` for the real component.
+ * /workspaces/$id/settings/ai/usage — route stub. See sibling `.lazy.tsx`.
  *
  * The `?windowDays=` search param is validated through Zod before the
  * lazy module mounts so an invalid URL value is normalised to one of
@@ -17,6 +16,6 @@ const searchSchema = z.object({
     .optional(),
 });
 
-export const Route = createFileRoute('/_authenticated/workspaces/$id/settings/ai/metrics')({
+export const Route = createFileRoute('/_authenticated/workspaces/$id/settings/ai/usage')({
   validateSearch: (raw) => searchSchema.parse(raw),
 });

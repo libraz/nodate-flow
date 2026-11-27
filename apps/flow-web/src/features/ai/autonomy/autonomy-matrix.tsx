@@ -286,7 +286,7 @@ export default function AutonomyMatrix({ workspaceId }: AutonomyMatrixProps): Re
     return (
       <section className={ui.section}>
         <header className={ui.sectionHeader}>
-          <h2 className={ui.sectionTitle}>{t('ai:autonomy.matrix.title')}</h2>
+          <h3 className={ui.sectionTitle}>{t('ai:autonomy.matrix.title')}</h3>
           <p className={ui.sectionDescription}>{t('ai:autonomy.matrix.description')}</p>
         </header>
         <p style={styles.empty}>{t('ai:autonomy.matrix.empty')}</p>
@@ -297,7 +297,7 @@ export default function AutonomyMatrix({ workspaceId }: AutonomyMatrixProps): Re
   return (
     <section className={ui.section}>
       <header className={ui.sectionHeader}>
-        <h2 className={ui.sectionTitle}>{t('ai:autonomy.matrix.title')}</h2>
+        <h3 className={ui.sectionTitle}>{t('ai:autonomy.matrix.title')}</h3>
         <p className={ui.sectionDescription}>{t('ai:autonomy.matrix.description')}</p>
       </header>
 

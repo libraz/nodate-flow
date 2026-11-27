@@ -42,27 +42,37 @@ function linkKeys(): string[] {
     .map((a) => a.textContent ?? '');
 }
 
-const ADMIN_ONLY = ['nav.webhooks', 'nav.ai_providers', 'nav.auto_actions', 'nav.audit_log'];
+const ADMIN_ONLY = ['nav.webhooks', 'nav.audit_log'];
+const REMOVED_AI = [
+  'nav.ai_providers',
+  'nav.ai_agents',
+  'nav.auto_actions',
+  'nav.ai_activity',
+  'nav.ai_metrics',
+];
 
 beforeEach(() => {
   mocks.role = null;
 });
 
 describe('workspace settings nav', () => {
-  it('shows member exactly 8 items, none of them admin-floor', () => {
+  it('shows member exactly 6 items, none of them admin-floor', () => {
     mocks.role = 'member';
     renderNav();
     const keys = linkKeys();
-    expect(keys).toHaveLength(8);
+    expect(keys).toHaveLength(6);
+    expect(keys).toContain('nav.ai');
+    for (const key of REMOVED_AI) expect(keys).not.toContain(key);
     for (const key of ADMIN_ONLY) expect(keys).not.toContain(key);
     expect(keys).toContain('nav.public_shares');
   });
 
-  it('shows guest 7 items without public shares', () => {
+  it('shows guest 5 items without public shares', () => {
     mocks.role = 'guest';
     renderNav();
     const keys = linkKeys();
-    expect(keys).toHaveLength(7);
+    expect(keys).toHaveLength(5);
+    expect(keys).toContain('nav.ai');
     expect(keys).not.toContain('nav.public_shares');
   });
 
@@ -73,20 +83,31 @@ describe('workspace settings nav', () => {
     for (const key of ADMIN_ONLY.filter((k) => k !== 'nav.audit_log')) {
       expect(keys).toContain(key);
     }
+    expect(keys).toContain('nav.ai');
   });
 
   it('hides admin-floor items while the role is unknown', () => {
     mocks.role = null;
     renderNav();
     const keys = linkKeys();
+    expect(keys).toContain('nav.ai');
     for (const key of ADMIN_ONLY) expect(keys).not.toContain(key);
     expect(keys).not.toContain('nav.public_shares');
   });
 
-  it('orders the groups workspace, integrations, ai, reports', () => {
+  it('lists the single AI item last in the workspace group and has no AI group', () => {
     mocks.role = 'owner';
     renderNav();
-    const labels = ['workspace', 'integrations', 'ai', 'reports'].map((g) =>
+    expect(screen.queryByText('nav_group.ai')).toBeNull();
+    const keys = linkKeys();
+    expect(keys.indexOf('nav.ai')).toBe(keys.indexOf('nav.public_shares') + 1);
+    expect(keys.indexOf('nav.ai')).toBeLessThan(keys.indexOf('nav.mcp_tokens'));
+  });
+
+  it('orders the groups workspace, integrations, reports', () => {
+    mocks.role = 'owner';
+    renderNav();
+    const labels = ['workspace', 'integrations', 'reports'].map((g) =>
       screen.getByText(`nav_group.${g}`),
     );
     for (let i = 1; i < labels.length; i += 1) {
