@@ -157,10 +157,7 @@ WHERE workspace_id = ? AND type = 'task.comment.added' AND JSON_UNQUOTE(JSON_EXT
 		k.f.workspaceID, agentRow.PublicID.String()).Scan(&actorUser, &actorAgent))
 	require.False(t, actorUser.Valid)
 	require.Equal(t, int64(k.f.agentID), int64(actorAgent.Int32))
-	require.NoError(t, k.db.QueryRowContext(k.ctx, `SELECT actor_user_id, actor_agent_id FROM mentions WHERE comment_id = ?`, agentRow.ID).
-		Scan(&actorUser, &actorAgent))
-	require.False(t, actorUser.Valid)
-	require.Equal(t, int64(k.f.agentID), int64(actorAgent.Int32))
+	require.Equal(t, 0, k.mentionCount(agentRow.ID))
 
 	// Refusals write nothing.
 	_, err = k.write(k.userArgs(""))

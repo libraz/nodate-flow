@@ -123,7 +123,7 @@ func WriteComment(ctx context.Context, tx *dbretry.Tx, args WriteArgs) (WrittenC
 		AuthorAgentPublicID: types.PublicID{},
 		Body:                args.Body,
 	}
-	var mentionUser, mentionAgent *int64
+	var mentionUser *int64
 	if args.AuthorUserID.Valid {
 		id, ok := int32ID(args.AuthorUserID.Int64)
 		if !ok {
@@ -151,8 +151,6 @@ func WriteComment(ctx context.Context, tx *dbretry.Tx, args WriteArgs) (WrittenC
 		params.AuthorAgentID = sql.NullInt32{Int32: id, Valid: true}
 		params.AuthorAgentPublicID = byline.PublicID
 		params.AuthorAgentName = sql.NullString{String: byline.Name, Valid: true}
-		v := args.AuthorAgentID.Int64
-		mentionAgent = &v
 	}
 	if !args.CreatedAt.IsZero() {
 		params.CreatedAt = args.CreatedAt
@@ -173,17 +171,19 @@ func WriteComment(ctx context.Context, tx *dbretry.Tx, args WriteArgs) (WrittenC
 	}
 	commentID := uint32(rowID) //#nosec G115 -- validated within uint32 range above
 
-	if err := mentions.SyncComment(ctx, tx, mentions.CommentArgs{
-		WorkspaceID:     args.Actor.WorkspaceID,
-		TaskID:          args.TaskID,
-		TaskPublicID:    args.TaskPublicID,
-		CommentID:       commentID,
-		CommentPublicID: pub,
-		ActorUserID:     mentionUser,
-		ActorAgentID:    mentionAgent,
-		Body:            args.Body,
-	}); err != nil {
-		return WrittenComment{}, err
+	// Agent text never creates mentions: an agent must not page people.
+	if mentionUser != nil {
+		if err := mentions.SyncComment(ctx, tx, mentions.CommentArgs{
+			WorkspaceID:     args.Actor.WorkspaceID,
+			TaskID:          args.TaskID,
+			TaskPublicID:    args.TaskPublicID,
+			CommentID:       commentID,
+			CommentPublicID: pub,
+			ActorUserID:     mentionUser,
+			Body:            args.Body,
+		}); err != nil {
+			return WrittenComment{}, err
+		}
 	}
 
 	payload := make(map[string]any, len(args.Payload)+2)

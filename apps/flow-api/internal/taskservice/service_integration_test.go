@@ -165,15 +165,14 @@ FROM v_comment_for_task WHERE workspace_id = ? AND public_id = ?`, f.workspaceID
 	require.Equal(t, f.agentName, viewName)
 	require.Equal(t, f.agentPublicID.String(), viewAgentID)
 
-	var mentionActorUser, mentionActorAgent sql.NullInt32
-	require.NoError(t, db.QueryRowContext(ctx, `SELECT actor_user_id, actor_agent_id FROM mentions
+	// Agent comments never mention: an agent cannot page humans by writing @name.
+	var mentionCount int
+	require.NoError(t, db.QueryRowContext(ctx, `SELECT COUNT(*) FROM mentions
 WHERE workspace_id = ? AND comment_id = (SELECT id FROM comments WHERE public_id = ?)`, f.workspaceID, comment.ID).
-		Scan(&mentionActorUser, &mentionActorAgent))
-	require.False(t, mentionActorUser.Valid)
-	require.True(t, mentionActorAgent.Valid)
-	require.Equal(t, int64(f.agentID), int64(mentionActorAgent.Int32))
+		Scan(&mentionCount))
+	require.Zero(t, mentionCount)
 
-	for _, eventType := range []string{"task.updated", "task.comment.added", "mention.created"} {
+	for _, eventType := range []string{"task.updated", "task.comment.added"} {
 		var userActor, agentActor sql.NullInt32
 		require.NoError(t, db.QueryRowContext(ctx, `SELECT actor_user_id, actor_agent_id FROM events
 WHERE workspace_id = ? AND task_id = ? AND type = ? ORDER BY id DESC LIMIT 1`, f.workspaceID, f.taskID, eventType).
