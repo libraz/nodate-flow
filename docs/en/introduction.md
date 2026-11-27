@@ -26,7 +26,17 @@ A signal passes through three stages:
 2. An LLM judge, run as an agent of kind `signal_judge`, reads the signal with workspace context and returns a verdict with a confidence. It does not write anything.
 3. A deterministic applier turns the verdict into events, a draft or a suggestion.
 
-Only the applier writes task events, so the event log stays the single writer of task state. Events written this way carry the judge agent as actor and point back to the signal that caused them. Autonomous completions and retro drafts are separate event kinds, which lets the UI label them and lets a user review drafts as a queue.
+The judge itself never writes. Events the applier writes carry the judge agent as actor and point back to the signal that caused them. Autonomous completions and retro drafts are separate event kinds, which lets the UI label them and lets a user review drafts as a queue.
+
+## Agents working on tasks
+
+A task agent assigned to a task can act on it, not only note what it thinks. It has five operations: add a comment, set the priority, set the due date, change the state, and create a subtask. An admin sets each operation per agent to off, approval or auto. An operation that is off is never performed.
+
+Approval means the agent files a proposal instead of writing. The proposal appears on the task page, where a person who can edit the task approves or rejects it. Approving applies it only if the target value is still what it was when the agent proposed it; if someone changed it in the meantime, or the proposal expired, nothing is applied.
+
+An operation set to auto runs without approval only when the agent's grant, the person who assigned the agent, and the person who triggered the run would each be allowed to do it. If any of the three is not, the operation becomes a proposal. Agents never act on private tasks.
+
+Every write goes through the same code as a person's edit and is attributed to the agent in the event log and the audit log. An agent's comments never mention people, and images in them render as links. Each run is capped in steps, writes and budget, and the steps of past runs are visible in the task's run history.
 
 Autonomy is one of `suggest`, `draft` or `auto`, resolved per workspace and signal kind in a fixed order: a rule for the exact kind, a rule for a kind pattern such as `*.presence`, the workspace's default rule, the workspace confidence threshold, and finally the default in the kind's YAML. The signal retention job in flow-worker removes expired signals that were never applied.
 
