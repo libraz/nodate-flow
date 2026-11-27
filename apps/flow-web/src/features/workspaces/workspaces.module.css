@@ -67,6 +67,12 @@
   overflow-x: auto;
 }
 
+.readingColumn {
+  inline-size: 100%;
+  max-inline-size: var(--nf-measure-page);
+  min-inline-size: 0;
+}
+
 .subNavLink {
   display: inline-flex;
   align-items: center;

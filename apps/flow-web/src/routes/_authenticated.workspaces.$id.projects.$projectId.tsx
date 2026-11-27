@@ -131,7 +131,8 @@ function ProjectLayout(): ReactElement {
   const { t } = useTranslation('common');
   const { id, projectId } = Route.useParams();
   const { data: project } = useProjectQuery(projectId);
-  // Task list/board/spreadsheet and gantt are grid surfaces; overview and timeline read as pages.
+  // The frame is always full width so header and tabs keep one edge on every tab; grid surfaces
+  // (tasks, gantt) fill it, reading views are capped at the page measure and start-aligned.
   const childMatches = useChildMatches();
   const gridView = childMatches.some(
     (m) => m.routeId.includes('/tasks') || m.routeId.includes('/gantt'),
@@ -155,7 +156,7 @@ function ProjectLayout(): ReactElement {
     return <Forbidden />;
   }
   return (
-    <PageFrame width={gridView ? 'full' : 'standard'}>
+    <PageFrame width="full">
       <PageHeader
         title={project.name}
         description={project.description}
@@ -189,7 +190,13 @@ function ProjectLayout(): ReactElement {
           </Link>
         ))}
       </nav>
-      <Outlet />
+      {gridView ? (
+        <Outlet />
+      ) : (
+        <div className={styles.readingColumn}>
+          <Outlet />
+        </div>
+      )}
     </PageFrame>
   );
 }
