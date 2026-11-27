@@ -404,6 +404,6 @@ func TestSkipStreamReauth_BypassesLimiterOnReplay(t *testing.T) {
 		require.NoError(t, reauth(req), "replay %d must not touch the bucket", i+1)
 	}
 	rec := httptest.NewRecorder()
-	gate(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {})).ServeHTTP(rec, req)
+	gate(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {})).ServeHTTP(rec, req)
 	require.Equal(t, http.StatusOK, rec.Code, "the first real request still has its full budget")
 }

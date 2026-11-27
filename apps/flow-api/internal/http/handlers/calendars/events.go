@@ -1326,7 +1326,7 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 		// itemkit emits the update event for a title or time change; a
 		// label change on its own has to record it here.
 		itemkitEmitted := isLinked && (titleChanged || timeChanged)
-		if isLinked && !(labelChanged && !itemkitEmitted) {
+		if isLinked && (!labelChanged || itemkitEmitted) {
 			// itemkit fired item.rescheduled / item.renamed inside the
 			// transaction above and dual-emitted the legacy
 			// calendar.event.updated kind with it, so the event row is

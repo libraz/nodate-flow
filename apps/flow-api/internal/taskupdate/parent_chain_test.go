@@ -10,7 +10,7 @@ import (
 func chainOf(parents map[uint32]uint32) parentLink {
 	return func(id uint32) (sql.NullInt32, error) {
 		p, ok := parents[id]
-		return sql.NullInt32{Int32: int32(p), Valid: ok}, nil
+		return sql.NullInt32{Int32: int32(p), Valid: ok}, nil //#nosec G115 -- test fixture ids are small
 	}
 }
 
