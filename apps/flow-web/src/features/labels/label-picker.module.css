@@ -5,6 +5,15 @@
   /* nf-token-override: fixed width so the panel does not resize while results shrink */
   inline-size: 15rem;
   max-inline-size: 100%;
+  box-sizing: border-box;
+  /* Room for the search field's focus ring, which the panel would otherwise clip. */
+  padding: var(--nf-space-1);
+}
+
+.search {
+  box-sizing: border-box;
+  inline-size: 100%;
+  min-inline-size: 0;
 }
 
 .list {
@@ -79,6 +88,7 @@
 }
 
 .trigger {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: var(--nf-space-1);
@@ -115,6 +125,19 @@
 
 .triggerIconOnly {
   padding-inline: var(--nf-space-1-5);
+}
+
+/* Touch hit area: the same floor Chip and Button use. */
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
+@media (max-width: 767px) {
+  .trigger::after {
+    content: "";
+    position: absolute;
+    inset: 50%;
+    inline-size: var(--nf-space-8);
+    block-size: var(--nf-space-8);
+    transform: translate(-50%, -50%);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

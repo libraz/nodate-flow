@@ -1,40 +1,37 @@
 /**
- * LabelBadge — renders a single label as a colored chip/badge.
+ * LabelBadge — renders a single label as a coloured chip.
  */
 
-import { X } from 'lucide-react';
-import type { CSSProperties, ReactElement } from 'react';
+import Chip, { type ChipSize } from '@nodate-flow/ui/primitives/chip';
+import type { ReactElement, Ref } from 'react';
 import { useTranslation } from 'react-i18next';
-import styles from './label-badge.module.css';
 
 export interface LabelBadgeProps {
   name: string;
   color: string;
   onRemove?: () => void;
+  /** `sm` matches Badge's height, for dense rows such as board cards. */
+  size?: ChipSize;
+  /** Receives the chip element, for callers that manage focus after removal. */
+  ref?: Ref<HTMLSpanElement>;
 }
 
-export default function LabelBadge({ name, color, onRemove }: LabelBadgeProps): ReactElement {
+export default function LabelBadge({
+  name,
+  color,
+  onRemove,
+  size = 'md',
+  ref,
+}: LabelBadgeProps): ReactElement {
   const { t } = useTranslation('labels');
-
   return (
-    <span className={styles.badge} style={{ '--label-color': color } as CSSProperties}>
-      <span className={styles.dot} aria-hidden="true" />
-      <span className={styles.name} title={name}>
-        {name}
-      </span>
-      {onRemove ? (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onRemove();
-          }}
-          className={styles.remove}
-          aria-label={t('badge.remove', { name })}
-        >
-          <X size={12} aria-hidden />
-        </button>
-      ) : null}
-    </span>
+    <Chip
+      ref={ref}
+      color={color}
+      size={size}
+      {...(onRemove ? { onDismiss: onRemove, dismissLabel: t('badge.remove', { name }) } : {})}
+    >
+      {name}
+    </Chip>
   );
 }

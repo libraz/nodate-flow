@@ -8,3 +8,17 @@
   align-items: center;
   gap: var(--presence-gap);
 }
+
+/* A long name truncates inside the chip instead of widening the row. */
+.chips > li,
+.chips > li > * {
+  min-inline-size: 0;
+  max-inline-size: 100%;
+}
+
+.skeleton {
+  /* nf-token-override: placeholder sized to the pill it stands in for, not a spacing step */
+  block-size: 1.5rem;
+  inline-size: 40%;
+  border-radius: var(--nf-radius-pill);
+}

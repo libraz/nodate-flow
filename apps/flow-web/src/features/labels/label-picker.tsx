@@ -106,6 +106,7 @@ export default function LabelPicker({
       content={
         <div className={styles.root}>
           <Input
+            className={styles.search}
             role="combobox"
             aria-expanded="true"
             aria-controls={listId}

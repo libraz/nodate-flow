@@ -2,10 +2,10 @@
  * Creating a label from the picker's search box, and applying it to the task.
  */
 
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@tests/helpers/render';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { Label } from '../api';
 import { pickLabelColor } from '../label-color';
@@ -17,11 +17,12 @@ const mocks = vi.hoisted(() => ({
   addAsync: vi.fn(),
   add: vi.fn(),
   remove: vi.fn(),
+  applied: [] as Label[],
 }));
 
 vi.mock('../api', () => ({
   useLabelsQuery: () => ({ data: [{ id: 'l1', name: 'Bug', color: '#E73B3B' }] }),
-  useTaskLabelsQuery: () => ({ data: [] }),
+  useTaskLabelsQuery: () => ({ data: mocks.applied }),
   useCreateLabel: () => ({ mutateAsync: mocks.createAsync, isPending: false }),
   useAddTaskLabel: () => ({ mutateAsync: mocks.addAsync, mutate: mocks.add }),
   useRemoveTaskLabel: () => ({ mutate: mocks.remove }),
@@ -79,6 +80,56 @@ describe('LabelPicker create option', () => {
 });
 
 describe('TaskLabelsField', () => {
+  afterEach(() => {
+    mocks.applied = [];
+  });
+
+  const two: Label[] = [
+    { id: 'a', name: 'Alpha', color: '#E73B3B' },
+    { id: 'b', name: 'Beta', color: '#47B2F7' },
+    { id: 'c', name: 'Gamma', color: '#2ECC87' },
+  ];
+
+  const removeOf = (name: string): HTMLElement =>
+    within(screen.getByText(name).parentElement as HTMLElement).getByRole('button');
+
+  it('moves focus to the next chip after a keyboard removal', async () => {
+    const user = userEvent.setup();
+    mocks.applied = two;
+    renderWithProviders(<TaskLabelsField taskId="t1" workspaceId="ws1" />);
+    await user.tab();
+    await user.tab();
+    expect(document.activeElement).toBe(removeOf('Beta'));
+    await user.keyboard('{Enter}');
+    expect(mocks.remove).toHaveBeenCalledWith({ taskId: 't1', labelId: 'b' }, expect.anything());
+    expect(document.activeElement).toBe(removeOf('Gamma'));
+  });
+
+  it('falls back to the previous chip, then to the add trigger', async () => {
+    const user = userEvent.setup();
+    mocks.applied = two;
+    const { unmount } = renderWithProviders(<TaskLabelsField taskId="t1" workspaceId="ws1" />);
+    await user.tab();
+    await user.tab();
+    await user.tab();
+    expect(document.activeElement).toBe(removeOf('Gamma'));
+    await user.keyboard('{Enter}');
+    expect(document.activeElement).toBe(removeOf('Beta'));
+    unmount();
+
+    mocks.applied = [two[0] as Label];
+    renderWithProviders(<TaskLabelsField taskId="t1" workspaceId="ws1" />);
+    await user.tab();
+    await user.keyboard('{Enter}');
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'task.add' }));
+  });
+
+  it('names the chip list with aria-labelledby', () => {
+    mocks.applied = two;
+    renderWithProviders(<TaskLabelsField taskId="t1" workspaceId="ws1" labelledBy="lbl" />);
+    expect(screen.getAllByRole('list')[0]?.getAttribute('aria-labelledby')).toBe('lbl');
+  });
+
   it('creates the label and then applies it to the task', async () => {
     const user = userEvent.setup();
     mocks.createAsync.mockResolvedValue({ id: 'new-id', name: 'Docs', color: '#fff' });
