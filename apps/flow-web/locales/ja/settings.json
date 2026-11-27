@@ -6,6 +6,7 @@
     "public_shares": "公開シェアページ",
     "mcp_tokens": "AI ツール連携トークン（MCP）",
     "webhooks": "Webhook",
+    "ai": "AI",
     "ai_providers": "AI プロバイダ",
     "ai_agents": "AI エージェント",
     "ai_activity": "AI アクティビティ",
@@ -621,5 +622,45 @@
   "secret_callout": {
     "once_title": "今すぐコピーしてください。表示されるのはこの 1 回だけです。",
     "keep_title": "このシークレットは外部に漏らさないでください"
+  },
+  "ai_page": {
+    "title": "AI",
+    "description": "接続・自動化・エージェント・利用状況",
+    "agents_note": "エージェントは任意です。上の AI 機能はエージェントなしで動きます。エージェントは、割り当てたタスクに対して指定のプロンプトを実行します。",
+    "tabs_label": "AI 設定の項目",
+    "tabs": {
+      "connection": "接続",
+      "automation": "自動化",
+      "agents": "エージェント",
+      "usage": "利用状況"
+    },
+    "status": {
+      "title": "いま使える機能",
+      "features": {
+        "label": "AI 機能",
+        "hint": "コマンドバー、文章からのレンズ作成、受信箱の振り分け、提案",
+        "ready": "利用可能 · {providerName} · {model}",
+        "ready_no_model": "利用可能 · {providerName}",
+        "no_default_model": "{providerName} に既定モデルがありません。そのサーバーにあるモデルを既定に設定してください。",
+        "none": "AI プロバイダが接続されていません",
+        "unavailable": "このサーバーでは AI が有効になっていません"
+      },
+      "embedding": {
+        "label": "タスク埋め込み",
+        "hint": "類似タスクの検出、関連タスクの提案、スマート作成",
+        "enabled": "有効",
+        "disabled": "このワークスペースでは無効",
+        "unconfigured": "サーバーで未設定"
+      },
+      "auto_actions": {
+        "label": "自動アクション",
+        "hint": "期限超過や放置されたレビューをルールで処理",
+        "on": "有効 · {minutes} 分ごと",
+        "off": "無効"
+      },
+      "fix_link": "設定する",
+      "ask_admin": "ワークスペースの管理者に設定を依頼してください。",
+      "load_failed": "AI の状態を読み込めませんでした。"
+    }
   }
 }

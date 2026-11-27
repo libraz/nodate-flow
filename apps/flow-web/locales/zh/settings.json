@@ -6,6 +6,7 @@
     "public_shares": "公开分享页",
     "mcp_tokens": "AI 工具令牌（MCP）",
     "webhooks": "Webhook",
+    "ai": "AI",
     "ai_providers": "AI 服务商",
     "ai_agents": "AI 代理",
     "ai_activity": "AI 活动",
@@ -621,5 +622,45 @@
   "secret_callout": {
     "once_title": "请立即复制，仅显示这一次。",
     "keep_title": "请妥善保管此密钥"
+  },
+  "ai_page": {
+    "title": "AI",
+    "description": "连接、自动化、代理和使用情况",
+    "agents_note": "代理是可选的。上方的 AI 功能无需任何代理即可使用；代理会对分配给它的任务运行你编写的提示词。",
+    "tabs_label": "AI 设置分区",
+    "tabs": {
+      "connection": "连接",
+      "automation": "自动化",
+      "agents": "代理",
+      "usage": "使用情况"
+    },
+    "status": {
+      "title": "当前可用功能",
+      "features": {
+        "label": "AI 功能",
+        "hint": "命令栏、文本生成视图、收件箱分拣、建议",
+        "ready": "可用 · {providerName} · {model}",
+        "ready_no_model": "可用 · {providerName}",
+        "no_default_model": "{providerName} 没有默认模型。请设置该服务器上存在的模型。",
+        "none": "尚未连接 AI 服务商",
+        "unavailable": "此服务器未启用 AI"
+      },
+      "embedding": {
+        "label": "任务嵌入",
+        "hint": "相似任务、相关任务建议、智能创建",
+        "enabled": "已开启",
+        "disabled": "已在此工作区关闭",
+        "unconfigured": "服务器未配置"
+      },
+      "auto_actions": {
+        "label": "自动操作",
+        "hint": "按规则处理逾期任务和停滞的评审",
+        "on": "已开启 · 每 {minutes} 分钟",
+        "off": "已关闭"
+      },
+      "fix_link": "去设置",
+      "ask_admin": "请联系工作区管理员进行设置。",
+      "load_failed": "无法加载 AI 状态。"
+    }
   }
 }

@@ -6,6 +6,7 @@
     "public_shares": "Public share pages",
     "mcp_tokens": "AI tool tokens (MCP)",
     "webhooks": "Webhooks",
+    "ai": "AI",
     "ai_providers": "AI providers",
     "ai_agents": "AI agents",
     "ai_activity": "AI activity",
@@ -621,5 +622,45 @@
   "secret_callout": {
     "once_title": "Copy it now. It is shown only once.",
     "keep_title": "Keep this secret private"
+  },
+  "ai_page": {
+    "title": "AI",
+    "description": "Connections, automation, agents and usage",
+    "agents_note": "Agents are optional. The AI features above work without any agent; an agent runs a prompt you write on the tasks you assign to it.",
+    "tabs_label": "AI settings sections",
+    "tabs": {
+      "connection": "Connection",
+      "automation": "Automation",
+      "agents": "Agents",
+      "usage": "Usage"
+    },
+    "status": {
+      "title": "What works now",
+      "features": {
+        "label": "AI features",
+        "hint": "Command bar, lens from text, inbox triage, suggestions",
+        "ready": "Ready · {providerName} · {model}",
+        "ready_no_model": "Ready · {providerName}",
+        "no_default_model": "{providerName} has no default model. Set one that exists on that server.",
+        "none": "No AI provider is connected",
+        "unavailable": "AI is not enabled on this server"
+      },
+      "embedding": {
+        "label": "Task embeddings",
+        "hint": "Similar tasks, related-task suggestions, smart create",
+        "enabled": "On",
+        "disabled": "Turned off for this workspace",
+        "unconfigured": "Not configured on this server"
+      },
+      "auto_actions": {
+        "label": "Auto-actions",
+        "hint": "Rule-based handling of overdue tasks and stale reviews",
+        "on": "On · every {minutes} min",
+        "off": "Off"
+      },
+      "fix_link": "Set up",
+      "ask_admin": "Ask a workspace admin to set this up.",
+      "load_failed": "Could not load the AI status."
+    }
   }
 }

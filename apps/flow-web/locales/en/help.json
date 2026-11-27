@@ -307,6 +307,16 @@
       "t4": "You cannot change your own role, and an owner's role cannot be changed here."
     }
   },
+  "workspace-settings-ai": {
+    "title": "AI settings",
+    "summary": "Everything AI for this workspace, in four tabs.",
+    "tips": {
+      "t1": "Connection: connect an AI provider and choose its default model. The command bar, lens from text, inbox triage and suggestions all use it. Admins only.",
+      "t2": "Automation: rules that check tasks on a schedule and handle clear cases, and how far each kind of signal may act on its own. Admins only.",
+      "t3": "Agents: optional. An agent runs a prompt you write on the tasks you assign to it; nothing else needs one.",
+      "t4": "Usage: recent AI calls, today's cost, and how often AI proposals were accepted."
+    }
+  },
   "workspace-settings-ai-activity": {
     "title": "AI activity",
     "summary": "A read-only list of the most recent LLM calls made for this workspace, with sensitive text redacted.",
@@ -314,7 +324,7 @@
       "t1": "Each row shows the outcome, what the call was for, the model and the time. Failed calls show an error code.",
       "t2": "Prompts are redacted when they are written, so the original text cannot be recovered from this page.",
       "t3": "Only the latest 50 calls are shown. Use it to check that agents and suggestions are really calling the model you set up.",
-      "t4": "Only workspace admins can open this page. For totals and acceptance, see AI metrics."
+      "t4": "Usage is open to every workspace member. For totals and acceptance, see the metrics section further down this tab."
     }
   },
   "workspace-settings-ai-agents": {
@@ -325,7 +335,7 @@
       "t2": "Trigger decides when it runs: Disabled never, On a schedule on the server's recurring cycle, On event when a listed event occurs, Manual only just when you press Run now.",
       "t3": "Pause is the kill switch: a paused agent does not run on any trigger and Run now is disabled. Resume turns it back on.",
       "t4": "Agents spend money through your provider. A per-agent monthly cost cap, when set, stops further calls once reached.",
-      "t5": "You need an AI provider with a model first; the New agent form links to that page if none exists."
+      "t5": "You need an AI provider with a model first. If none exists, the Agents tab points to the Connection tab, where admins can add one."
     }
   },
   "workspace-settings-ai-metrics": {
@@ -335,7 +345,7 @@
       "t1": "Proposed counts AI suggestions shown, Applied those a person accepted, Dismissed those rejected. Acceptance rate is applied out of decided ones, so pending proposals are not counted.",
       "t2": "A low acceptance rate means people mostly reject what the AI proposes; a high one means its proposals fit how you work.",
       "t3": "Provider rate limits count calls per provider: sent right away, delayed by the limiter, or refused. Many delayed or refused calls mean the provider quota is too tight.",
-      "t4": "Switch the window between 7, 30 and 90 days. Only workspace admins can open this page."
+      "t4": "Switch the window between 7, 30 and 90 days. It sits in the same tab as the AI call list."
     }
   },
   "workspace-settings-ai-providers": {
@@ -346,7 +356,7 @@
       "t2": "When several providers exist, the most recently added one is used by default. Agents can run on a specific model you choose when creating them.",
       "t3": "API keys are write-only. After saving they are shown masked and cannot be read back; replace one with Rotate key, which discards the old key at once.",
       "t4": "Choose OpenAI-compatible for Azure, a proxy, a gateway or a local server. The plain OpenAI kind always uses the official endpoint and ignores any base URL.",
-      "t5": "Prompts and task text are sent to the provider you register. Task embeddings (similar-task search) are configured at the bottom of this page."
+      "t5": "Prompts and task text are sent to the provider you register. Task embeddings (similar-task search) are configured further down the Connection tab."
     }
   },
   "workspace-settings-audit-log": {
@@ -367,7 +377,7 @@
       "t2": "Escalate overdue and Close stale review change tasks automatically (a priority bump, a state change). Assign owner and Nudge assignee only record a suggestion and never change anything.",
       "t3": "The confidence threshold is the minimum score an action needs to be applied on its own. Lower means more actions and more mistakes; higher is more cautious.",
       "t4": "Every applied action is recorded as an event, so you can review it later in the task history.",
-      "t5": "Only workspace admins can open this page. Start with a high threshold and check what was applied in the task history."
+      "t5": "Only workspace admins can open the Automation tab. Start with a high threshold and check what was applied in the task history."
     }
   },
   "workspace-settings-data": {

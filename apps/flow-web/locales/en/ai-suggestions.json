@@ -9,6 +9,8 @@
     "title": "AI agents",
     "subtitle": "Create agents that work on tasks, choose when each one runs, and pause any of them instantly.",
     "empty": "No AI agents yet. Create an AI provider and set a default model first.",
+    "empty_ready": "No AI agents yet. Agents are optional; create one to run a prompt on tasks you assign to it.",
+    "empty_member": "No AI agents yet. Agents need an AI provider, which a workspace admin connects.",
     "pause": "Pause",
     "resume": "Resume",
     "status": {
@@ -61,6 +63,7 @@
       "failed": "Failed to create agent",
       "missingFields": "Fill in name, model and system prompt",
       "noModels": "No models registered. Add an AI provider and model first.",
+      "noModels_member": "No models are available. Ask a workspace admin to connect an AI provider.",
       "systemPrompt_help": "Standing instructions the agent follows on every run, such as its role and the rules it must respect. It cannot be edited on this page after creation.",
       "model_help": "The model this agent runs on. The list comes from the AI providers added to this workspace."
     },
