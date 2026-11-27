@@ -31,9 +31,11 @@ export interface MarkdownProps {
   children: string;
   /** Optional extra class on the wrapper. */
   className?: string | undefined;
+  /** Render images as `<img>` (default). When false, each image becomes a link to its URL. */
+  allowImages?: boolean | undefined;
 }
 
-function MarkdownImpl({ children, className }: MarkdownProps): ReactElement {
+function MarkdownImpl({ children, className, allowImages = true }: MarkdownProps): ReactElement {
   return (
     <div className={cx(styles.md, className)}>
       <ReactMarkdown
@@ -42,6 +44,23 @@ function MarkdownImpl({ children, className }: MarkdownProps): ReactElement {
         // which would erase the marker `remarkMention` just wrote.
         urlTransform={(url) => (url.startsWith(MENTION_SCHEME) ? url : defaultUrlTransform(url))}
         components={{
+          // Replaced at the node level, so inline and reference-style images both land here.
+          ...(allowImages
+            ? {}
+            : {
+                img: ({ src, alt }) => {
+                  const href =
+                    typeof src === 'string' && !src.startsWith(MENTION_SCHEME) ? src : '';
+                  const label = alt || href;
+                  return href ? (
+                    <a href={href} target="_blank" rel="noreferrer noopener">
+                      {label}
+                    </a>
+                  ) : (
+                    <>{label}</>
+                  );
+                },
+              }),
           a: ({ href, children: body, ...rest }) => {
             if (href?.startsWith(MENTION_SCHEME)) {
               return (
