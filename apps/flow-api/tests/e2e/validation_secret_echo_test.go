@@ -106,7 +106,7 @@ func TestRefusedOrdinaryFieldStillEchoesItsValue(t *testing.T) {
 	t.Parallel()
 
 	tt := newTenant(t)
-	submitted := strings.Repeat("n", 101)                       // over the declared maximum of 100
+	submitted := strings.Repeat("n", 129)                       // over the declared maximum of 128
 	const wellFormedKey = "sk-ant-valid-looking-key-0123456789" //#nosec G101 -- synthetic test fixture, never a real key
 
 	status, raw := doJSONStatus(t, http.MethodPost,
