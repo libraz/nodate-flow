@@ -12,10 +12,6 @@ import (
 const (
 	ScopeReadWorkspace  = "read:workspace"
 	ScopeWriteWorkspace = "write:workspace"
-
-	ToolReadTask    = "read_task"
-	ToolSetPriority = "set_priority"
-	ToolAddComment  = "add_comment"
 )
 
 var (

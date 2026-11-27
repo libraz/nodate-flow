@@ -27,6 +27,10 @@ const (
 	CapabilitySetPriority Capability = "set_priority"
 	CapabilityAddComment  Capability = "add_comment"
 	CapabilityEditTask    Capability = "edit_task"
+
+	CapabilitySetDueOn       Capability = ToolSetDueOn
+	CapabilityTransitionTask Capability = ToolTransitionTask
+	CapabilityCreateSubtask  Capability = ToolCreateSubtask
 )
 
 // AgentIdentity contains the current public agent identity needed for
@@ -48,10 +52,13 @@ type TaskAuthorization struct {
 	IsProjectMember     bool
 	Agent               *AgentIdentity
 	DelegatedByPublicID types.PublicID
+	// Mode is the agent's grant mode for the authorized tool. It is the
+	// zero value for human principals and for reads, which need no grant.
+	Mode GrantMode
 }
 
 type requirement struct {
-	tool  string
+	tool  Tool // empty when no grant is needed
 	scope string
 	floor acl.ProjectRole
 }
@@ -59,11 +66,17 @@ type requirement struct {
 func requirementFor(capability Capability) (requirement, error) {
 	switch capability {
 	case CapabilityReadTask:
-		return requirement{tool: ToolReadTask, scope: ScopeReadWorkspace}, nil
+		return requirement{scope: ScopeReadWorkspace}, nil
 	case CapabilitySetPriority:
 		return requirement{tool: ToolSetPriority, scope: ScopeWriteWorkspace, floor: acl.ProjectRoleEditor}, nil
 	case CapabilityAddComment:
 		return requirement{tool: ToolAddComment, scope: ScopeWriteWorkspace, floor: acl.ProjectRoleCommenter}, nil
+	case CapabilitySetDueOn:
+		return requirement{tool: ToolSetDueOn, scope: ScopeWriteWorkspace, floor: acl.ProjectRoleEditor}, nil
+	case CapabilityTransitionTask:
+		return requirement{tool: ToolTransitionTask, scope: ScopeWriteWorkspace, floor: acl.ProjectRoleEditor}, nil
+	case CapabilityCreateSubtask:
+		return requirement{tool: ToolCreateSubtask, scope: ScopeWriteWorkspace, floor: acl.ProjectRoleEditor}, nil
 	case CapabilityEditTask:
 		return requirement{floor: acl.ProjectRoleEditor}, nil
 	default:
@@ -191,13 +204,13 @@ func authorizeAgentTaskTx(
 	_ types.PublicID,
 	req requirement,
 ) (TaskAuthorization, error) {
-	if !p.HasTool(req.tool) || !p.HasScope(req.scope) {
+	if (req.tool != "" && !p.HasTool(string(req.tool))) || !p.HasScope(req.scope) {
 		return TaskAuthorization{}, apierrors.New(apierrors.McpScopeInsufficient)
 	}
 	if rec.Visibility != acl.TaskVisibilityPublic {
 		return TaskAuthorization{}, apierrors.New(apierrors.WsTaskNotFound)
 	}
-	agent, err := loadCurrentAgentForShare(ctx, db, p.WorkspaceID(), p.AgentID(), req)
+	agent, mode, err := loadCurrentAgentForShare(ctx, db, p.WorkspaceID(), p.AgentID(), req)
 	if err != nil {
 		return TaskAuthorization{}, err
 	}
@@ -209,7 +222,7 @@ func authorizeAgentTaskTx(
 		return TaskAuthorization{}, apierrors.New(apierrors.WsTaskNotFound)
 	}
 
-	authz := TaskAuthorization{Task: rec, Agent: &agent}
+	authz := TaskAuthorization{Task: rec, Agent: &agent, Mode: mode}
 	if delegatorID := p.DelegatedByUserID(); delegatorID != 0 {
 		delegator, err := authorizeUserTaskTx(ctx, db, p.WorkspaceID(), delegatorID, rec, req)
 		if err != nil {
@@ -231,7 +244,7 @@ func loadCurrentAgentForShare(
 	db acl.DB,
 	workspaceID, agentID uint32,
 	req requirement,
-) (AgentIdentity, error) {
+) (AgentIdentity, GrantMode, error) {
 	const q = `SELECT public_id, name, enabled, paused, tools_json, allowed_scopes_json
 FROM ai_agents
 WHERE id = ? AND workspace_id = ?
@@ -248,34 +261,46 @@ LIMIT 1 FOR SHARE`
 		&identity.PublicID, &identity.Name, &enabled, &paused, &toolsRaw, &scopesRaw,
 	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return AgentIdentity{}, apierrors.New(apierrors.WsTaskNotFound)
+			return AgentIdentity{}, "", apierrors.New(apierrors.WsTaskNotFound)
 		}
-		return AgentIdentity{}, err
+		return AgentIdentity{}, "", err
 	}
 	if !enabled || paused {
-		return AgentIdentity{}, apierrors.New(apierrors.WsTaskNotFound)
+		return AgentIdentity{}, "", apierrors.New(apierrors.WsTaskNotFound)
 	}
-	var tools []string
-	if len(toolsRaw) != 0 {
-		if err := json.Unmarshal(toolsRaw, &tools); err != nil {
-			return AgentIdentity{}, apierrors.New(apierrors.InternalUnexpected)
-		}
+	grants, err := ParseToolGrants(toolsRaw)
+	if err != nil {
+		return AgentIdentity{}, "", apierrors.New(apierrors.InternalUnexpected)
 	}
-	if !contains(tools, req.tool) {
-		return AgentIdentity{}, apierrors.New(apierrors.McpScopeInsufficient)
+	mode, err := grantModeFor(grants, req.tool)
+	if err != nil {
+		return AgentIdentity{}, "", err
 	}
 	var scopes []string
 	if len(scopesRaw) != 0 {
 		if err := json.Unmarshal(scopesRaw, &scopes); err != nil {
-			return AgentIdentity{}, apierrors.New(apierrors.InternalUnexpected)
+			return AgentIdentity{}, "", apierrors.New(apierrors.InternalUnexpected)
 		}
 	}
 	// An empty agent allowlist inherits the token scope, matching the
 	// established agentguard behavior. A non-empty list narrows it.
 	if len(scopes) != 0 && !hasScope(scopes, req.scope) {
-		return AgentIdentity{}, apierrors.New(apierrors.McpScopeInsufficient)
+		return AgentIdentity{}, "", apierrors.New(apierrors.McpScopeInsufficient)
 	}
-	return identity, nil
+	return identity, mode, nil
+}
+
+// grantModeFor returns the stored mode for the required tool. A requirement
+// without a tool needs no grant; a tool absent from the grants is not permitted.
+func grantModeFor(grants ToolGrants, tool Tool) (GrantMode, error) {
+	if tool == "" {
+		return "", nil
+	}
+	mode, ok := grants[tool]
+	if !ok {
+		return "", apierrors.New(apierrors.McpScopeInsufficient)
+	}
+	return mode, nil
 }
 
 func loadUserPublicID(ctx context.Context, db acl.DB, userID uint32) (types.PublicID, error) {

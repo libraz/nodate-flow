@@ -87,7 +87,7 @@ VALUES (?, ?, ?, ?, 1, 'Taskservice fixture', 1, 'public')`, f.taskPublicID, f.w
 		require.NoError(t, err)
 		f.agentName = agent.Name
 		_, err = db.ExecContext(ctx, `UPDATE ai_agents
-SET tools_json = JSON_ARRAY('read_task','set_priority','add_comment'),
+SET tools_json = JSON_OBJECT('set_priority','auto','add_comment','auto'),
     allowed_scopes_json = JSON_ARRAY('write:workspace')
 WHERE id = ?`, f.agentID)
 		require.NoError(t, err, "allow the task commands the fixture agent exercises")
@@ -269,7 +269,7 @@ func TestAgentCommentGETBylineSurvivesAgentDeletion(t *testing.T) {
 		Name: "Byline Agent",
 	})
 	_, err = db.ExecContext(context.Background(), `UPDATE ai_agents
-SET tools_json = JSON_ARRAY('add_comment'), allowed_scopes_json = JSON_ARRAY('write:workspace')
+SET tools_json = JSON_OBJECT('add_comment','auto'), allowed_scopes_json = JSON_ARRAY('write:workspace')
 WHERE id = ?`, seededAgent.AgentID)
 	require.NoError(t, err)
 	helpers.AssignAgentToTask(t, db, tenant.WorkspacePublicID, task.ID, seededAgent.AgentID)
