@@ -13,12 +13,36 @@
   font-weight: var(--nf-weight-medium);
   line-height: var(--nf-leading-tight);
   cursor: default;
+  min-inline-size: 0;
+  max-inline-size: 100%;
+}
+
+.label {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dot {
+  flex: none;
+  inline-size: var(--nf-space-2);
+  block-size: var(--nf-space-2);
+  border-radius: 50%;
+  background: var(--chip-color);
+}
+
+.custom {
+  background: color-mix(in oklab, var(--chip-color) 10%, transparent);
+  border-color: color-mix(in oklab, var(--chip-color) 28%, transparent);
+  color: var(--nf-color-fg);
 }
 
 .dismiss {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex: none;
   inline-size: var(--nf-space-4);
   block-size: var(--nf-space-4);
   margin-inline-end: calc(var(--nf-space-1) * -1);
@@ -74,11 +98,33 @@
   color: var(--nf-color-fg);
 }
 
+/* sm: root padding, font and radius are identical to Badge; the dismiss button is
+   no taller than the text line so the chip never outgrows a Badge beside it. */
+.sm .dismiss {
+  position: relative;
+  inline-size: 1em;
+  block-size: 1em;
+}
+
 /* Touch hit area: the same floor Button uses. */
 /* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
 @media (max-width: 767px) {
   .dismiss {
     min-inline-size: var(--nf-space-8);
     min-block-size: var(--nf-space-8);
+  }
+
+  .sm .dismiss {
+    min-inline-size: 0;
+    min-block-size: 0;
+  }
+
+  .sm .dismiss::after {
+    content: "";
+    position: absolute;
+    inset: 50%;
+    inline-size: var(--nf-space-8);
+    block-size: var(--nf-space-8);
+    transform: translate(-50%, -50%);
   }
 }

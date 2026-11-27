@@ -35,7 +35,7 @@ export type { CardAsProps, CardProps } from './card/card';
 export { default as Card } from './card/card';
 export type { CheckboxProps } from './checkbox/checkbox';
 export { default as Checkbox } from './checkbox/checkbox';
-export type { ChipProps, ChipTone } from './chip/chip';
+export type { ChipProps, ChipSize, ChipTone } from './chip/chip';
 export { default as Chip } from './chip/chip';
 export type { CollapseProps } from './collapse/collapse';
 export { default as Collapse } from './collapse/collapse';
