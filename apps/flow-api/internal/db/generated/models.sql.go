@@ -13,38 +13,150 @@ import (
 	types "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 )
 
-const listModelsForProvider = `-- name: ListModelsForProvider :many
-SELECT
-  m.public_id,
-  m.name,
-  m.display_name,
-  m.context_window,
-  m.max_output_tokens,
-  m.input_price_micro_usd_per_mtok,
-  m.output_price_micro_usd_per_mtok,
-  m.supports_tools,
-  m.supports_vision,
-  m.updated_at,
-  m.created_at,
-  COUNT(*) OVER() AS total
+const countEnabledAgentsForModel = `-- name: CountEnabledAgentsForModel :one
+SELECT COUNT(*)
+FROM ai_agents
+WHERE model_id = ?
+  AND enabled = TRUE
+FOR SHARE
+`
+
+// Enabled agents using a model. FOR SHARE forces a current read so a
+// concurrent agent create cannot be missed under REPEATABLE READ.
+func (q *Queries) CountEnabledAgentsForModel(ctx context.Context, modelID uint32) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countEnabledAgentsForModel, modelID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countEnabledModelsForWorkspace = `-- name: CountEnabledModelsForWorkspace :one
+SELECT COUNT(*)
 FROM ai_models m
 INNER JOIN ai_providers p ON p.id = m.provider_id AND p.enabled = TRUE
 WHERE m.workspace_id = ?
-  AND p.public_id = ?
   AND m.enabled = TRUE
-ORDER BY m.sort_weight ASC, m.created_at DESC, m.public_id DESC
-LIMIT ? OFFSET ?
 `
 
-type ListModelsForProviderParams struct {
-	WorkspaceID uint32         `json:"-"`
-	PublicID    types.PublicID `json:"publicId"`
-	Limit       int32          `json:"limit"`
-	Offset      int32          `json:"offset"`
+// Enabled models on enabled providers; the quantity capped per workspace.
+// Deliberately unlocked: the cap is a guideline, not an invariant.
+func (q *Queries) CountEnabledModelsForWorkspace(ctx context.Context, workspaceID uint32) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countEnabledModelsForWorkspace, workspaceID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
 }
 
-type ListModelsForProviderRow struct {
+const getAIModelByNameForUpdate = `-- name: GetAIModelByNameForUpdate :one
+SELECT
+  id,
+  public_id,
+  name,
+  display_name,
+  enabled
+FROM ai_models
+WHERE provider_id = ?
+  AND name = ?
+LIMIT 1
+FOR UPDATE
+`
+
+type GetAIModelByNameForUpdateParams struct {
+	ProviderID uint32 `json:"-"`
+	Name       string `json:"name"`
+}
+
+type GetAIModelByNameForUpdateRow struct {
+	ID          uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+	Name        string         `json:"name"`
+	DisplayName string         `json:"displayName"`
+	Enabled     bool           `json:"enabled"`
+}
+
+// Lock the row that collides on (provider_id, name) after a duplicate-key
+// insert. Name matching is case-insensitive (column collation).
+func (q *Queries) GetAIModelByNameForUpdate(ctx context.Context, arg GetAIModelByNameForUpdateParams) (GetAIModelByNameForUpdateRow, error) {
+	row := q.db.QueryRowContext(ctx, getAIModelByNameForUpdate, arg.ProviderID, arg.Name)
+	var i GetAIModelByNameForUpdateRow
+	err := row.Scan(
+		&i.ID,
+		&i.PublicID,
+		&i.Name,
+		&i.DisplayName,
+		&i.Enabled,
+	)
+	return i, err
+}
+
+const getProviderModelForUpdate = `-- name: GetProviderModelForUpdate :one
+SELECT
+  m.id,
+  m.public_id,
+  m.name,
+  m.display_name,
+  m.enabled,
+  (m.name = COALESCE(p.default_model, '')) AS is_default
+FROM ai_models m
+INNER JOIN ai_providers p ON p.id = m.provider_id
+WHERE m.workspace_id = ?
+  AND m.provider_id = ?
+  AND m.public_id = ?
+LIMIT 1
+FOR UPDATE
+`
+
+type GetProviderModelForUpdateParams struct {
+	WorkspaceID uint32         `json:"-"`
+	ProviderID  uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+}
+
+type GetProviderModelForUpdateRow struct {
+	ID          uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+	Name        string         `json:"name"`
+	DisplayName string         `json:"displayName"`
+	Enabled     bool           `json:"enabled"`
+	IsDefault   bool           `json:"isDefault"`
+}
+
+// Lock one model row of a provider (any enabled state) before a state change.
+func (q *Queries) GetProviderModelForUpdate(ctx context.Context, arg GetProviderModelForUpdateParams) (GetProviderModelForUpdateRow, error) {
+	row := q.db.QueryRowContext(ctx, getProviderModelForUpdate, arg.WorkspaceID, arg.ProviderID, arg.PublicID)
+	var i GetProviderModelForUpdateRow
+	err := row.Scan(
+		&i.ID,
+		&i.PublicID,
+		&i.Name,
+		&i.DisplayName,
+		&i.Enabled,
+		&i.IsDefault,
+	)
+	return i, err
+}
+
+const insertAIModel = `-- name: InsertAIModel :execlastid
+INSERT INTO ai_models (
+  public_id,
+  workspace_id,
+  provider_id,
+  name,
+  display_name,
+  context_window,
+  max_output_tokens,
+  input_price_micro_usd_per_mtok,
+  output_price_micro_usd_per_mtok,
+  supports_tools,
+  supports_vision,
+  enabled
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)
+`
+
+type InsertAIModelParams struct {
 	PublicID                   types.PublicID `json:"publicId"`
+	WorkspaceID                uint32         `json:"-"`
+	ProviderID                 uint32         `json:"-"`
 	Name                       string         `json:"name"`
 	DisplayName                string         `json:"displayName"`
 	ContextWindow              uint32         `json:"contextWindow"`
@@ -53,39 +165,80 @@ type ListModelsForProviderRow struct {
 	OutputPriceMicroUsdPerMtok uint64         `json:"outputPriceMicroUsdPerMtok"`
 	SupportsTools              bool           `json:"supportsTools"`
 	SupportsVision             bool           `json:"supportsVision"`
-	UpdatedAt                  sql.NullTime   `json:"updatedAt"`
-	CreatedAt                  time.Time      `json:"createdAt"`
-	Total                      interface{}    `json:"total"`
 }
 
-// List models registered under a provider. Workspace-scoped.
-func (q *Queries) ListModelsForProvider(ctx context.Context, arg ListModelsForProviderParams) ([]ListModelsForProviderRow, error) {
-	rows, err := q.db.QueryContext(ctx, listModelsForProvider,
-		arg.WorkspaceID,
+// Register a model under a provider. Duplicate (provider_id, name) raises a
+// duplicate-key error for the caller to handle.
+func (q *Queries) InsertAIModel(ctx context.Context, arg InsertAIModelParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, insertAIModel,
 		arg.PublicID,
-		arg.Limit,
-		arg.Offset,
+		arg.WorkspaceID,
+		arg.ProviderID,
+		arg.Name,
+		arg.DisplayName,
+		arg.ContextWindow,
+		arg.MaxOutputTokens,
+		arg.InputPriceMicroUsdPerMtok,
+		arg.OutputPriceMicroUsdPerMtok,
+		arg.SupportsTools,
+		arg.SupportsVision,
 	)
+	if err != nil {
+		return 0, err
+	}
+	return result.LastInsertId()
+}
+
+const listProviderModels = `-- name: ListProviderModels :many
+SELECT
+  m.public_id,
+  m.name,
+  m.display_name,
+  m.enabled,
+  (m.name = COALESCE(p.default_model, '')) AS is_default,
+  (SELECT COUNT(*) FROM ai_agents a WHERE a.model_id = m.id AND a.enabled = TRUE) AS agent_count,
+  m.created_at
+FROM ai_models m
+INNER JOIN ai_providers p ON p.id = m.provider_id
+WHERE m.workspace_id = ?
+  AND m.provider_id = ?
+ORDER BY m.created_at DESC, m.public_id DESC
+`
+
+type ListProviderModelsParams struct {
+	WorkspaceID uint32 `json:"-"`
+	ProviderID  uint32 `json:"-"`
+}
+
+type ListProviderModelsRow struct {
+	PublicID    types.PublicID `json:"publicId"`
+	Name        string         `json:"name"`
+	DisplayName string         `json:"displayName"`
+	Enabled     bool           `json:"enabled"`
+	IsDefault   bool           `json:"isDefault"`
+	AgentCount  int64          `json:"agentCount"`
+	CreatedAt   time.Time      `json:"createdAt"`
+}
+
+// Every model (enabled and disabled) registered under a provider, with the
+// enabled-agent count for display only (unlocked). is_default is NULL-safe.
+func (q *Queries) ListProviderModels(ctx context.Context, arg ListProviderModelsParams) ([]ListProviderModelsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listProviderModels, arg.WorkspaceID, arg.ProviderID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ListModelsForProviderRow{}
+	items := []ListProviderModelsRow{}
 	for rows.Next() {
-		var i ListModelsForProviderRow
+		var i ListProviderModelsRow
 		if err := rows.Scan(
 			&i.PublicID,
 			&i.Name,
 			&i.DisplayName,
-			&i.ContextWindow,
-			&i.MaxOutputTokens,
-			&i.InputPriceMicroUsdPerMtok,
-			&i.OutputPriceMicroUsdPerMtok,
-			&i.SupportsTools,
-			&i.SupportsVision,
-			&i.UpdatedAt,
+			&i.Enabled,
+			&i.IsDefault,
+			&i.AgentCount,
 			&i.CreatedAt,
-			&i.Total,
 		); err != nil {
 			return nil, err
 		}
@@ -98,4 +251,63 @@ func (q *Queries) ListModelsForProvider(ctx context.Context, arg ListModelsForPr
 		return nil, err
 	}
 	return items, nil
+}
+
+const reenableAIModel = `-- name: ReenableAIModel :execrows
+UPDATE ai_models
+SET enabled = TRUE,
+    name = ?,
+    display_name = ?
+WHERE id = ?
+  AND enabled = FALSE
+`
+
+type ReenableAIModelParams struct {
+	Name        string `json:"name"`
+	DisplayName string `json:"displayName"`
+	ID          uint32 `json:"-"`
+}
+
+// Re-enable a disabled model, overwriting name and display_name. Rows-affected
+// is 0 when the row is already enabled or gone.
+func (q *Queries) ReenableAIModel(ctx context.Context, arg ReenableAIModelParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, reenableAIModel, arg.Name, arg.DisplayName, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const setAIModelEnabled = `-- name: SetAIModelEnabled :exec
+UPDATE ai_models
+SET enabled = ?
+WHERE id = ?
+`
+
+type SetAIModelEnabledParams struct {
+	Enabled bool   `json:"enabled"`
+	ID      uint32 `json:"-"`
+}
+
+// Set the enabled flag on a model row the caller already holds locked.
+func (q *Queries) SetAIModelEnabled(ctx context.Context, arg SetAIModelEnabledParams) error {
+	_, err := q.db.ExecContext(ctx, setAIModelEnabled, arg.Enabled, arg.ID)
+	return err
+}
+
+const updateAIModelDisplayName = `-- name: UpdateAIModelDisplayName :exec
+UPDATE ai_models
+SET display_name = ?
+WHERE id = ?
+`
+
+type UpdateAIModelDisplayNameParams struct {
+	DisplayName string `json:"displayName"`
+	ID          uint32 `json:"-"`
+}
+
+// Change the display label of a model row the caller already holds locked.
+func (q *Queries) UpdateAIModelDisplayName(ctx context.Context, arg UpdateAIModelDisplayNameParams) error {
+	_, err := q.db.ExecContext(ctx, updateAIModelDisplayName, arg.DisplayName, arg.ID)
+	return err
 }

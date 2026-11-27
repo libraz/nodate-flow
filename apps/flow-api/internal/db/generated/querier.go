@@ -386,6 +386,15 @@ type Querier interface {
 	CountArchivedTasksForWorkspace(ctx context.Context, arg CountArchivedTasksForWorkspaceParams) (int64, error)
 	// Count enabled child pages for a given parent. Used to check before deletion.
 	CountChildPages(ctx context.Context, arg CountChildPagesParams) (int64, error)
+	// Enabled agents using a model. FOR SHARE forces a current read so a
+	// concurrent agent create cannot be missed under REPEATABLE READ.
+	CountEnabledAgentsForModel(ctx context.Context, modelID uint32) (int64, error)
+	// Enabled agents using any model of a provider. FOR SHARE forces a current
+	// read so a concurrent agent create cannot be missed under REPEATABLE READ.
+	CountEnabledAgentsForProvider(ctx context.Context, providerID uint32) (int64, error)
+	// Enabled models on enabled providers; the quantity capped per workspace.
+	// Deliberately unlocked: the cap is a guideline, not an invariant.
+	CountEnabledModelsForWorkspace(ctx context.Context, workspaceID uint32) (int64, error)
 	// Number of live OAuth sign-in allowlist entries; the allowlist is
 	// instance-wide, so there is no workspace to scope by.
 	CountEnabledSigninAllowlistForImport(ctx context.Context) (int64, error)
@@ -1097,9 +1106,15 @@ type Querier interface {
 	// Restricted to 'running' so a job cancelled mid-flight keeps the
 	// cancelled status the API gave it.
 	FinishImportJob(ctx context.Context, arg FinishImportJobParams) error
+	// Lock the row that collides on (provider_id, name) after a duplicate-key
+	// insert. Name matching is case-insensitive (column collation).
+	GetAIModelByNameForUpdate(ctx context.Context, arg GetAIModelByNameForUpdateParams) (GetAIModelByNameForUpdateRow, error)
 	// Fetch the minimal fields an agent runner needs to invoke an LLM, including
 	// the provider that owns the agent's model.
 	GetAgentForExec(ctx context.Context, arg GetAgentForExecParams) (GetAgentForExecRow, error)
+	// Lock an enabled agent with its current model. The model and provider enabled
+	// flags are intentionally not filtered so a stranded agent can be re-pointed.
+	GetAgentForModelUpdate(ctx context.Context, arg GetAgentForModelUpdateParams) (GetAgentForModelUpdateRow, error)
 	// Fetch the minimal fields the agent guard needs to make an allow/deny
 	// decision. Returns enabled, paused, allowed_scopes_json, and the
 	// monthly cost cap. Used by the MCP dispatch guard.
@@ -1137,6 +1152,11 @@ type Querier interface {
 	GetCommentAgentByline(ctx context.Context, arg GetCommentAgentBylineParams) (GetCommentAgentBylineRow, error)
 	// Read back the server-assigned creation time of a just-inserted comment.
 	GetCommentCreatedAt(ctx context.Context, arg GetCommentCreatedAtParams) (time.Time, error)
+	// Resolve a model an agent may use (model and provider both enabled). FOR SHARE
+	// serializes against admin-side FOR UPDATE on the model and provider rows.
+	GetEnabledModelForAgentForShare(ctx context.Context, arg GetEnabledModelForAgentForShareParams) (GetEnabledModelForAgentForShareRow, error)
+	// Enabled provider lookup by public id. NEVER selects api_key_ciphertext.
+	GetEnabledProviderForWorkspace(ctx context.Context, arg GetEnabledProviderForWorkspaceParams) (GetEnabledProviderForWorkspaceRow, error)
 	// Resolve an event's public id and logical occurrence time given its
 	// internal id, scoped by workspace as a defence-in-depth check.
 	// Used by the webhook fanout chain: the worker needs the event's
@@ -1193,6 +1213,8 @@ type Querier interface {
 	// Current authority used by prompt snapshots and proposal-cache hits. An
 	// absent or disabled workspace membership is intentionally no row.
 	GetProposalCacheWorkspaceAccess(ctx context.Context, arg GetProposalCacheWorkspaceAccessParams) (interface{}, error)
+	// Lock one model row of a provider (any enabled state) before a state change.
+	GetProviderModelForUpdate(ctx context.Context, arg GetProviderModelForUpdateParams) (GetProviderModelForUpdateRow, error)
 	// Internal id of the task a signal is attached to, through task_id or a
 	// task subject. subject_id counts only when it joins a task in the same
 	// workspace. ErrNoRows means the signal is not attached to a task.
@@ -1339,6 +1361,9 @@ type Querier interface {
 	// same transaction as the referencing INSERT so the count cannot drift
 	// if the INSERT fails.
 	IncrementStorageObjectRefCount(ctx context.Context, id uint32) error
+	// Register a model under a provider. Duplicate (provider_id, name) raises a
+	// duplicate-key error for the caller to handle.
+	InsertAIModel(ctx context.Context, arg InsertAIModelParams) (int64, error)
 	// Insert a hashed recovery code for a user.
 	InsertRecoveryCode(ctx context.Context, arg InsertRecoveryCodeParams) error
 	// Insert an inbound signal (manual or webhook).
@@ -1762,8 +1787,8 @@ type Querier interface {
 	// No enabled filter: the agent is the historical actor of the mention; the
 	// snapshot answers once the agent row is gone.
 	ListMentionsForUser(ctx context.Context, arg ListMentionsForUserParams) ([]ListMentionsForUserRow, error)
-	// List models registered under a provider. Workspace-scoped.
-	ListModelsForProvider(ctx context.Context, arg ListModelsForProviderParams) ([]ListModelsForProviderRow, error)
+	// Every enabled model on an enabled provider across the workspace.
+	ListModelsForWorkspace(ctx context.Context, arg ListModelsForWorkspaceParams) ([]ListModelsForWorkspaceRow, error)
 	// Tasks where the given user is attached as an actor, via v_my_tasks.
 	// task-visibility: not-applicable — v_my_tasks emits only rows where the
 	// reader holds an enabled task_actors row, and every caller binds its own
@@ -1932,6 +1957,9 @@ type Querier interface {
 	// The primary assignee rule of v_task_list_all: the first assignee in
 	// display order, with no name when that actor is an agent or disabled.
 	ListProposalCacheTaskInputs(ctx context.Context, arg ListProposalCacheTaskInputsParams) ([]ListProposalCacheTaskInputsRow, error)
+	// Every model (enabled and disabled) registered under a provider, with the
+	// enabled-agent count for display only (unlocked). is_default is NULL-safe.
+	ListProviderModels(ctx context.Context, arg ListProviderModelsParams) ([]ListProviderModelsRow, error)
 	// Workspace provider list. NEVER selects api_key_ciphertext.
 	ListProvidersForWorkspace(ctx context.Context, arg ListProvidersForWorkspaceParams) ([]ListProvidersForWorkspaceRow, error)
 	// Resolve a publicly shared lens's task projection.
@@ -2211,6 +2239,8 @@ type Querier interface {
 	// Read an enabled human author's byline and share-lock the row so a
 	// concurrent suspension cannot interleave with the comment insert.
 	LockCommentHumanAuthor(ctx context.Context, id uint32) (LockCommentHumanAuthorRow, error)
+	// Lock an enabled provider row; serializes against agent-side FOR SHARE reads.
+	LockEnabledProviderForUpdate(ctx context.Context, arg LockEnabledProviderForUpdateParams) (uint32, error)
 	// Lock the owning project row before task-number allocation. This serializes
 	// concurrent creators for the same project while still allowing different
 	// projects to allocate independently.
@@ -2321,6 +2351,9 @@ type Querier interface {
 	QueueStorageBlobRemoval(ctx context.Context, storageKey string) error
 	// Publish the running counters so the polling UI can show movement.
 	RecordImportJobProgress(ctx context.Context, arg RecordImportJobProgressParams) error
+	// Re-enable a disabled model, overwriting name and display_name. Rows-affected
+	// is 0 when the row is already enabled or gone.
+	ReenableAIModel(ctx context.Context, arg ReenableAIModelParams) (int64, error)
 	// Insert a new global user account. The caller supplies a UUID v7 public_id.
 	RegisterUser(ctx context.Context, arg RegisterUserParams) (int64, error)
 	// Give back a claim whose dispatch failed, so the next tick retries.
@@ -2430,6 +2463,8 @@ type Querier interface {
 	// Seed avatar_url from the sign-in provider's profile picture. A no-op when
 	// the user already has an external or uploaded avatar.
 	SeedOAuthAvatarURL(ctx context.Context, arg SeedOAuthAvatarURLParams) error
+	// Set the enabled flag on a model row the caller already holds locked.
+	SetAIModelEnabled(ctx context.Context, arg SetAIModelEnabledParams) error
 	// Begin (or restart) TOTP enrollment by writing a fresh encrypted
 	// secret and clearing any previous confirmation timestamp.
 	SetIdentityMfaSecret(ctx context.Context, arg SetIdentityMfaSecretParams) error
@@ -2459,6 +2494,10 @@ type Querier interface {
 	// PatchMe query cannot be reused because it treats NULL as "leave alone"
 	// rather than "overwrite with this value".
 	SetMyAvatarURL(ctx context.Context, arg SetMyAvatarURLParams) error
+	// Point the provider's default_model at a model name.
+	SetProviderDefaultModel(ctx context.Context, arg SetProviderDefaultModelParams) error
+	// Set default_model only while it is still unset.
+	SetProviderDefaultModelIfNull(ctx context.Context, arg SetProviderDefaultModelIfNullParams) error
 	// Set the task_number after allocation.
 	// updated_by_user_id is appended so the audit field records who allocated
 	// the number; in practice this runs in the same transaction as CreateTask
@@ -2506,6 +2545,10 @@ type Querier interface {
 	// updated_by_user_id is appended so the audit field records who unarchived
 	// the row (NULL for system writers).
 	UnarchiveTask(ctx context.Context, arg UnarchiveTaskParams) (int64, error)
+	// Change the display label of a model row the caller already holds locked.
+	UpdateAIModelDisplayName(ctx context.Context, arg UpdateAIModelDisplayNameParams) error
+	// Re-point an agent at a model with its (possibly clamped) temperature.
+	UpdateAgentModel(ctx context.Context, arg UpdateAgentModelParams) error
 	// Update the schedule_kind on an existing agent.
 	UpdateAgentScheduleKind(ctx context.Context, arg UpdateAgentScheduleKindParams) (int64, error)
 	// Replace stored tokens after a successful refresh.

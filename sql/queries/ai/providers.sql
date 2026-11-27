@@ -76,6 +76,53 @@ WHERE workspace_id = ?
   AND enabled = TRUE
 LIMIT 1;
 
+-- name: GetEnabledProviderForWorkspace :one
+-- Enabled provider lookup by public id. NEVER selects api_key_ciphertext.
+SELECT
+  id,
+  public_id,
+  kind,
+  name,
+  default_model
+FROM ai_providers
+WHERE workspace_id = ?
+  AND public_id = ?
+  AND enabled = TRUE
+LIMIT 1;
+
+-- name: LockEnabledProviderForUpdate :one
+-- Lock an enabled provider row; serializes against agent-side FOR SHARE reads.
+SELECT id
+FROM ai_providers
+WHERE workspace_id = ?
+  AND public_id = ?
+  AND enabled = TRUE
+LIMIT 1
+FOR UPDATE;
+
+-- name: SetProviderDefaultModel :exec
+-- Point the provider's default_model at a model name.
+UPDATE ai_providers
+SET default_model = ?
+WHERE id = ?;
+
+-- name: SetProviderDefaultModelIfNull :exec
+-- Set default_model only while it is still unset.
+UPDATE ai_providers
+SET default_model = ?
+WHERE id = ?
+  AND default_model IS NULL;
+
+-- name: CountEnabledAgentsForProvider :one
+-- Enabled agents using any model of a provider. FOR SHARE forces a current
+-- read so a concurrent agent create cannot be missed under REPEATABLE READ.
+SELECT COUNT(*)
+FROM ai_agents a
+INNER JOIN ai_models m ON m.id = a.model_id
+WHERE m.provider_id = ?
+  AND a.enabled = TRUE
+FOR SHARE;
+
 -- name: UpdateProviderKey :execrows
 -- Rotate a provider's API key. Caller passes new ciphertext + prefix + suffix.
 -- Returns rows-affected so the handler can detect a not-found / wrong-workspace

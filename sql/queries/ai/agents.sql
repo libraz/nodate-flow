@@ -37,6 +37,62 @@ WHERE a.workspace_id = ?
 ORDER BY a.created_at DESC, a.public_id DESC
 LIMIT ? OFFSET ?;
 
+-- name: GetEnabledModelForAgentForShare :one
+-- Resolve a model an agent may use (model and provider both enabled). FOR SHARE
+-- serializes against admin-side FOR UPDATE on the model and provider rows.
+SELECT
+  m.id,
+  m.name,
+  p.kind
+FROM ai_models m
+INNER JOIN ai_providers p ON p.id = m.provider_id
+WHERE m.workspace_id = ?
+  AND m.public_id = ?
+  AND m.enabled = TRUE
+  AND p.enabled = TRUE
+LIMIT 1
+FOR SHARE;
+
+-- name: GetAgentForModelUpdate :one
+-- Lock an enabled agent with its current model. The model and provider enabled
+-- flags are intentionally not filtered so a stranded agent can be re-pointed.
+SELECT
+  a.id,
+  a.temperature,
+  m.public_id AS model_public_id,
+  m.name AS model_name
+FROM ai_agents a
+INNER JOIN ai_models m ON m.id = a.model_id
+WHERE a.workspace_id = ?
+  AND a.public_id = ?
+  AND a.enabled = TRUE
+LIMIT 1
+FOR UPDATE;
+
+-- name: UpdateAgentModel :exec
+-- Re-point an agent at a model with its (possibly clamped) temperature.
+UPDATE ai_agents
+SET model_id = ?,
+    temperature = ?
+WHERE id = ?;
+
+-- name: ListModelsForWorkspace :many
+-- Every enabled model on an enabled provider across the workspace.
+SELECT
+  m.public_id,
+  m.name,
+  m.display_name,
+  p.public_id AS provider_id,
+  p.kind AS provider_kind,
+  p.name AS provider_name,
+  COUNT(*) OVER() AS total
+FROM ai_models m
+INNER JOIN ai_providers p ON p.id = m.provider_id AND p.enabled = TRUE
+WHERE m.workspace_id = ?
+  AND m.enabled = TRUE
+ORDER BY m.sort_weight ASC, m.created_at DESC, m.public_id DESC
+LIMIT ? OFFSET ?;
+
 -- name: UpdateAgentScheduleKind :execrows
 -- Update the schedule_kind on an existing agent.
 UPDATE ai_agents

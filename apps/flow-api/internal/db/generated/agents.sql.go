@@ -121,6 +121,47 @@ func (q *Queries) GetAgentForExec(ctx context.Context, arg GetAgentForExecParams
 	return i, err
 }
 
+const getAgentForModelUpdate = `-- name: GetAgentForModelUpdate :one
+SELECT
+  a.id,
+  a.temperature,
+  m.public_id AS model_public_id,
+  m.name AS model_name
+FROM ai_agents a
+INNER JOIN ai_models m ON m.id = a.model_id
+WHERE a.workspace_id = ?
+  AND a.public_id = ?
+  AND a.enabled = TRUE
+LIMIT 1
+FOR UPDATE
+`
+
+type GetAgentForModelUpdateParams struct {
+	WorkspaceID uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+}
+
+type GetAgentForModelUpdateRow struct {
+	ID            uint32         `json:"-"`
+	Temperature   uint16         `json:"temperature"`
+	ModelPublicID types.PublicID `json:"modelPublicId"`
+	ModelName     string         `json:"modelName"`
+}
+
+// Lock an enabled agent with its current model. The model and provider enabled
+// flags are intentionally not filtered so a stranded agent can be re-pointed.
+func (q *Queries) GetAgentForModelUpdate(ctx context.Context, arg GetAgentForModelUpdateParams) (GetAgentForModelUpdateRow, error) {
+	row := q.db.QueryRowContext(ctx, getAgentForModelUpdate, arg.WorkspaceID, arg.PublicID)
+	var i GetAgentForModelUpdateRow
+	err := row.Scan(
+		&i.ID,
+		&i.Temperature,
+		&i.ModelPublicID,
+		&i.ModelName,
+	)
+	return i, err
+}
+
 const getAgentGuardSnapshot = `-- name: GetAgentGuardSnapshot :one
 SELECT
   enabled,
@@ -154,6 +195,41 @@ func (q *Queries) GetAgentGuardSnapshot(ctx context.Context, id uint32) (GetAgen
 		&i.AllowedScopesJson,
 		&i.MonthlyCostCapCents,
 	)
+	return i, err
+}
+
+const getEnabledModelForAgentForShare = `-- name: GetEnabledModelForAgentForShare :one
+SELECT
+  m.id,
+  m.name,
+  p.kind
+FROM ai_models m
+INNER JOIN ai_providers p ON p.id = m.provider_id
+WHERE m.workspace_id = ?
+  AND m.public_id = ?
+  AND m.enabled = TRUE
+  AND p.enabled = TRUE
+LIMIT 1
+FOR SHARE
+`
+
+type GetEnabledModelForAgentForShareParams struct {
+	WorkspaceID uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+}
+
+type GetEnabledModelForAgentForShareRow struct {
+	ID   uint32          `json:"-"`
+	Name string          `json:"name"`
+	Kind AiProvidersKind `json:"kind"`
+}
+
+// Resolve a model an agent may use (model and provider both enabled). FOR SHARE
+// serializes against admin-side FOR UPDATE on the model and provider rows.
+func (q *Queries) GetEnabledModelForAgentForShare(ctx context.Context, arg GetEnabledModelForAgentForShareParams) (GetEnabledModelForAgentForShareRow, error) {
+	row := q.db.QueryRowContext(ctx, getEnabledModelForAgentForShare, arg.WorkspaceID, arg.PublicID)
+	var i GetEnabledModelForAgentForShareRow
+	err := row.Scan(&i.ID, &i.Name, &i.Kind)
 	return i, err
 }
 
@@ -228,6 +304,71 @@ func (q *Queries) ListAgentsForWorkspace(ctx context.Context, arg ListAgentsForW
 			&i.Paused,
 			&i.UpdatedAt,
 			&i.CreatedAt,
+			&i.Total,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listModelsForWorkspace = `-- name: ListModelsForWorkspace :many
+SELECT
+  m.public_id,
+  m.name,
+  m.display_name,
+  p.public_id AS provider_id,
+  p.kind AS provider_kind,
+  p.name AS provider_name,
+  COUNT(*) OVER() AS total
+FROM ai_models m
+INNER JOIN ai_providers p ON p.id = m.provider_id AND p.enabled = TRUE
+WHERE m.workspace_id = ?
+  AND m.enabled = TRUE
+ORDER BY m.sort_weight ASC, m.created_at DESC, m.public_id DESC
+LIMIT ? OFFSET ?
+`
+
+type ListModelsForWorkspaceParams struct {
+	WorkspaceID uint32 `json:"-"`
+	Limit       int32  `json:"limit"`
+	Offset      int32  `json:"offset"`
+}
+
+type ListModelsForWorkspaceRow struct {
+	PublicID     types.PublicID  `json:"publicId"`
+	Name         string          `json:"name"`
+	DisplayName  string          `json:"displayName"`
+	ProviderID   types.PublicID  `json:"providerId"`
+	ProviderKind AiProvidersKind `json:"providerKind"`
+	ProviderName string          `json:"providerName"`
+	Total        interface{}     `json:"total"`
+}
+
+// Every enabled model on an enabled provider across the workspace.
+func (q *Queries) ListModelsForWorkspace(ctx context.Context, arg ListModelsForWorkspaceParams) ([]ListModelsForWorkspaceRow, error) {
+	rows, err := q.db.QueryContext(ctx, listModelsForWorkspace, arg.WorkspaceID, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListModelsForWorkspaceRow{}
+	for rows.Next() {
+		var i ListModelsForWorkspaceRow
+		if err := rows.Scan(
+			&i.PublicID,
+			&i.Name,
+			&i.DisplayName,
+			&i.ProviderID,
+			&i.ProviderKind,
+			&i.ProviderName,
 			&i.Total,
 		); err != nil {
 			return nil, err
@@ -368,6 +509,25 @@ func (q *Queries) ListOnEventAgentsForEvent(ctx context.Context, arg ListOnEvent
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateAgentModel = `-- name: UpdateAgentModel :exec
+UPDATE ai_agents
+SET model_id = ?,
+    temperature = ?
+WHERE id = ?
+`
+
+type UpdateAgentModelParams struct {
+	ModelID     uint32 `json:"-"`
+	Temperature uint16 `json:"temperature"`
+	ID          uint32 `json:"-"`
+}
+
+// Re-point an agent at a model with its (possibly clamped) temperature.
+func (q *Queries) UpdateAgentModel(ctx context.Context, arg UpdateAgentModelParams) error {
+	_, err := q.db.ExecContext(ctx, updateAgentModel, arg.ModelID, arg.Temperature, arg.ID)
+	return err
 }
 
 const updateAgentScheduleKind = `-- name: UpdateAgentScheduleKind :execrows

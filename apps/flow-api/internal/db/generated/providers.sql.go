@@ -13,6 +13,24 @@ import (
 	types "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 )
 
+const countEnabledAgentsForProvider = `-- name: CountEnabledAgentsForProvider :one
+SELECT COUNT(*)
+FROM ai_agents a
+INNER JOIN ai_models m ON m.id = a.model_id
+WHERE m.provider_id = ?
+  AND a.enabled = TRUE
+FOR SHARE
+`
+
+// Enabled agents using any model of a provider. FOR SHARE forces a current
+// read so a concurrent agent create cannot be missed under REPEATABLE READ.
+func (q *Queries) CountEnabledAgentsForProvider(ctx context.Context, providerID uint32) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countEnabledAgentsForProvider, providerID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createProvider = `-- name: CreateProvider :execlastid
 
 INSERT INTO ai_providers (
@@ -178,6 +196,47 @@ func (q *Queries) FindProviderForDecrypt(ctx context.Context, arg FindProviderFo
 	return i, err
 }
 
+const getEnabledProviderForWorkspace = `-- name: GetEnabledProviderForWorkspace :one
+SELECT
+  id,
+  public_id,
+  kind,
+  name,
+  default_model
+FROM ai_providers
+WHERE workspace_id = ?
+  AND public_id = ?
+  AND enabled = TRUE
+LIMIT 1
+`
+
+type GetEnabledProviderForWorkspaceParams struct {
+	WorkspaceID uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+}
+
+type GetEnabledProviderForWorkspaceRow struct {
+	ID           uint32          `json:"-"`
+	PublicID     types.PublicID  `json:"publicId"`
+	Kind         AiProvidersKind `json:"kind"`
+	Name         string          `json:"name"`
+	DefaultModel sql.NullString  `json:"defaultModel"`
+}
+
+// Enabled provider lookup by public id. NEVER selects api_key_ciphertext.
+func (q *Queries) GetEnabledProviderForWorkspace(ctx context.Context, arg GetEnabledProviderForWorkspaceParams) (GetEnabledProviderForWorkspaceRow, error) {
+	row := q.db.QueryRowContext(ctx, getEnabledProviderForWorkspace, arg.WorkspaceID, arg.PublicID)
+	var i GetEnabledProviderForWorkspaceRow
+	err := row.Scan(
+		&i.ID,
+		&i.PublicID,
+		&i.Kind,
+		&i.Name,
+		&i.DefaultModel,
+	)
+	return i, err
+}
+
 const listProvidersForWorkspace = `-- name: ListProvidersForWorkspace :many
 SELECT
   public_id,
@@ -249,6 +308,64 @@ func (q *Queries) ListProvidersForWorkspace(ctx context.Context, arg ListProvide
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockEnabledProviderForUpdate = `-- name: LockEnabledProviderForUpdate :one
+SELECT id
+FROM ai_providers
+WHERE workspace_id = ?
+  AND public_id = ?
+  AND enabled = TRUE
+LIMIT 1
+FOR UPDATE
+`
+
+type LockEnabledProviderForUpdateParams struct {
+	WorkspaceID uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+}
+
+// Lock an enabled provider row; serializes against agent-side FOR SHARE reads.
+func (q *Queries) LockEnabledProviderForUpdate(ctx context.Context, arg LockEnabledProviderForUpdateParams) (uint32, error) {
+	row := q.db.QueryRowContext(ctx, lockEnabledProviderForUpdate, arg.WorkspaceID, arg.PublicID)
+	var id uint32
+	err := row.Scan(&id)
+	return id, err
+}
+
+const setProviderDefaultModel = `-- name: SetProviderDefaultModel :exec
+UPDATE ai_providers
+SET default_model = ?
+WHERE id = ?
+`
+
+type SetProviderDefaultModelParams struct {
+	DefaultModel sql.NullString `json:"defaultModel"`
+	ID           uint32         `json:"-"`
+}
+
+// Point the provider's default_model at a model name.
+func (q *Queries) SetProviderDefaultModel(ctx context.Context, arg SetProviderDefaultModelParams) error {
+	_, err := q.db.ExecContext(ctx, setProviderDefaultModel, arg.DefaultModel, arg.ID)
+	return err
+}
+
+const setProviderDefaultModelIfNull = `-- name: SetProviderDefaultModelIfNull :exec
+UPDATE ai_providers
+SET default_model = ?
+WHERE id = ?
+  AND default_model IS NULL
+`
+
+type SetProviderDefaultModelIfNullParams struct {
+	DefaultModel sql.NullString `json:"defaultModel"`
+	ID           uint32         `json:"-"`
+}
+
+// Set default_model only while it is still unset.
+func (q *Queries) SetProviderDefaultModelIfNull(ctx context.Context, arg SetProviderDefaultModelIfNullParams) error {
+	_, err := q.db.ExecContext(ctx, setProviderDefaultModelIfNull, arg.DefaultModel, arg.ID)
+	return err
 }
 
 const updateProviderKey = `-- name: UpdateProviderKey :execrows
