@@ -32,5 +32,6 @@
   "agent.task.handoff_to_agent": "event.agent_task_handoff_to_agent",
   "agent.task.attached": "event.agent_task_attached",
   "agent.task.detached": "event.agent_task_detached",
+  "agent.action.proposed": "event.agent_action_proposed",
   "mention.created": "event.mention_created"
 }

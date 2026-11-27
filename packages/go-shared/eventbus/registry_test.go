@@ -201,3 +201,31 @@ func TestJudgeOnlyKindsAreDeclared(t *testing.T) {
 		t.Error("SignalAttached is reserved for the Applier, but the public ingestion endpoint appends it")
 	}
 }
+
+// TestAgentActionKindsRegistered pins the agent run and proposal kinds
+// into Kinds() and their families.
+func TestAgentActionKindsRegistered(t *testing.T) {
+	t.Parallel()
+
+	want := map[Kind]Family{
+		AgentTaskRunRequested: FamilyAgentTask,
+		AgentTaskStep:         FamilyAgentTask,
+		AgentActionProposed:   FamilyAgentAction,
+		AgentActionDecided:    FamilyAgentAction,
+	}
+	declared := map[Kind]bool{}
+	for _, k := range Kinds() {
+		declared[k] = true
+	}
+	for k, fam := range want {
+		if !declared[k] {
+			t.Errorf("%q is not in Kinds()", k)
+		}
+		if got, ok := FamilyOf(k); !ok || got != fam {
+			t.Errorf("FamilyOf(%q) = %q, %v; want %q", k, got, ok, fam)
+		}
+	}
+	if FamilyAgentAction.Prefix() != "agent.action." {
+		t.Errorf("agent.action prefix = %q", FamilyAgentAction.Prefix())
+	}
+}

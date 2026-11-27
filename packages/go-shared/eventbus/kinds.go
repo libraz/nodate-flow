@@ -202,6 +202,23 @@ const (
 	// AgentTaskHandoffToAgent is appended when an agent transfers a task
 	// to another agent (delegation chain).
 	AgentTaskHandoffToAgent Kind = "agent.task.handoff_to_agent"
+	// AgentTaskRunRequested is appended when a person asks an agent to
+	// run on a task now.
+	AgentTaskRunRequested Kind = "agent.task.run_requested"
+	// AgentTaskStep is appended for each tool call an agent makes during
+	// a run.
+	AgentTaskStep Kind = "agent.task.step"
+)
+
+// Agent action events: a change an agent wants to make that a person
+// must approve before it is applied.
+const (
+	// AgentActionProposed is appended when an agent queues a change for
+	// approval.
+	AgentActionProposed Kind = "agent.action.proposed"
+	// AgentActionDecided is appended when a proposal is approved,
+	// rejected, expired or found stale.
+	AgentActionDecided Kind = "agent.action.decided"
 )
 
 // Timebox lifecycle events.

@@ -133,6 +133,13 @@ var classifications = map[eventbus.Kind]classification{
 	eventbus.AgentTaskAttached:       notify("An agent was attached to a task", "task", generated.NotificationsSeverityLow),
 	eventbus.AgentTaskDetached:       notify("An agent was detached from a task", "task", generated.NotificationsSeverityLow),
 	eventbus.AgentTaskThought:        silent,
+	eventbus.AgentTaskRunRequested:   silent,
+	eventbus.AgentTaskStep:           silent,
+
+	// A proposal waits on the person who delegated the task; the decision
+	// is visible on the proposal itself.
+	eventbus.AgentActionProposed: notify("An agent proposed a change", "task", generated.NotificationsSeverityNormal).to(audienceTargetUser),
+	eventbus.AgentActionDecided:  silent,
 
 	// Task metadata: the task itself carries the change and the lists
 	// refresh off the stream, so a per-recipient row would be noise.
@@ -328,7 +335,8 @@ func categoryForEventType(eventType string) string {
 	case "item.milestone.link.added", "item.milestone.link.removed":
 		return prefs.CategoryRelation
 	case "agent.task.handoff_to_user", "agent.task.handoff_to_agent",
-		"agent.task.attached", "agent.task.detached", "agent.task.thought":
+		"agent.task.attached", "agent.task.detached", "agent.task.thought",
+		"agent.action.proposed":
 		return prefs.CategoryAI
 	default:
 		return prefs.CategoryTaskLifecycle

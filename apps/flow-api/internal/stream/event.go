@@ -145,6 +145,7 @@ var streamKindForFamily = map[eventbus.Family]Kind{
 	// the frontend does not yet accept.
 	eventbus.FamilyLabel:           "",
 	eventbus.FamilyAgentTask:       KindTaskChanged,
+	eventbus.FamilyAgentAction:     KindTaskChanged,
 	eventbus.FamilyAiAgent:         KindTaskChanged,
 	eventbus.FamilySignal:          KindTaskChanged,
 	eventbus.FamilyExport:          "",

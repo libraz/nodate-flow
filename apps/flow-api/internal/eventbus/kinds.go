@@ -127,6 +127,14 @@ const (
 	AgentTaskThought        = sharedbus.AgentTaskThought
 	AgentTaskHandoffToUser  = sharedbus.AgentTaskHandoffToUser
 	AgentTaskHandoffToAgent = sharedbus.AgentTaskHandoffToAgent
+	AgentTaskRunRequested   = sharedbus.AgentTaskRunRequested
+	AgentTaskStep           = sharedbus.AgentTaskStep
+)
+
+// Agent action events (proposals awaiting a person's decision).
+const (
+	AgentActionProposed = sharedbus.AgentActionProposed
+	AgentActionDecided  = sharedbus.AgentActionDecided
 )
 
 // Timebox lifecycle events.

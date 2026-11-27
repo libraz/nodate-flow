@@ -39,12 +39,28 @@ type ReservedKind struct {
 // could receive if anything ever wrote the row.
 var reservedKinds = []ReservedKind{
 	{
+		Name:   "AgentActionDecided",
+		Reason: "the proposal approve and reject endpoints that append it are being added in the same change",
+	},
+	{
+		Name:   "AgentActionProposed",
+		Reason: "the agent task-work service that appends it is being added in the same change",
+	},
+	{
 		Name:   "AgentTaskAttached",
 		Reason: "attaching an agent inserts a task_actors row with kind='agent' and appends task.actor.added; nothing appends this",
 	},
 	{
 		Name:   "AgentTaskDetached",
 		Reason: "removing an agent actor goes through the same path as a user actor and appends task.actor.removed",
+	},
+	{
+		Name:   "AgentTaskRunRequested",
+		Reason: "the run-now endpoint that appends it is being added in the same change",
+	},
+	{
+		Name:   "AgentTaskStep",
+		Reason: "the agent task-work loop that appends it is being added in the same change",
 	},
 	{
 		Name:   "AgentTaskThought",

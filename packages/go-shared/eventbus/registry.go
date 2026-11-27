@@ -55,6 +55,8 @@ var declaredKinds = []Kind{
 
 	AgentTaskAttached, AgentTaskDetached, AgentTaskThought,
 	AgentTaskHandoffToUser, AgentTaskHandoffToAgent,
+	AgentTaskRunRequested, AgentTaskStep,
+	AgentActionProposed, AgentActionDecided,
 
 	TimeboxCreated, TimeboxUpdated, TimeboxActivated, TimeboxCompleted,
 	TimeboxTaskAdded, TimeboxTaskRemoved,
@@ -137,6 +139,7 @@ const (
 	FamilyTask            Family = "task"
 	FamilyLabel           Family = "label"
 	FamilyAgentTask       Family = "agent.task"
+	FamilyAgentAction     Family = "agent.action"
 	FamilyAiSuggestion    Family = "ai.suggestion"
 	FamilyAiAutoAction    Family = "ai.auto_action"
 	FamilyAiAgent         Family = "ai.agent"
@@ -174,6 +177,7 @@ var familyPrefix = map[Family]string{
 	FamilyTask:            "task.",
 	FamilyLabel:           "label.",
 	FamilyAgentTask:       "agent.task.",
+	FamilyAgentAction:     "agent.action.",
 	FamilyAiSuggestion:    "ai.suggestion.",
 	FamilyAiAutoAction:    "ai.auto_action.",
 	FamilyAiAgent:         "ai.agent.",

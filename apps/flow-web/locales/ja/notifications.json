@@ -62,6 +62,7 @@
     "agent_task_handoff_to_agent": "タスクがエージェントに引き継がれました",
     "agent_task_attached": "タスクにエージェントが割り当てられました",
     "agent_task_detached": "タスクからエージェントが外されました",
+    "agent_action_proposed": "エージェントがタスクへの変更を提案しました",
     "mention_created": "メンションされました"
   }
 }
