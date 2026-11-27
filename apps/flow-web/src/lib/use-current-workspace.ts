@@ -149,10 +149,12 @@ export function useCurrentWorkspaceId(): string | null {
   // return the partial value straight from the cache and never refetch,
   // leaving the page rendered with empty title/priority/dates (see
   // docs/bugs/2026-04-23-web-task-detail-empty-after-spa-nav.md).
+  // The keys also sit outside the entity prefixes: the owning workspace never
+  // changes, so realtime invalidation of `['tasks']` must not refetch them.
   const projectQuery = useQuery({
     queryKey: projectId
-      ? (['projects', 'workspace-id', projectId] as const)
-      : (['projects', 'workspace-id', 'none'] as const),
+      ? (['project-workspace', projectId] as const)
+      : (['project-workspace', 'none'] as const),
     enabled: projectId !== null,
     staleTime: 60_000,
     queryFn: async (): Promise<{ workspaceId: string } | null> => {
@@ -172,8 +174,8 @@ export function useCurrentWorkspaceId(): string | null {
 
   const taskQuery = useQuery({
     queryKey: taskId
-      ? (['tasks', 'workspace-id', taskId] as const)
-      : (['tasks', 'workspace-id', 'none'] as const),
+      ? (['task-workspace', taskId] as const)
+      : (['task-workspace', 'none'] as const),
     enabled: taskId !== null,
     staleTime: 60_000,
     queryFn: async (): Promise<{ workspaceId: string } | null> => {

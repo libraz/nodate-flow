@@ -25,6 +25,7 @@ import { i18n } from '../../i18n';
 import { apiBaseUrl } from '../../lib/sdk';
 import { authStore } from '../auth/auth-store';
 import { keysForEvent, type StreamEvent } from './event-to-keys';
+import { flushInvalidations } from './flush-invalidations';
 import { createInvalidationCoalescer } from './invalidation-coalescer';
 import { setStreamHealthy } from './stream-health';
 
@@ -74,10 +75,7 @@ export function useWorkspaceStream(workspaceId: string | undefined): void {
       flush: (keys) => {
         const hidden = document.hidden;
         if (hidden) flushedWhileHidden = true;
-        const refetchType = hidden ? 'none' : 'active';
-        for (const key of keys) {
-          void queryClient.invalidateQueries({ queryKey: key, refetchType });
-        }
+        void flushInvalidations(queryClient, keys, hidden);
       },
     });
 
