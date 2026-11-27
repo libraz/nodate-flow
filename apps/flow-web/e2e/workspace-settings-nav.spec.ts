@@ -18,18 +18,12 @@ import { expect, type Page, test } from '@playwright/test';
 
 import enSettings from '../locales/en/settings.json' with { type: 'json' };
 import { loadTenants } from './fixtures/load-tenants';
-import {
-  AUTH_API_URL,
-  cleanupTenant,
-  createTestTenant,
-  injectAuth,
-  type TestTenant,
-} from './fixtures/tenant';
+import { cleanupTenant, createMember, createTestTenant, injectAuth } from './fixtures/tenant';
 
 interface NavEntry {
   /** i18n label rendered on the sidebar link. */
   label: string;
-  /** URL fragment after `/settings/`. */
+  /** URL fragment after `/settings/` that the link navigates to (after any redirect). */
   slug: string;
 }
 
@@ -39,11 +33,8 @@ const NAV_ENTRIES: readonly NavEntry[] = [
   { label: enSettings.nav.public_shares, slug: 'public-shares' },
   { label: enSettings.nav.mcp_tokens, slug: 'mcp-tokens' },
   { label: enSettings.nav.webhooks, slug: 'webhooks' },
-  { label: enSettings.nav.ai_providers, slug: 'ai-providers' },
-  { label: enSettings.nav.ai_agents, slug: 'ai-agents' },
-  { label: enSettings.nav.auto_actions, slug: 'auto-actions' },
-  { label: enSettings.nav.ai_activity, slug: 'ai-activity' },
-  { label: enSettings.nav.ai_metrics, slug: 'ai/metrics' },
+  // `/settings/ai` sends an admin on to the connection tab.
+  { label: enSettings.nav.ai, slug: 'ai/connection' },
   { label: enSettings.nav.weekly_digest, slug: 'weekly-digest' },
 ];
 
@@ -62,33 +53,6 @@ async function readNavGroups(page: Page): Promise<NavGroupText[]> {
       items: Array.from(group.querySelectorAll('a')).map((a) => a.textContent?.trim() ?? ''),
     })),
   );
-}
-
-/** Invites a fresh user into `owner`'s workspace as a member and accepts on their behalf. */
-async function createMember(owner: TestTenant): Promise<TestTenant> {
-  const createRes = await fetch(`${AUTH_API_URL}/workspaces/${owner.workspaceId}/invites`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      accept: 'application/json',
-      authorization: `Bearer ${owner.accessToken}`,
-    },
-    body: JSON.stringify({ role: 'member' }),
-  });
-  if (!createRes.ok) {
-    throw new Error(`create invite failed: ${createRes.status} ${await createRes.text()}`);
-  }
-  const { token } = (await createRes.json()) as { token: string };
-
-  const member = await createTestTenant({ locale: 'en' });
-  const acceptRes = await fetch(`${AUTH_API_URL}/invites/${token}/accept`, {
-    method: 'POST',
-    headers: { accept: 'application/json', authorization: `Bearer ${member.accessToken}` },
-  });
-  if (!acceptRes.ok) {
-    throw new Error(`accept invite failed: ${acceptRes.status} ${await acceptRes.text()}`);
-  }
-  return member;
 }
 
 test.describe('workspace settings sidebar', () => {
@@ -138,17 +102,10 @@ test.describe('workspace settings sidebar', () => {
       const expected: NavGroupText[] = [
         {
           label: enSettings.nav_group.workspace,
-          items: [n.general, n.data, n.public_shares],
+          items: [n.general, n.data, n.public_shares, n.ai],
         },
         { label: enSettings.nav_group.integrations, items: [n.mcp_tokens, n.webhooks] },
-        {
-          label: enSettings.nav_group.ai,
-          items: [n.ai_providers, n.ai_agents, n.auto_actions],
-        },
-        {
-          label: enSettings.nav_group.reports,
-          items: [n.ai_activity, n.ai_metrics, n.weekly_digest, n.audit_log],
-        },
+        { label: enSettings.nav_group.reports, items: [n.weekly_digest, n.audit_log] },
       ];
 
       // The audit log link is behind a build-time feature flag; every other
@@ -169,11 +126,11 @@ test.describe('workspace settings sidebar', () => {
     }
   });
 
-  test('member sees exactly the eight non-admin items and a read-only general page', async ({
+  test('member sees exactly the six non-admin items and a read-only general page', async ({
     page,
   }) => {
     const owner = await createTestTenant({ locale: 'en' });
-    const member = await createMember(owner);
+    const member = await createMember(owner, 'member');
     try {
       await injectAuth(page.context(), member);
       await page.goto(`/workspaces/${owner.workspaceId}/settings/general`);
@@ -181,26 +138,16 @@ test.describe('workspace settings sidebar', () => {
       const n = enSettings.nav;
       await expect
         .poll(async () => (await readNavGroups(page)).flatMap((g) => g.items), { timeout: 15_000 })
-        .toEqual([
-          n.general,
-          n.data,
-          n.public_shares,
-          n.mcp_tokens,
-          n.ai_agents,
-          n.ai_activity,
-          n.ai_metrics,
-          n.weekly_digest,
-        ]);
+        .toEqual([n.general, n.data, n.public_shares, n.ai, n.mcp_tokens, n.weekly_digest]);
       const groups = await readNavGroups(page);
       expect(groups.map((g) => g.label)).toEqual([
         enSettings.nav_group.workspace,
         enSettings.nav_group.integrations,
-        enSettings.nav_group.ai,
         enSettings.nav_group.reports,
       ]);
 
       const sidebar = page.getByRole('navigation', { name: enSettings.sections_label });
-      for (const hidden of [n.webhooks, n.ai_providers, n.auto_actions, n.audit_log]) {
+      for (const hidden of [n.webhooks, n.audit_log]) {
         await expect(sidebar.getByRole('link', { name: hidden, exact: true })).toHaveCount(0);
       }
 

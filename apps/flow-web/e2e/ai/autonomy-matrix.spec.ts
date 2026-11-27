@@ -3,7 +3,7 @@
  *
  * Covers `apps/flow-web/src/features/ai/autonomy/autonomy-matrix.tsx`
  * rendered as a section inside `auto-action-settings.tsx`, mounted at
- * `/workspaces/{wsId}/settings/auto-actions`.
+ * `/workspaces/{wsId}/settings/ai/automation`.
  *
  * The matrix renders one row per signal_kind (4 today, sourced from the
  * SDK's SIGNAL_KINDS registry). Each row exposes a SegmentedControl with
@@ -68,7 +68,7 @@ function saveLabel(count: number): string {
  * the surrounding workspace settings layout.
  */
 async function openAutonomyMatrix(page: Page, tenant: TestTenant): Promise<Locator> {
-  await page.goto(`/workspaces/${tenant.workspaceId}/settings/auto-actions`);
+  await page.goto(`/workspaces/${tenant.workspaceId}/settings/ai/automation`);
   await page.waitForLoadState('domcontentloaded');
   const matrix = page.getByRole('table', { name: copy.matrixTitle });
   await expect(matrix).toBeVisible({ timeout: 15_000 });

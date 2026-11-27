@@ -178,6 +178,40 @@ export async function createTestTenant(opts: CreateTestTenantOptions = {}): Prom
 }
 
 /**
+ * Invites a fresh user into `owner`'s workspace at the given workspace
+ * role and accepts the invite on their behalf. Returns the invitee's
+ * tenant; only its credentials are meaningful for the owner's workspace.
+ */
+export async function createMember(
+  owner: TestTenant,
+  role: 'admin' | 'member' | 'guest' = 'member',
+): Promise<TestTenant> {
+  const createRes = await fetch(`${AUTH_API_URL}/workspaces/${owner.workspaceId}/invites`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      accept: 'application/json',
+      authorization: `Bearer ${owner.accessToken}`,
+    },
+    body: JSON.stringify({ role }),
+  });
+  if (!createRes.ok) {
+    throw new Error(`create invite failed: ${createRes.status} ${await createRes.text()}`);
+  }
+  const { token } = (await createRes.json()) as { token: string };
+
+  const member = await createTestTenant({ locale: 'en' });
+  const acceptRes = await fetch(`${AUTH_API_URL}/invites/${token}/accept`, {
+    method: 'POST',
+    headers: { accept: 'application/json', authorization: `Bearer ${member.accessToken}` },
+  });
+  if (!acceptRes.ok) {
+    throw new Error(`accept invite failed: ${acceptRes.status} ${await acceptRes.text()}`);
+  }
+  return member;
+}
+
+/**
  * Best-effort logout. Failures are swallowed because cleanup must not
  * mask the underlying test failure.
  */

@@ -1,5 +1,5 @@
 /**
- * AI Metrics dashboard E2E (G1 — `/workspaces/{wsId}/settings/ai/metrics`).
+ * AI Metrics dashboard E2E (`/workspaces/{wsId}/settings/ai/usage`, the metrics section of the Usage tab).
  *
  * Smoke-level coverage for the workspace-scoped AI telemetry surface.
  * The page lays out three KPI cards (Proposed / Applied / Dismissed),
@@ -57,9 +57,9 @@ const copy = {
 } as const;
 
 async function openMetrics(page: Page, tenant: TestTenant): Promise<void> {
-  await page.goto(`/workspaces/${tenant.workspaceId}/settings/ai/metrics`);
+  await page.goto(`/workspaces/${tenant.workspaceId}/settings/ai/usage`);
   await page.waitForLoadState('domcontentloaded');
-  await expect(page.getByRole('heading', { level: 1, name: copy.pageTitle })).toBeVisible({
+  await expect(page.getByRole('heading', { level: 2, name: copy.pageTitle })).toBeVisible({
     timeout: 15_000,
   });
 }
@@ -85,10 +85,10 @@ test.describe('ai metrics dashboard', () => {
 
     // KPI card labels are plain `<span>` text inside KpiCard. Numeric
     // values depend on workspace state, so assert on the label only.
-    await expect(page.getByText(copy.proposed)).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText(copy.applied)).toBeVisible();
-    await expect(page.getByText(copy.dismissed)).toBeVisible();
-    await expect(page.getByText(copy.acceptanceRate)).toBeVisible();
+    await expect(page.getByText(copy.proposed, { exact: true })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(copy.applied, { exact: true })).toBeVisible();
+    await expect(page.getByText(copy.dismissed, { exact: true })).toBeVisible();
+    await expect(page.getByText(copy.acceptanceRate, { exact: true })).toBeVisible();
     // Outbound section header — `<h2>` with the title copy.
     await expect(page.getByRole('heading', { name: copy.outboundTitle })).toBeVisible();
   });
@@ -145,13 +145,13 @@ test.describe('ai metrics dashboard', () => {
       }),
     );
 
-    await page.goto(`/workspaces/${tenant.workspaceId}/settings/ai/metrics`);
+    await page.goto(`/workspaces/${tenant.workspaceId}/settings/ai/usage`);
     await page.waitForLoadState('domcontentloaded');
 
-    // Header (page title) lives outside the error boundary, so it
+    // The section header lives outside the error boundary, so it
     // still renders. The error panel itself is role="alert" with
     // the fetchFailed copy and a Retry button.
-    await expect(page.getByRole('heading', { level: 1, name: copy.pageTitle })).toBeVisible({
+    await expect(page.getByRole('heading', { level: 2, name: copy.pageTitle })).toBeVisible({
       timeout: 15_000,
     });
     const alert = page.getByRole('alert');
@@ -178,10 +178,10 @@ test.describe('ai metrics dashboard', () => {
       localStorage.setItem('nf.lang', 'ja');
     });
 
-    await page.goto(`/workspaces/${tenant.workspaceId}/settings/ai/metrics`);
+    await page.goto(`/workspaces/${tenant.workspaceId}/settings/ai/usage`);
     await page.waitForLoadState('domcontentloaded');
 
-    await expect(page.getByRole('heading', { level: 1, name: copy.pageTitleJa })).toBeVisible({
+    await expect(page.getByRole('heading', { level: 2, name: copy.pageTitleJa })).toBeVisible({
       timeout: 15_000,
     });
   });
@@ -210,14 +210,14 @@ test.describe('ai metrics dashboard — mobile viewport', () => {
     tenant = await createTestTenant();
     await injectAuth(page.context(), tenant);
 
-    await page.goto(`/workspaces/${tenant.workspaceId}/settings/ai/metrics`);
+    await page.goto(`/workspaces/${tenant.workspaceId}/settings/ai/usage`);
     await page.waitForLoadState('domcontentloaded');
 
-    await expect(page.getByRole('heading', { level: 1, name: copy.pageTitle })).toBeVisible({
+    await expect(page.getByRole('heading', { level: 2, name: copy.pageTitle })).toBeVisible({
       timeout: 15_000,
     });
-    await expect(page.getByText(copy.proposed)).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText(copy.applied)).toBeVisible();
-    await expect(page.getByText(copy.dismissed)).toBeVisible();
+    await expect(page.getByText(copy.proposed, { exact: true })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(copy.applied, { exact: true })).toBeVisible();
+    await expect(page.getByText(copy.dismissed, { exact: true })).toBeVisible();
   });
 });

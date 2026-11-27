@@ -16,10 +16,10 @@ import { checkA11y } from './helpers/a11y';
 const SUB_ROUTES = [
   'general',
   'mcp-tokens',
-  'ai-providers',
-  'ai-agents',
-  'auto-actions',
-  'ai-activity',
+  'ai/connection',
+  'ai/automation',
+  'ai/agents',
+  'ai/usage',
   'weekly-digest',
   'audit-log',
 ] as const;
