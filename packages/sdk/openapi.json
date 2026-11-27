@@ -1,71 +1,6 @@
 {
   "components": {
     "schemas": {
-      "AIStatusAutoActions": {
-        "additionalProperties": false,
-        "properties": {
-          "enabled": {
-            "type": "boolean"
-          },
-          "intervalMinutes": {
-            "format": "int32",
-            "type": "integer"
-          }
-        },
-        "required": ["enabled", "intervalMinutes"],
-        "type": "object"
-      },
-      "AIStatusBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/AIStatusBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "autoActions": {
-            "$ref": "#/components/schemas/AIStatusAutoActions"
-          },
-          "embedding": {
-            "$ref": "#/components/schemas/AIStatusEmbedding"
-          },
-          "provider": {
-            "$ref": "#/components/schemas/AIStatusProvider"
-          }
-        },
-        "required": ["provider", "embedding", "autoActions"],
-        "type": "object"
-      },
-      "AIStatusEmbedding": {
-        "additionalProperties": false,
-        "properties": {
-          "status": {
-            "enum": ["enabled", "disabled", "unconfigured"],
-            "type": "string"
-          }
-        },
-        "required": ["status"],
-        "type": "object"
-      },
-      "AIStatusProvider": {
-        "additionalProperties": false,
-        "properties": {
-          "model": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "state": {
-            "enum": ["ready", "no_default_model", "none", "unavailable"],
-            "type": "string"
-          }
-        },
-        "required": ["state"],
-        "type": "object"
-      },
       "AcceptEventInviteInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -14408,6 +14343,71 @@
         "required": ["id", "slug", "name", "timezone", "country", "memberCount", "createdAt"],
         "type": "object"
       },
+      "WorkspaceAIStatusAutoActions": {
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "intervalMinutes": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": ["enabled", "intervalMinutes"],
+        "type": "object"
+      },
+      "WorkspaceAIStatusBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/WorkspaceAIStatusBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "autoActions": {
+            "$ref": "#/components/schemas/WorkspaceAIStatusAutoActions"
+          },
+          "embedding": {
+            "$ref": "#/components/schemas/WorkspaceAIStatusEmbedding"
+          },
+          "provider": {
+            "$ref": "#/components/schemas/WorkspaceAIStatusProvider"
+          }
+        },
+        "required": ["provider", "embedding", "autoActions"],
+        "type": "object"
+      },
+      "WorkspaceAIStatusEmbedding": {
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "enum": ["enabled", "disabled", "unconfigured"],
+            "type": "string"
+          }
+        },
+        "required": ["status"],
+        "type": "object"
+      },
+      "WorkspaceAIStatusProvider": {
+        "additionalProperties": false,
+        "properties": {
+          "model": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "state": {
+            "enum": ["ready", "no_default_model", "none", "unavailable"],
+            "type": "string"
+          }
+        },
+        "required": ["state"],
+        "type": "object"
+      },
       "WorkspaceDeleteWorkspaceInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -24805,7 +24805,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AIStatusBody"
+                  "$ref": "#/components/schemas/WorkspaceAIStatusBody"
                 }
               }
             },

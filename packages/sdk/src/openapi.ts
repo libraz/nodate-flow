@@ -5366,32 +5366,6 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        AIStatusAutoActions: {
-            enabled: boolean;
-            /** Format: int32 */
-            intervalMinutes: number;
-        };
-        AIStatusBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/AIStatusBody.json
-             */
-            readonly $schema?: string;
-            autoActions: components["schemas"]["AIStatusAutoActions"];
-            embedding: components["schemas"]["AIStatusEmbedding"];
-            provider: components["schemas"]["AIStatusProvider"];
-        };
-        AIStatusEmbedding: {
-            /** @enum {string} */
-            status: "enabled" | "disabled" | "unconfigured";
-        };
-        AIStatusProvider: {
-            model?: string;
-            name?: string;
-            /** @enum {string} */
-            state: "ready" | "no_default_model" | "none" | "unavailable";
-        };
         AcceptEventInviteInputBody: {
             /**
              * Format: uri
@@ -11951,6 +11925,32 @@ export interface components {
             /** Format: int64 */
             updatedAt?: number;
         };
+        WorkspaceAIStatusAutoActions: {
+            enabled: boolean;
+            /** Format: int32 */
+            intervalMinutes: number;
+        };
+        WorkspaceAIStatusBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/WorkspaceAIStatusBody.json
+             */
+            readonly $schema?: string;
+            autoActions: components["schemas"]["WorkspaceAIStatusAutoActions"];
+            embedding: components["schemas"]["WorkspaceAIStatusEmbedding"];
+            provider: components["schemas"]["WorkspaceAIStatusProvider"];
+        };
+        WorkspaceAIStatusEmbedding: {
+            /** @enum {string} */
+            status: "enabled" | "disabled" | "unconfigured";
+        };
+        WorkspaceAIStatusProvider: {
+            model?: string;
+            name?: string;
+            /** @enum {string} */
+            state: "ready" | "no_default_model" | "none" | "unavailable";
+        };
         WorkspaceDeleteWorkspaceInputBody: {
             /**
              * Format: uri
@@ -18255,7 +18255,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AIStatusBody"];
+                    "application/json": components["schemas"]["WorkspaceAIStatusBody"];
                 };
             };
             /** @description Error */

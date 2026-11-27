@@ -15,41 +15,41 @@ type GetAIStatusInput struct {
 	WsID string `path:"wsId"`
 }
 
-// AIStatusOutput is the response for GET /workspaces/{wsId}/ai/status.
-type AIStatusOutput struct {
-	Body AIStatusBody
+// WorkspaceAIStatusOutput is the response for GET /workspaces/{wsId}/ai/status.
+type WorkspaceAIStatusOutput struct {
+	Body WorkspaceAIStatusBody
 }
 
-// AIStatusBody summarises which AI capabilities work for the workspace.
+// WorkspaceAIStatusBody summarises which AI capabilities work for the workspace.
 // It never carries credentials.
-type AIStatusBody struct {
-	Provider    AIStatusProvider    `json:"provider"`
-	Embedding   AIStatusEmbedding   `json:"embedding"`
-	AutoActions AIStatusAutoActions `json:"autoActions"`
+type WorkspaceAIStatusBody struct {
+	Provider    WorkspaceAIStatusProvider    `json:"provider"`
+	Embedding   WorkspaceAIStatusEmbedding   `json:"embedding"`
+	AutoActions WorkspaceAIStatusAutoActions `json:"autoActions"`
 }
 
-// AIStatusProvider describes the provider AI features resolve to.
-type AIStatusProvider struct {
+// WorkspaceAIStatusProvider describes the provider AI features resolve to.
+type WorkspaceAIStatusProvider struct {
 	State string `json:"state" enum:"ready,no_default_model,none,unavailable"`
 	Name  string `json:"name,omitempty"`
 	Model string `json:"model,omitempty"`
 }
 
-// AIStatusEmbedding is the effective embedding status.
-type AIStatusEmbedding struct {
+// WorkspaceAIStatusEmbedding is the effective embedding status.
+type WorkspaceAIStatusEmbedding struct {
 	Status string `json:"status" enum:"enabled,disabled,unconfigured"`
 }
 
-// AIStatusAutoActions is the auto-action executor state.
-type AIStatusAutoActions struct {
+// WorkspaceAIStatusAutoActions is the auto-action executor state.
+type WorkspaceAIStatusAutoActions struct {
 	Enabled         bool  `json:"enabled"`
 	IntervalMinutes int32 `json:"intervalMinutes"`
 }
 
 // GetAIStatus reports the workspace's effective AI status. Readable by every
 // workspace member, so it decrypts nothing and returns no key material.
-func GetAIStatus(deps Deps) func(context.Context, *GetAIStatusInput) (*AIStatusOutput, error) {
-	return func(ctx context.Context, _ *GetAIStatusInput) (*AIStatusOutput, error) {
+func GetAIStatus(deps Deps) func(context.Context, *GetAIStatusInput) (*WorkspaceAIStatusOutput, error) {
+	return func(ctx context.Context, _ *GetAIStatusInput) (*WorkspaceAIStatusOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
@@ -64,30 +64,30 @@ func GetAIStatus(deps Deps) func(context.Context, *GetAIStatusInput) (*AIStatusO
 			return nil, err
 		}
 
-		auto := AIStatusAutoActions{Enabled: defaultAutoActionEnabled, IntervalMinutes: defaultAutoActionIntervalMinutes}
+		auto := WorkspaceAIStatusAutoActions{Enabled: defaultAutoActionEnabled, IntervalMinutes: defaultAutoActionIntervalMinutes}
 		row, err := deps.Queries.GetAiSettings(ctx, ws.ID)
 		if err != nil && err != sql.ErrNoRows {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		if err == nil {
 			a := autoActionBodyFromRow(row)
-			auto = AIStatusAutoActions{Enabled: a.Enabled, IntervalMinutes: int32(a.IntervalMinutes)} //#nosec G115 -- bounded 0..1440 by the settings endpoint
+			auto = WorkspaceAIStatusAutoActions{Enabled: a.Enabled, IntervalMinutes: int32(a.IntervalMinutes)} //#nosec G115 -- bounded 0..1440 by the settings endpoint
 		}
 
-		return &AIStatusOutput{Body: AIStatusBody{
+		return &WorkspaceAIStatusOutput{Body: WorkspaceAIStatusBody{
 			Provider:    provider,
-			Embedding:   AIStatusEmbedding{Status: embedding},
+			Embedding:   WorkspaceAIStatusEmbedding{Status: embedding},
 			AutoActions: auto,
 		}}, nil
 	}
 }
 
-func aiStatusProvider(ctx context.Context, deps Deps, workspaceID uint32) (AIStatusProvider, error) {
+func aiStatusProvider(ctx context.Context, deps Deps, workspaceID uint32) (WorkspaceAIStatusProvider, error) {
 	if deps.Resolver == nil {
-		return AIStatusProvider{State: "unavailable"}, nil
+		return WorkspaceAIStatusProvider{State: "unavailable"}, nil
 	}
 	if _, ok := deps.Resolver.(*providers.MockResolver); ok {
-		return AIStatusProvider{State: "ready", Name: "mock"}, nil
+		return WorkspaceAIStatusProvider{State: "ready", Name: "mock"}, nil
 	}
 	rows, err := deps.Queries.ListProvidersForWorkspace(ctx, generated.ListProvidersForWorkspaceParams{
 		WorkspaceID: workspaceID,
@@ -95,18 +95,18 @@ func aiStatusProvider(ctx context.Context, deps Deps, workspaceID uint32) (AISta
 		Offset:      0,
 	})
 	if err != nil {
-		return AIStatusProvider{}, httpErr(apierrors.InternalUnexpected)
+		return WorkspaceAIStatusProvider{}, httpErr(apierrors.InternalUnexpected)
 	}
 	if len(rows) == 0 {
-		return AIStatusProvider{State: "none"}, nil
+		return WorkspaceAIStatusProvider{State: "none"}, nil
 	}
 	row := rows[0]
 	if row.DefaultModel.Valid && row.DefaultModel.String != "" {
-		return AIStatusProvider{State: "ready", Name: row.Name, Model: row.DefaultModel.String}, nil
+		return WorkspaceAIStatusProvider{State: "ready", Name: row.Name, Model: row.DefaultModel.String}, nil
 	}
 	kind := providers.Kind(row.Kind)
 	if kind == providers.KindOpenAICompat || kind == providers.KindOllama {
-		return AIStatusProvider{State: "no_default_model", Name: row.Name}, nil
+		return WorkspaceAIStatusProvider{State: "no_default_model", Name: row.Name}, nil
 	}
-	return AIStatusProvider{State: "ready", Name: row.Name, Model: providers.OfficialDefaultModel(kind)}, nil
+	return WorkspaceAIStatusProvider{State: "ready", Name: row.Name, Model: providers.OfficialDefaultModel(kind)}, nil
 }
