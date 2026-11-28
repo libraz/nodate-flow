@@ -29,8 +29,8 @@ help: ## Show this help
 
 .PHONY: dev dev-api dev-auth-api dev-worker dev-presence dev-web dev-accounts-web dev-reset reload stop-dev up down logs
 dev: db-schema .env ## Start MySQL (compose) + auth API + flow API + accounts web + flow web
-	@echo "starting mysql, auth-api, flow-api, accounts-web, flow-web..."
-	@docker compose up -d mysql
+	@echo "starting mysql, storage, auth-api, flow-api, accounts-web, flow-web..."
+	@docker compose up -d mysql storage
 	@$(MAKE) -j4 dev-auth-api dev-api dev-accounts-web dev-web
 
 stop-dev: ## Kill any running dev servers (auth-api + flow-api + accounts-web + flow-web), idempotent
@@ -68,13 +68,19 @@ dev-reset: ## Full reset: nuke volumes, rebuild schema, start fresh, seed
 	@# `make dev` runs the api on the host so point it at 127.0.0.1.
 	@sed -i.bak 's|@tcp(mysql:3306)|@tcp(127.0.0.1:3306)|' .env && rm -f .env.bak
 
-dev-api: ## Run Go flow API against the local MySQL (reads .env)
-	cd apps/flow-api && \
+# The host-run APIs reach the compose storage through its published port;
+# the compose-network `storage:7070` that .env.example names is unreachable from the host.
+DEV_S3_ENV = NF_S3_ENDPOINT="$(if $(filter-out storage:7070,$(NF_S3_ENDPOINT)),$(NF_S3_ENDPOINT),localhost:$(or $(NF_S3_PORT),9000))" \
+  NF_S3_ACCESS_KEY="$${NF_S3_ACCESS_KEY:-minioadmin}" NF_S3_SECRET_KEY="$${NF_S3_SECRET_KEY:-minioadmin}" \
+  NF_S3_BUCKET="$${NF_S3_BUCKET:-nodate-flow}" NF_S3_USE_SSL="$${NF_S3_USE_SSL:-false}"
+
+dev-api: ## Run Go flow API against the local MySQL and compose storage (reads .env)
+	cd apps/flow-api && $(DEV_S3_ENV) \
 	  NF_DB_DSN="$${NF_DB_DSN:-$(NF_DB_USER):$(NF_DB_PASSWORD)@tcp($(NF_DB_HOST):$(NF_DB_PORT))/$(NF_DB_NAME)?parseTime=true&charset=utf8mb4&collation=utf8mb4_0900_ai_ci}" \
 	  go run ./cmd/api
 
-dev-auth-api: ## Run Go auth API against the local MySQL (reads .env)
-	cd apps/auth-api && \
+dev-auth-api: ## Run Go auth API against the local MySQL and compose storage (reads .env)
+	cd apps/auth-api && $(DEV_S3_ENV) \
 	  NF_DB_DSN="$${NF_DB_DSN:-$(NF_DB_USER):$(NF_DB_PASSWORD)@tcp($(NF_DB_HOST):$(NF_DB_PORT))/$(NF_DB_NAME)?parseTime=true&charset=utf8mb4&collation=utf8mb4_0900_ai_ci}" \
 	  go run ./cmd/api
 
