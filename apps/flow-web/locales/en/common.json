@@ -790,6 +790,13 @@
       "text": "This project is archived. It is hidden from the sidebar."
     }
   },
+  "file_size": {
+    "byte": "B",
+    "kilobyte": "KB",
+    "megabyte": "MB",
+    "gigabyte": "GB",
+    "terabyte": "TB"
+  },
   "tasks": {
     "title": "Tasks",
     "new": "New task",
@@ -925,13 +932,6 @@
     "assignee": {
       "plus_n": "+{n, plural, one {# more} other {# more}}",
       "count": "{count, plural, one {# person} other {# people}}"
-    },
-    "file_size": {
-      "byte": "B",
-      "kilobyte": "KB",
-      "megabyte": "MB",
-      "gigabyte": "GB",
-      "terabyte": "TB"
     },
     "bulk": {
       "selected": "{count, plural, one {# task selected} other {# tasks selected}}",

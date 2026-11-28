@@ -282,13 +282,7 @@
       "upload_dedup_success": "相同文件已存在，已直接关联",
       "upload_error": "上传失败",
       "download": "下载",
-      "download_error": "获取下载链接失败",
-      "size_unit": {
-        "b": "B",
-        "kb": "KB",
-        "mb": "MB",
-        "gb": "GB"
-      }
+      "download_error": "获取下载链接失败"
     },
     "invites": {
       "empty": "暂无邀请",

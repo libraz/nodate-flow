@@ -790,6 +790,13 @@
       "text": "このプロジェクトはアーカイブされています。サイドバーには表示されません。"
     }
   },
+  "file_size": {
+    "byte": "B",
+    "kilobyte": "KB",
+    "megabyte": "MB",
+    "gigabyte": "GB",
+    "terabyte": "TB"
+  },
   "tasks": {
     "title": "タスク",
     "new": "タスクを作成",
@@ -925,13 +932,6 @@
     "assignee": {
       "plus_n": "+他{n}件",
       "count": "{count}名"
-    },
-    "file_size": {
-      "byte": "B",
-      "kilobyte": "KB",
-      "megabyte": "MB",
-      "gigabyte": "GB",
-      "terabyte": "TB"
     },
     "bulk": {
       "selected": "{count}件のタスクを選択中",

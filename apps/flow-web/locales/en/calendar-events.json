@@ -282,13 +282,7 @@
       "upload_dedup_success": "Attachment already on file — linked instantly",
       "upload_error": "Upload failed",
       "download": "Download",
-      "download_error": "Failed to fetch download URL",
-      "size_unit": {
-        "b": "B",
-        "kb": "KB",
-        "mb": "MB",
-        "gb": "GB"
-      }
+      "download_error": "Failed to fetch download URL"
     },
     "invites": {
       "empty": "No invites yet",

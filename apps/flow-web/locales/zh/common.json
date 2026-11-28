@@ -790,6 +790,13 @@
       "text": "此项目已归档，不会显示在侧边栏中。"
     }
   },
+  "file_size": {
+    "byte": "B",
+    "kilobyte": "KB",
+    "megabyte": "MB",
+    "gigabyte": "GB",
+    "terabyte": "TB"
+  },
   "tasks": {
     "title": "任务",
     "new": "新建任务",
@@ -925,13 +932,6 @@
     "assignee": {
       "plus_n": "+{n, plural, other {# 人}}",
       "count": "{count, plural, other {# 人}}"
-    },
-    "file_size": {
-      "byte": "B",
-      "kilobyte": "KB",
-      "megabyte": "MB",
-      "gigabyte": "GB",
-      "terabyte": "TB"
     },
     "bulk": {
       "selected": "{count, plural, other {已选 # 个任务}}",

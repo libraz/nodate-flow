@@ -43,6 +43,7 @@ import {
 import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import { formatEpochDateTime } from '../../lib/format';
+import { formatBytes } from '../../lib/format-bytes';
 import {
   type EventAttachment,
   eventAttachmentPreviewQueryOptions,
@@ -58,31 +59,6 @@ export interface AttachmentsTabProps {
   workspaceId: string;
   calendarId: string;
   eventId: string;
-}
-
-/**
- * Format a byte count using the user's locale and a binary scale,
- * resolving the unit suffix through static i18n keys (no dynamic
- * template lookups, per the web feature conventions).
- */
-function formatBytes(bytes: number, locale: string, t: (key: string) => string): string {
-  const unitLabels: readonly string[] = [
-    t('event.attachments.size_unit.b'),
-    t('event.attachments.size_unit.kb'),
-    t('event.attachments.size_unit.mb'),
-    t('event.attachments.size_unit.gb'),
-  ];
-  let value = bytes;
-  let unitIndex = 0;
-  while (value >= 1024 && unitIndex < unitLabels.length - 1) {
-    value /= 1024;
-    unitIndex += 1;
-  }
-  const formatted = new Intl.NumberFormat(locale, {
-    maximumFractionDigits: unitIndex === 0 ? 0 : 1,
-  }).format(value);
-  const label = unitLabels[unitIndex] ?? unitLabels[0];
-  return `${formatted} ${label}`;
 }
 
 /** Remaining lifetime under which a failed thumbnail load is retried with a fresh URL. */
@@ -170,6 +146,7 @@ function AttachmentRow({
   onOpenPreview,
 }: AttachmentRowProps): ReactElement {
   const { t } = useTranslation('calendar-events');
+  const { t: tCommon } = useTranslation('common');
   const deleteMutation = useDeleteEventAttachmentMutation();
 
   const handleDelete = async (): Promise<void> => {
@@ -223,7 +200,7 @@ function AttachmentRow({
       <div className={styles.attachmentIdentity}>
         <span className={styles.attachmentName}>{attachment.filename}</span>
         <span className={styles.attachmentMeta}>
-          <span>{formatBytes(attachment.byteSize, locale, t)}</span>
+          <span>{formatBytes(attachment.byteSize, locale, tCommon)}</span>
           <span>{attachment.contentType}</span>
           <span>{attachment.uploaderName || t('common:common.deactivated_user')}</span>
           {created ? <span>{created}</span> : null}

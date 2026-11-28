@@ -3,7 +3,7 @@
  * @param bytes Raw byte count (>= 0).
  * @param locale BCP 47 locale tag used for number formatting.
  * @param t Translator bound to the {@code common} namespace; reads
- *          {@code common.file_size.*} keys.
+ *          {@code file_size.*} keys.
  *
  * Walks the binary KiB ladder until the value falls under 1024 or the
  * largest known unit (TB) is reached. Bytes never get a fractional
@@ -11,11 +11,11 @@
  */
 export function formatBytes(bytes: number, locale: string, t: (key: string) => string): string {
   const unitKeys = [
-    'common.file_size.byte',
-    'common.file_size.kilobyte',
-    'common.file_size.megabyte',
-    'common.file_size.gigabyte',
-    'common.file_size.terabyte',
+    'file_size.byte',
+    'file_size.kilobyte',
+    'file_size.megabyte',
+    'file_size.gigabyte',
+    'file_size.terabyte',
   ] as const;
   let value = bytes;
   let unitIndex = 0;
