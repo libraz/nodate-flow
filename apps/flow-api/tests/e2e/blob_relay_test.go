@@ -317,3 +317,185 @@ func TestBlobRelayGet(t *testing.T) {
 		require.Equal(t, http.StatusNotFound, resp.StatusCode)
 	})
 }
+
+// TestBlobRelayInlineImage covers the inline (preview) form of a GET URL:
+// allowlisted raster types come back as themselves with the sandbox headers,
+// anything else cannot be minted, and the inline mark cannot be added or
+// removed after signing.
+func TestBlobRelayInlineImage(t *testing.T) {
+	bootstrap(t)
+	requireStorage(t)
+	t.Parallel()
+
+	const sandboxCSP = "default-src 'none'; sandbox; frame-ancestors 'none'"
+	get := func(t *testing.T, method, target, rng string) (*http.Response, []byte) {
+		t.Helper()
+		req, err := http.NewRequest(method, target, nil)
+		require.NoError(t, err)
+		if rng != "" {
+			req.Header.Set("Range", rng)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer func() { _ = resp.Body.Close() }()
+		raw, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		return resp, raw
+	}
+	requireInlineHeaders := func(t *testing.T, resp *http.Response, wantType, name string) {
+		t.Helper()
+		require.Equal(t, wantType, resp.Header.Get("Content-Type"))
+		require.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
+		require.Equal(t, sandboxCSP, resp.Header.Get("Content-Security-Policy"))
+		require.Equal(t, flowstorage.ContentDispositionInline(name), resp.Header.Get("Content-Disposition"))
+		require.True(t, strings.HasPrefix(resp.Header.Get("Content-Disposition"), "inline;"))
+		require.Contains(t, resp.Header.Get("Cache-Control"), "private")
+	}
+
+	t.Run("each allowlisted type is served as itself", func(t *testing.T) {
+		t.Parallel()
+		cases := []struct{ stored, served string }{
+			{"image/png", "image/png"},
+			{"image/jpeg", "image/jpeg"},
+			{"image/gif", "image/gif"},
+			{"image/webp", "image/webp"},
+			{"image/avif", "image/avif"},
+			{"IMAGE/PNG; charset=binary", "image/png"},
+			{" image/png ", "image/png"},
+			{"image/jpg", "image/jpeg"},
+			{"image/pjpeg", "image/jpeg"},
+			{"image/x-png", "image/png"},
+		}
+		for _, c := range cases {
+			t.Run(c.stored, func(t *testing.T) {
+				t.Parallel()
+				key := relayKey(t)
+				payload := randomBytes(t, 256)
+				// The object metadata is irrelevant: the served type comes from the signed grant.
+				require.NoError(t, testStorage.PutBytes(t.Context(), key, payload, "application/octet-stream"))
+				target, expires, err := testStorage.Flow.SignedPreviewURL(key, "pic.img", c.stored)
+				require.NoError(t, err)
+				require.True(t, expires.After(time.Now().Add(10*time.Minute)), "valid for at least 15 minutes")
+				require.True(t, expires.Before(time.Now().Add(31*time.Minute)), "valid for at most 30 minutes")
+
+				resp, raw := get(t, http.MethodGet, target, "")
+				require.Equal(t, http.StatusOK, resp.StatusCode)
+				require.Equal(t, payload, raw)
+				requireInlineHeaders(t, resp, c.served, "pic.img")
+			})
+		}
+	})
+
+	t.Run("html bytes stored as image/png are still served as image/png with the sandbox", func(t *testing.T) {
+		t.Parallel()
+		key := relayKey(t)
+		payload := []byte("<!doctype html><title>x</title><script>document.title='pwned'</script>")
+		require.NoError(t, testStorage.PutBytes(t.Context(), key, payload, "image/png"))
+		target, _, err := testStorage.Flow.SignedPreviewURL(key, "page.png", "image/png")
+		require.NoError(t, err)
+
+		resp, raw := get(t, http.MethodGet, target, "")
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		require.Equal(t, payload, raw)
+		requireInlineHeaders(t, resp, "image/png", "page.png")
+	})
+
+	t.Run("range and head carry the inline headers", func(t *testing.T) {
+		t.Parallel()
+		key := relayKey(t)
+		payload := randomBytes(t, 1024)
+		require.NoError(t, testStorage.PutBytes(t.Context(), key, payload, "image/webp"))
+		target, _, err := testStorage.Flow.SignedPreviewURL(key, "r.webp", "image/webp")
+		require.NoError(t, err)
+
+		resp, raw := get(t, http.MethodGet, target, "bytes=10-19")
+		require.Equal(t, http.StatusPartialContent, resp.StatusCode)
+		require.Equal(t, "bytes 10-19/1024", resp.Header.Get("Content-Range"))
+		require.Equal(t, payload[10:20], raw)
+		requireInlineHeaders(t, resp, "image/webp", "r.webp")
+
+		resp, raw = get(t, http.MethodHead, target, "")
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		require.Empty(t, raw)
+		require.Equal(t, "1024", resp.Header.Get("Content-Length"))
+		requireInlineHeaders(t, resp, "image/webp", "r.webp")
+
+		resp, _ = get(t, http.MethodGet, target, "bytes=5000-6000")
+		require.Equal(t, http.StatusRequestedRangeNotSatisfiable, resp.StatusCode)
+		require.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
+		require.Equal(t, sandboxCSP, resp.Header.Get("Content-Security-Policy"))
+	})
+
+	t.Run("japanese filename uses the shared disposition encoding", func(t *testing.T) {
+		t.Parallel()
+		key := relayKey(t)
+		require.NoError(t, testStorage.PutBytes(t.Context(), key, randomBytes(t, 64), "image/png"))
+		name := "日本語 \"写真\".png"
+		target, _, err := testStorage.Flow.SignedPreviewURL(key, name, "image/png")
+		require.NoError(t, err)
+
+		resp, _ := get(t, http.MethodGet, target, "")
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		requireInlineHeaders(t, resp, "image/png", name)
+		require.Contains(t, resp.Header.Get("Content-Disposition"), "filename*=UTF-8''")
+	})
+
+	t.Run("a type outside the allowlist cannot be minted", func(t *testing.T) {
+		t.Parallel()
+		key := relayKey(t)
+		for _, ct := range []string{"image/svg+xml", "application/pdf", "text/html", "application/octet-stream", "image/png, text/html", ""} {
+			_, _, err := testStorage.Flow.SignedPreviewURL(key, "x", ct)
+			require.ErrorIsf(t, err, flowstorage.ErrNotPreviewable, "content type %q", ct)
+		}
+	})
+
+	t.Run("the inline mark and the type are bound by the signature", func(t *testing.T) {
+		t.Parallel()
+		key := relayKey(t)
+		require.NoError(t, testStorage.PutBytes(t.Context(), key, randomBytes(t, 64), "image/png"))
+		inline, _, err := testStorage.Flow.SignedPreviewURL(key, "p.png", "image/png")
+		require.NoError(t, err)
+		attach, err := testStorage.Flow.SignedDownloadURL(key, "p.png", 5*time.Minute)
+		require.NoError(t, err)
+
+		resp, _ := get(t, http.MethodGet, inline, "")
+		require.Equal(t, http.StatusOK, resp.StatusCode, "control: the untouched inline URL works")
+		resp, _ = get(t, http.MethodGet, attach, "")
+		require.Equal(t, http.StatusOK, resp.StatusCode, "control: the untouched download URL works")
+		require.Equal(t, "application/octet-stream", resp.Header.Get("Content-Type"))
+		require.True(t, strings.HasPrefix(resp.Header.Get("Content-Disposition"), "attachment;"))
+
+		mutate := func(raw string, fn func(q url.Values)) string {
+			u, err := url.Parse(raw)
+			require.NoError(t, err)
+			q := u.Query()
+			fn(q)
+			u.RawQuery = q.Encode()
+			return u.String()
+		}
+		for name, target := range map[string]string{
+			"inl removed":                 mutate(inline, func(q url.Values) { q.Del("inl") }),
+			"inl added to a download URL": mutate(attach, func(q url.Values) { q.Set("inl", "1") }),
+			"ct tampered":                 mutate(inline, func(q url.Values) { q.Set("ct", "text/html") }),
+			"ct emptied":                  mutate(inline, func(q url.Values) { q.Del("ct") }),
+			"inl not 1":                   mutate(inline, func(q url.Values) { q.Set("inl", "true") }),
+			"inl duplicated":              inline + "&inl=1",
+			"ct added to a download URL":  mutate(attach, func(q url.Values) { q.Set("ct", "image/png") }),
+		} {
+			resp, _ := get(t, http.MethodGet, target, "")
+			require.Equalf(t, http.StatusForbidden, resp.StatusCode, "%s", name)
+		}
+	})
+
+	t.Run("an inline mark cannot be used to write", func(t *testing.T) {
+		t.Parallel()
+		key := relayKey(t)
+		payload := randomBytes(t, 128)
+		sum := sha256.Sum256(payload)
+		put, err := testStorage.Flow.SignedPutURL(key, "image/png", int64(len(payload)), hex.EncodeToString(sum[:]), time.Minute)
+		require.NoError(t, err)
+		status, body := relayPut(t, put+"&inl=1", "image/png", payload, int64(len(payload)))
+		require.Equalf(t, http.StatusForbidden, status, "body=%s", body)
+		testStorage.MustNotExist(t, key)
+	})
+}
