@@ -21,7 +21,7 @@ import 'yet-another-react-lightbox/plugins/captions.css';
 import 'yet-another-react-lightbox/plugins/counter.css';
 import 'yet-another-react-lightbox/plugins/thumbnails.css';
 import type { ReactElement } from 'react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import styles from './image-gallery.module.css';
 
@@ -127,20 +127,33 @@ export default function ImageGallery({
   } satisfies Required<Pick<Labels, UsedLabelKey>>;
   // biome-ignore-end lint/style/useNamingConvention: keys are YARL's label identifiers
 
+  // YARL snaps back to `index` whenever `slides` or `index` change identity, so the
+  // viewed slide is tracked by id and the slide array is stable for equal content.
+  const [currentId, setCurrentId] = useState(() => slides[index]?.id);
+  const foundIndex = slides.findIndex((s) => s.id === currentId);
+  const viewIndex = foundIndex >= 0 ? foundIndex : Math.max(0, Math.min(index, slides.length - 1));
+  const contentKey = slides.map((s) => `${s.id}\n${s.src}\n${s.filename}`).join('\n\n');
+  // biome-ignore lint/correctness/useExhaustiveDependencies: contentKey is the content of `slides`
+  const lightboxSlides = useMemo(
+    () =>
+      slides.map((s) => ({
+        src: s.src,
+        alt: s.filename,
+        title: s.filename,
+        attachmentId: s.id,
+      })),
+    [contentKey],
+  );
+
   const single = slides.length <= 1;
   const themeAttr: { 'data-theme'?: string } = darkTheme ? { 'data-theme': darkTheme } : {};
 
   return (
     <Lightbox
       open
-      index={index}
+      index={viewIndex}
       close={onClose}
-      slides={slides.map((s) => ({
-        src: s.src,
-        alt: s.filename,
-        title: s.filename,
-        attachmentId: s.id,
-      }))}
+      slides={lightboxSlides}
       labels={labels}
       plugins={
         single
@@ -157,7 +170,10 @@ export default function ImageGallery({
           if (slide.attachmentId) onDownload(slide.attachmentId);
         },
       }}
-      on={{ exited: onExited }}
+      on={{
+        view: ({ index: viewed }) => setCurrentId(slides[viewed]?.id),
+        exited: onExited,
+      }}
       {...(single ? { render: { buttonPrev: () => null, buttonNext: () => null } } : {})}
       {...(reduceMotion ? { animation: { fade: 0, swipe: 0, zoom: 0 } } : {})}
     />

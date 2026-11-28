@@ -2,7 +2,7 @@
 
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Suspense } from 'react';
+import { type ReactElement, Suspense } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { AttachmentThumbnail, LazyImageGallery } from '../image-gallery';
@@ -141,5 +141,31 @@ describe('<ImageGallery>', () => {
     renderGallery();
     await screen.findByRole('button', { name: 'gallery.labels.close' });
     expect(document.body.querySelector('[data-theme="glass-dark"]')).not.toBeNull();
+  });
+
+  it('stays on the viewed slide when slides are rebuilt or their URLs refresh', async () => {
+    const three = [...slides, { id: 'c1', src: 'https://blob.example/c.png', filename: 'c.png' }];
+    const onDownload = vi.fn();
+    const ui = (list: typeof three): ReactElement => (
+      <Suspense fallback={null}>
+        <LazyImageGallery
+          slides={list}
+          index={0}
+          onClose={vi.fn()}
+          onDownload={onDownload}
+          onExited={vi.fn()}
+        />
+      </Suspense>
+    );
+    const { rerender } = render(ui(three));
+    const next = await screen.findByRole('button', { name: 'gallery.labels.next' });
+    await userEvent.click(next);
+    await userEvent.click(screen.getByRole('button', { name: 'gallery.labels.download' }));
+    expect(onDownload).toHaveBeenLastCalledWith('b1');
+
+    rerender(ui(three.map((s) => ({ ...s }))));
+    rerender(ui(three.map((s) => ({ ...s, src: `${s.src}?v=2` }))));
+    await userEvent.click(screen.getByRole('button', { name: 'gallery.labels.download' }));
+    expect(onDownload).toHaveBeenLastCalledWith('b1');
   });
 });
