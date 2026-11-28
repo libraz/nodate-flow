@@ -1664,5 +1664,35 @@
         "body": "分享邀请链接并选择权限。"
       }
     }
+  },
+  "gallery": {
+    "open_preview": "预览 {filename}",
+    "too_large_hint": "图片较大，点击查看",
+    "load_failed": "无法加载图片",
+    "labels": {
+      "previous": "上一张",
+      "next": "下一张",
+      "close": "关闭",
+      "slide": "幻灯片",
+      "carousel": "轮播",
+      "lightbox": "图片查看器",
+      "photo_gallery": "图片",
+      "index_of_total": "{index} / {total}",
+      "zoom_in": "放大",
+      "zoom_out": "缩小",
+      "rotate_cw": "顺时针旋转",
+      "rotate_ccw": "逆时针旋转",
+      "enter_fullscreen": "进入全屏",
+      "exit_fullscreen": "退出全屏",
+      "play": "播放幻灯片",
+      "pause": "暂停幻灯片",
+      "download": "下载",
+      "thumbnails": "缩略图",
+      "show_thumbnails": "显示缩略图",
+      "hide_thumbnails": "隐藏缩略图",
+      "caption": "说明文字",
+      "show_captions": "显示说明文字",
+      "hide_captions": "隐藏说明文字"
+    }
   }
 }

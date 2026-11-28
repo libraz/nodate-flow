@@ -1664,5 +1664,35 @@
         "body": "Share an invite link and choose each person's role."
       }
     }
+  },
+  "gallery": {
+    "open_preview": "Preview {filename}",
+    "too_large_hint": "Large image — click to view",
+    "load_failed": "Could not load the image",
+    "labels": {
+      "previous": "Previous",
+      "next": "Next",
+      "close": "Close",
+      "slide": "Slide",
+      "carousel": "Carousel",
+      "lightbox": "Image viewer",
+      "photo_gallery": "Images",
+      "index_of_total": "{index} of {total}",
+      "zoom_in": "Zoom in",
+      "zoom_out": "Zoom out",
+      "rotate_cw": "Rotate clockwise",
+      "rotate_ccw": "Rotate counterclockwise",
+      "enter_fullscreen": "Enter full screen",
+      "exit_fullscreen": "Exit full screen",
+      "play": "Play slideshow",
+      "pause": "Pause slideshow",
+      "download": "Download",
+      "thumbnails": "Thumbnails",
+      "show_thumbnails": "Show thumbnails",
+      "hide_thumbnails": "Hide thumbnails",
+      "caption": "Caption",
+      "show_captions": "Show captions",
+      "hide_captions": "Hide captions"
+    }
   }
 }

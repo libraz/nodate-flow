@@ -1664,5 +1664,35 @@
         "body": "招待リンクを共有し、権限を選びます。"
       }
     }
+  },
+  "gallery": {
+    "open_preview": "{filename} をプレビュー",
+    "too_large_hint": "大きい画像です。クリックで表示",
+    "load_failed": "画像を読み込めませんでした",
+    "labels": {
+      "previous": "前へ",
+      "next": "次へ",
+      "close": "閉じる",
+      "slide": "スライド",
+      "carousel": "カルーセル",
+      "lightbox": "画像ビューア",
+      "photo_gallery": "画像",
+      "index_of_total": "{index} / {total}",
+      "zoom_in": "拡大",
+      "zoom_out": "縮小",
+      "rotate_cw": "右に回転",
+      "rotate_ccw": "左に回転",
+      "enter_fullscreen": "全画面表示",
+      "exit_fullscreen": "全画面を終了",
+      "play": "スライドショーを再生",
+      "pause": "スライドショーを一時停止",
+      "download": "ダウンロード",
+      "thumbnails": "サムネイル",
+      "show_thumbnails": "サムネイルを表示",
+      "hide_thumbnails": "サムネイルを非表示",
+      "caption": "キャプション",
+      "show_captions": "キャプションを表示",
+      "hide_captions": "キャプションを非表示"
+    }
   }
 }
