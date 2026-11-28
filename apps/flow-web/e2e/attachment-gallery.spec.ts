@@ -25,6 +25,9 @@ import {
   type TestTenant,
 } from './fixtures/tenant';
 
+/** Modules of the lazily loaded viewer; the dev server serves them by source path. */
+const GALLERY_CHUNK = /image-gallery\.tsx|yet-another-react-lightbox/;
+
 const CRC_TABLE = Array.from({ length: 256 }, (_, n) => {
   let c = n;
   for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
@@ -145,6 +148,11 @@ test.describe('attachment image gallery', () => {
       await setTheme(tenant, 'glass-light');
       await injectAuth(page.context(), tenant);
 
+      const galleryRequests: string[] = [];
+      page.on('request', (req) => {
+        if (GALLERY_CHUNK.test(req.url())) galleryRequests.push(req.url());
+      });
+
       await page.goto(`/tasks/${task.id}`);
       await expect(page.locator('html')).toHaveAttribute('data-theme', 'glass-light', {
         timeout: 15_000,
@@ -177,10 +185,13 @@ test.describe('attachment image gallery', () => {
       await expect(thumbs).toHaveCount(2);
       const opener = thumbs.nth(1);
       const openerName = (await opener.getAttribute('aria-label')) ?? '';
+      // The viewer chunk is not fetched until a thumbnail is clicked.
+      expect(galleryRequests).toEqual([]);
       await opener.click();
 
       const dialog = page.getByRole('dialog');
       await expect(dialog).toBeVisible();
+      await expect.poll(() => galleryRequests.length).toBeGreaterThan(0);
       const counter = dialog.locator('.yarl__counter');
       const total = 2;
       await expect(counter).toHaveText(`2 / ${total}`);
@@ -202,6 +213,20 @@ test.describe('attachment image gallery', () => {
       ]) {
         await expect(dialog.getByRole('button', { name, exact: true })).toBeVisible();
       }
+      // Thumbnail strip (no toolbar toggle is configured), and the counter.
+      await expect(dialog.locator('.yarl__thumbnails_container')).toBeVisible();
+      await expect(counter).toBeVisible();
+
+      // Download requests the task download API for the opened attachment.
+      const downloadRequest = page.waitForRequest((req) =>
+        /\/tasks\/[^/]+\/attachments\/[^/]+\/download/.test(req.url()),
+      );
+      const popup = page.waitForEvent('popup');
+      await dialog.getByRole('button', { name: labels.download, exact: true }).click();
+      await downloadRequest;
+      await (await popup).close();
+      // Return to the tab the way a user would before using the keyboard again.
+      await page.bringToFront();
       if (locale === 'ja') {
         for (const en of ['Previous', 'Next', 'Close', 'Zoom in', 'Download']) {
           await expect(dialog.getByRole('button', { name: en, exact: true })).toHaveCount(0);
@@ -274,8 +299,66 @@ test.describe('attachment image gallery', () => {
     await dialog.getByRole('button', { name: labels.previous, exact: true }).click();
     await expect(dialog.locator('.yarl__counter')).toHaveText('1 / 2');
 
+    const downloadRequest = page.waitForRequest((req) =>
+      /\/calendars\/[^/]+\/events\/[^/]+\/attachments\/[^/]+\/download/.test(req.url()),
+    );
+    const popup = page.waitForEvent('popup');
+    await dialog.getByRole('button', { name: labels.download, exact: true }).click();
+    await downloadRequest;
+    await (await popup).close();
+
     await page.keyboard.press('Escape');
     await expect(dialog).toHaveCount(0);
     await expect(panel.getByRole('button', { name: openerName, exact: true })).toBeFocused();
+  });
+
+  test('task: HTML declared as image/png is served as an image and runs no script', async ({
+    page,
+  }) => {
+    tenant = await createTestTenant();
+    const task = await createTask(tenant, 'Gallery sniff task');
+    await injectAuth(page.context(), tenant);
+    await page.goto(`/tasks/${task.id}`);
+    const panel = page.locator('#main-content');
+    await uploadAll(panel, [
+      {
+        name: 'sniff.png',
+        mimeType: 'image/png',
+        buffer: Buffer.from(
+          "<html><head><title>pwned</title><script>document.title='x'</script></head></html>",
+        ),
+      },
+    ]);
+
+    // The bytes cannot decode, so the row drops its thumbnail; ask the API for the preview URL directly.
+    const authHeaders = {
+      accept: 'application/json',
+      authorization: `Bearer ${tenant.accessToken}`,
+    };
+    const listRes = await fetch(`${API_BASE_URL}/tasks/${task.id}/attachments`, {
+      headers: authHeaders,
+    });
+    expect(listRes.status).toBe(200);
+    const list = (await listRes.json()) as { attachments: { id: string; previewable: boolean }[] };
+    expect(list.attachments).toHaveLength(1);
+    const [attachment] = list.attachments;
+    expect(attachment?.previewable).toBe(true);
+    const previewRes = await fetch(
+      `${API_BASE_URL}/tasks/${task.id}/attachments/${attachment?.id}/preview`,
+      { headers: authHeaders },
+    );
+    expect(previewRes.status).toBe(200);
+    const src = ((await previewRes.json()) as { previewUrl: string }).previewUrl;
+    expect(new URL(src).pathname).toMatch(/\/blobs\//);
+
+    const top = await page.context().newPage();
+    const response = await top.goto(src);
+    expect(response?.headers()['content-type']).toBe('image/png');
+    expect(response?.headers()['x-content-type-options']).toBe('nosniff');
+    expect(await top.evaluate(() => document.contentType)).toBe('image/png');
+    const title = await top.title();
+    expect(title).not.toBe('x');
+    expect(title).not.toBe('pwned');
+    await top.close();
   });
 });
