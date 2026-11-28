@@ -11,6 +11,7 @@
   --nf-color-surface: oklch(24.04% 0.0064 78.2);
   --nf-color-surface-hover: oklch(27.45% 0.0085 75.24);
   --nf-color-overlay: oklch(0% 0 0 / 0.62);
+  --nf-color-media-backdrop: oklch(10% 0 0 / 0.92);
 
   --nf-color-fg: oklch(92.14% 0.0206 81.78);
   --nf-color-fg-muted: oklch(71.8% 0.0281 82.35);
