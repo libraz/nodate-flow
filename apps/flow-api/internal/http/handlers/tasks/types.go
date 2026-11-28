@@ -232,6 +232,7 @@ type TaskAttachment struct {
 	ByteSize            uint64 `json:"byteSize"`
 	StorageKey          string `json:"storageKey"`
 	ChecksumSHA256      string `json:"checksumSha256,omitempty"`
+	Previewable         bool   `json:"previewable" doc:"Whether the attachment is a raster image that can be previewed inline"`
 	UpdatedAt           *int64 `json:"updatedAt,omitempty"`
 	CreatedAt           int64  `json:"createdAt"`
 }
@@ -1002,6 +1003,23 @@ type DownloadAttachmentOutputBody struct {
 // DownloadAttachmentOutput is the response for GET /tasks/{id}/attachments/{aid}/download.
 type DownloadAttachmentOutput struct {
 	Body DownloadAttachmentOutputBody
+}
+
+// PreviewAttachmentInput is the path for GET /tasks/{id}/attachments/{aid}/preview.
+type PreviewAttachmentInput struct {
+	ID  string `path:"id"`
+	AID string `path:"aid"`
+}
+
+// PreviewAttachmentOutputBody is the response body for preview.
+type PreviewAttachmentOutputBody struct {
+	PreviewURL string `json:"previewUrl" doc:"Signed URL on this API's blob relay that serves the image inline"`
+	ExpiresAt  int64  `json:"expiresAt" doc:"Unix seconds after which the URL is refused"`
+}
+
+// PreviewAttachmentOutput is the response for GET /tasks/{id}/attachments/{aid}/preview.
+type PreviewAttachmentOutput struct {
+	Body PreviewAttachmentOutputBody
 }
 
 // ---- Archive I/O ----------------------------------------------------------

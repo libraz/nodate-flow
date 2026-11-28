@@ -1315,6 +1315,10 @@
           "id": {
             "type": "string"
           },
+          "previewable": {
+            "description": "True when the preview endpoint can serve this file inline (allowlisted raster image)",
+            "type": "boolean"
+          },
           "storageKey": {
             "type": "string"
           },
@@ -1336,7 +1340,8 @@
           "storageKey",
           "uploaderId",
           "uploaderName",
-          "createdAt"
+          "createdAt",
+          "previewable"
         ],
         "type": "object"
       },
@@ -9507,6 +9512,52 @@
         "required": ["storageKey", "attachmentId", "deduplicated"],
         "type": "object"
       },
+      "PreviewAttachmentOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/PreviewAttachmentOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "expiresAt": {
+            "description": "Unix seconds after which the URL is refused",
+            "format": "int64",
+            "type": "integer"
+          },
+          "previewUrl": {
+            "description": "Signed URL on this API's blob relay that serves the image inline",
+            "type": "string"
+          }
+        },
+        "required": ["previewUrl", "expiresAt"],
+        "type": "object"
+      },
+      "PreviewCalendarAttachmentOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/PreviewCalendarAttachmentOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "expiresAt": {
+            "description": "Unix seconds at which the URL stops working",
+            "format": "int64",
+            "type": "integer"
+          },
+          "previewUrl": {
+            "description": "Signed GET URL on the API; the image is served inline",
+            "type": "string"
+          }
+        },
+        "required": ["previewUrl", "expiresAt"],
+        "type": "object"
+      },
       "Project": {
         "additionalProperties": false,
         "properties": {
@@ -12234,6 +12285,10 @@
           "id": {
             "type": "string"
           },
+          "previewable": {
+            "description": "Whether the attachment is a raster image that can be previewed inline",
+            "type": "boolean"
+          },
           "storageKey": {
             "type": "string"
           },
@@ -12259,6 +12314,7 @@
           "contentType",
           "byteSize",
           "storageKey",
+          "previewable",
           "createdAt"
         ],
         "type": "object"
@@ -20944,6 +21000,59 @@
         "tags": ["Tasks"]
       }
     },
+    "/tasks/{id}/attachments/{aid}/preview": {
+      "get": {
+        "description": "Returns a signed URL on this API's blob relay that serves the file inline, for allowlisted raster images only (PNG, JPEG, GIF, WebP, AVIF). The URL is valid for 15 to 30 minutes. Any other type answers 415 VALIDATION.FILE.NOT_PREVIEWABLE.",
+        "operationId": "tasks-attachments-preview",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "aid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewAttachmentOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Get a signed inline preview URL for an image attachment",
+        "tags": ["Tasks"]
+      }
+    },
     "/tasks/{id}/comments": {
       "get": {
         "description": "Returns the comments on the task in chronological order with reaction counts. Cursor-paginated for long threads.",
@@ -27367,6 +27476,83 @@
           }
         ],
         "summary": "Get a signed download URL for an attachment",
+        "tags": ["Calendar"]
+      }
+    },
+    "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attachments/{attId}/preview": {
+      "get": {
+        "description": "Returns a signed URL on this API's blob relay that serves the file inline, for allowlisted raster images only (PNG, JPEG, GIF, WebP, AVIF). The URL is valid for 15 to 30 minutes. Any other type answers 415 VALIDATION.FILE.NOT_PREVIEWABLE. Each call writes a calendar.attachment.preview audit row.",
+        "operationId": "attachments-preview",
+        "parameters": [
+          {
+            "description": "Workspace public ID",
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "description": "Workspace public ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Calendar public ID",
+            "in": "path",
+            "name": "calId",
+            "required": true,
+            "schema": {
+              "description": "Calendar public ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Event public ID",
+            "in": "path",
+            "name": "evtId",
+            "required": true,
+            "schema": {
+              "description": "Event public ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Attachment public ID",
+            "in": "path",
+            "name": "attId",
+            "required": true,
+            "schema": {
+              "description": "Attachment public ID",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewCalendarAttachmentOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Get a signed inline preview URL for an image attachment",
         "tags": ["Calendar"]
       }
     },

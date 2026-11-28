@@ -257,6 +257,7 @@
   "VALIDATION.BODY.FIELD_MISSING": "リクエストボディに必須フィールドがありません",
   "VALIDATION.BODY.UNPARSEABLE": "リクエストボディを解析できませんでした",
   "VALIDATION.CHECKSUM.FORMAT_INVALID": "チェックサム形式が不正です。SHA-256 を 64 文字の 16 進数で送信してください。",
+  "VALIDATION.FILE.NOT_PREVIEWABLE": "このファイルはプレビューできません",
   "VALIDATION.FILE.TOO_LARGE": "ファイルサイズが上限を超えています",
   "VALIDATION.FILE.TYPE_NOT_ALLOWED": "許可されていないファイル形式です",
   "VALIDATION.PATH.PARAM_INVALID": "パスパラメータが不正です",

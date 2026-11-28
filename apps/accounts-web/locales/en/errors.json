@@ -257,6 +257,7 @@
   "VALIDATION.BODY.FIELD_MISSING": "A required field is missing in the request body",
   "VALIDATION.BODY.UNPARSEABLE": "Request body could not be parsed",
   "VALIDATION.CHECKSUM.FORMAT_INVALID": "Invalid checksum format. Expected SHA-256 as 64 hex characters.",
+  "VALIDATION.FILE.NOT_PREVIEWABLE": "This file cannot be previewed",
   "VALIDATION.FILE.TOO_LARGE": "File exceeds the maximum allowed size",
   "VALIDATION.FILE.TYPE_NOT_ALLOWED": "File type is not allowed",
   "VALIDATION.PATH.PARAM_INVALID": "A path parameter is invalid",

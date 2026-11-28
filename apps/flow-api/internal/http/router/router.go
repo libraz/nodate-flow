@@ -1583,6 +1583,14 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Tags:        []string{"Calendar"},
 		}, calendars.DownloadAttachment(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
+			OperationID: "attachments-preview",
+			Method:      http.MethodGet,
+			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attachments/{attId}/preview",
+			Summary:     "Get a signed inline preview URL for an image attachment",
+			Description: "Returns a signed URL on this API's blob relay that serves the file inline, for allowlisted raster images only (PNG, JPEG, GIF, WebP, AVIF). The URL is valid for 15 to 30 minutes. Any other type answers 415 VALIDATION.FILE.NOT_PREVIEWABLE. Each call writes a calendar.attachment.preview audit row.",
+			Tags:        []string{"Calendar"},
+		}, calendars.PreviewAttachment(shared.calDeps))
+		huma.Register(subAPI, huma.Operation{
 			OperationID: "attachments-confirm",
 			Method:      http.MethodPost,
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attachments/{attId}/confirm",

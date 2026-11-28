@@ -156,3 +156,49 @@ func DownloadAttachment(deps Deps) func(context.Context, *DownloadAttachmentInpu
 		}}, nil
 	}
 }
+
+// PreviewAttachment handles GET /tasks/{id}/attachments/{aid}/preview.
+// It returns a signed URL that serves an allowlisted raster image inline.
+// Like DownloadAttachment it writes no audit row.
+func PreviewAttachment(deps Deps) func(context.Context, *PreviewAttachmentInput) (*PreviewAttachmentOutput, error) {
+	return func(ctx context.Context, in *PreviewAttachmentInput) (*PreviewAttachmentOutput, error) {
+		if deps.Storage == nil {
+			return nil, httpErr(apierrors.InternalStorageNotConfigured)
+		}
+		ws, ok := middleware.WorkspaceFromContext(ctx)
+		if !ok {
+			return nil, httpErr(apierrors.WsTaskNotFound)
+		}
+		task, ok := middleware.TaskFromContext(ctx)
+		if !ok {
+			return nil, httpErr(apierrors.WsTaskNotFound)
+		}
+
+		aid, err := types.Parse(in.AID)
+		if err != nil {
+			return nil, httpErr(apierrors.ValidationPathParamInvalid)
+		}
+
+		row, err := deps.Queries.GetAttachmentByPublicID(ctx, generated.GetAttachmentByPublicIDParams{
+			WorkspaceID: ws.ID,
+			TaskID:      handlerutil.NullInt32From(task.ID),
+			PublicID:    aid,
+		})
+		if err != nil {
+			return nil, httpErr(apierrors.WsTaskNotFound)
+		}
+
+		previewURL, expiresAt, err := deps.Storage.SignedPreviewURL(row.StorageKey, row.Filename, row.ContentType)
+		if err != nil {
+			if stderrors.Is(err, storage.ErrNotPreviewable) {
+				return nil, httpErr(apierrors.ValidationFileNotPreviewable)
+			}
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+
+		return &PreviewAttachmentOutput{Body: PreviewAttachmentOutputBody{
+			PreviewURL: previewURL,
+			ExpiresAt:  expiresAt.Unix(),
+		}}, nil
+	}
+}

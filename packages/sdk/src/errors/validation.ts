@@ -31,6 +31,11 @@ export const ValidationErrors = {
     status: 400,
     message: "Invalid checksum format. Expected SHA-256 as 64 hex characters.",
   },
+  VALIDATION_FILE_NOT_PREVIEWABLE: {
+    code: "VALIDATION.FILE.NOT_PREVIEWABLE",
+    status: 415,
+    message: "This file cannot be previewed",
+  },
   VALIDATION_FILE_TOO_LARGE: {
     code: "VALIDATION.FILE.TOO_LARGE",
     status: 413,

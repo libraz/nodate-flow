@@ -83,6 +83,15 @@ resources:
         description: "Returned when the uploaded file exceeds the per-file size limit."
         userAction: "Reduce the file size and try again."
 
+      not_previewable:
+        code: VALIDATION.FILE.NOT_PREVIEWABLE
+        status: 415
+        message: "This file cannot be previewed"
+        message_ja: "このファイルはプレビューできません"
+        message_zh: "此文件无法预览"
+        description: "Returned when a preview URL is requested for an attachment whose content type is not one of the raster image types served inline (PNG, JPEG, GIF, WebP, AVIF)."
+        userAction: "Download the file instead."
+
   path:
     breadcrumb: "Validation > Path"
     errors:

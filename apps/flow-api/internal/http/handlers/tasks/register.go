@@ -207,6 +207,15 @@ func RegisterTaskScopedReads(api huma.API, deps Deps) {
 	}, DownloadAttachment(deps))
 
 	huma.Register(api, huma.Operation{
+		OperationID: "tasks-attachments-preview",
+		Method:      http.MethodGet,
+		Path:        "/tasks/{id}/attachments/{aid}/preview",
+		Summary:     "Get a signed inline preview URL for an image attachment",
+		Description: "Returns a signed URL on this API's blob relay that serves the file inline, for allowlisted raster images only (PNG, JPEG, GIF, WebP, AVIF). The URL is valid for 15 to 30 minutes. Any other type answers 415 VALIDATION.FILE.NOT_PREVIEWABLE.",
+		Tags:        []string{"Tasks"},
+	}, PreviewAttachment(deps))
+
+	huma.Register(api, huma.Operation{
 		OperationID: "tasks-description-history-list",
 		Method:      http.MethodGet,
 		Path:        "/tasks/{id}/description-history",

@@ -1866,6 +1866,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tasks/{id}/attachments/{aid}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a signed inline preview URL for an image attachment
+         * @description Returns a signed URL on this API's blob relay that serves the file inline, for allowlisted raster images only (PNG, JPEG, GIF, WebP, AVIF). The URL is valid for 15 to 30 minutes. Any other type answers 415 VALIDATION.FILE.NOT_PREVIEWABLE.
+         */
+        get: operations["tasks-attachments-preview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tasks/{id}/comments": {
         parameters: {
             query?: never;
@@ -3702,6 +3722,26 @@ export interface paths {
          * @description Returns a short-lived signed URL on this API's blob relay. The file is always served as an attachment of opaque bytes, never inline. Non-ASCII filenames are emitted in RFC 5987 form so they survive HTTP header transport.
          */
         get: operations["attachments-download"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attachments/{attId}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a signed inline preview URL for an image attachment
+         * @description Returns a signed URL on this API's blob relay that serves the file inline, for allowlisted raster images only (PNG, JPEG, GIF, WebP, AVIF). The URL is valid for 15 to 30 minutes. Any other type answers 415 VALIDATION.FILE.NOT_PREVIEWABLE. Each call writes a calendar.attachment.preview audit row.
+         */
+        get: operations["attachments-preview"];
         put?: never;
         post?: never;
         delete?: never;
@@ -6082,6 +6122,8 @@ export interface components {
             createdAt: number;
             filename: string;
             id: string;
+            /** @description True when the preview endpoint can serve this file inline (allowlisted raster image) */
+            previewable: boolean;
             storageKey: string;
             storageObjectId?: string;
             uploaderId: string;
@@ -9862,6 +9904,36 @@ export interface components {
             /** @description Signed upload URL served by this API. The sha256, size and content type are bound in the URL; PUT the file body with no extra headers. Empty when deduplicated=true. */
             uploadUrl?: string;
         };
+        PreviewAttachmentOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/PreviewAttachmentOutputBody.json
+             */
+            readonly $schema?: string;
+            /**
+             * Format: int64
+             * @description Unix seconds after which the URL is refused
+             */
+            expiresAt: number;
+            /** @description Signed URL on this API's blob relay that serves the image inline */
+            previewUrl: string;
+        };
+        PreviewCalendarAttachmentOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/PreviewCalendarAttachmentOutputBody.json
+             */
+            readonly $schema?: string;
+            /**
+             * Format: int64
+             * @description Unix seconds at which the URL stops working
+             */
+            expiresAt: number;
+            /** @description Signed GET URL on the API; the image is served inline */
+            previewUrl: string;
+        };
         Project: {
             /**
              * Format: uri
@@ -11108,6 +11180,8 @@ export interface components {
             createdAt: number;
             filename: string;
             id: string;
+            /** @description Whether the attachment is a raster image that can be previewed inline */
+            previewable: boolean;
             storageKey: string;
             storageObjectId?: string;
             /** Format: int64 */
@@ -15961,6 +16035,38 @@ export interface operations {
             };
         };
     };
+    "tasks-attachments-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                aid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreviewAttachmentOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "tasks-comments-list": {
         parameters: {
             query?: {
@@ -19720,6 +19826,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DownloadCalendarAttachmentOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "attachments-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+                /** @description Event public ID */
+                evtId: string;
+                /** @description Attachment public ID */
+                attId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreviewCalendarAttachmentOutputBody"];
                 };
             };
             /** @description Error */

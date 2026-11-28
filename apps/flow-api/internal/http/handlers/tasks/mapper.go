@@ -29,6 +29,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/storage"
 )
 
 // bytesToUUIDString / nullBytesToUUIDString / nullBytesToUUIDPtr /
@@ -489,6 +490,7 @@ func rowToAttachment(r generated.ListAttachmentsForTaskRow) TaskAttachment {
 		ByteSize:            r.ByteSize,
 		StorageKey:          r.StorageKey,
 		ChecksumSHA256:      hex.EncodeToString(r.Sha256),
+		Previewable:         storage.IsPreviewableImage(r.ContentType),
 		UpdatedAt:           nullTimeUnix(r.UpdatedAt),
 		CreatedAt:           r.CreatedAt.Unix(),
 	}

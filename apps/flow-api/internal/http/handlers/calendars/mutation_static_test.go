@@ -88,6 +88,7 @@ var writeOperationsWithoutMutationLog = map[string]string{
 // its method exempts it.
 var readOperationsRequiringMutationLog = map[string]string{
 	"attachments-download": "mints a presigned URL carrying the stored bytes to whoever holds it; the audit row is the only trace that the file left the workspace",
+	"attachments-preview":  "the inline signed URL also hands out the stored bytes as-is, so like download its audit row is the only trace of the file leaving",
 }
 
 func loadCalendarPackage(t *testing.T) *mutationguard.Analysis {

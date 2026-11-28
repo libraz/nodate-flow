@@ -52,6 +52,7 @@ type AttachmentResponse struct {
 	UploaderID      string `json:"uploaderId"`
 	UploaderName    string `json:"uploaderName"`
 	CreatedAt       int64  `json:"createdAt"`
+	Previewable     bool   `json:"previewable" doc:"True when the preview endpoint can serve this file inline (allowlisted raster image)"`
 }
 
 // ListAttachmentsOutput is the response for the list attachments endpoint.
@@ -105,6 +106,27 @@ type DownloadCalendarAttachmentOutputBody struct {
 // DownloadAttachmentOutput is the response for the download endpoint.
 type DownloadAttachmentOutput struct {
 	Body DownloadCalendarAttachmentOutputBody
+}
+
+// PreviewCalendarAttachmentInput is the input for the preview endpoint.
+type PreviewCalendarAttachmentInput struct {
+	WsID  string `path:"wsId" doc:"Workspace public ID"`
+	CalID string `path:"calId" doc:"Calendar public ID"`
+	EvtID string `path:"evtId" doc:"Event public ID"`
+	AttID string `path:"attId" doc:"Attachment public ID"`
+}
+
+// PreviewCalendarAttachmentOutputBody is the response body for the
+// calendar event attachment preview endpoint. The operation-specific name
+// avoids a schema collision with the tasks package.
+type PreviewCalendarAttachmentOutputBody struct {
+	PreviewURL string `json:"previewUrl" doc:"Signed GET URL on the API; the image is served inline"`
+	ExpiresAt  int64  `json:"expiresAt" doc:"Unix seconds at which the URL stops working"`
+}
+
+// PreviewCalendarAttachmentOutput is the response for the preview endpoint.
+type PreviewCalendarAttachmentOutput struct {
+	Body PreviewCalendarAttachmentOutputBody
 }
 
 // DeleteAttachmentInput is the input for soft-deleting an attachment.
@@ -165,6 +187,7 @@ func ListAttachments(deps Deps) func(context.Context, *ListAttachmentsInput) (*L
 				UploaderID:      handlerutil.PublicIDOrEmpty(r.UserPublicID),
 				UploaderName:    handlerutil.BylineDisplayName(r.DisplayName),
 				CreatedAt:       r.CreatedAt.Unix(),
+				Previewable:     storage.IsPreviewableImage(r.ContentType),
 			}
 		}
 		return out, nil
@@ -395,6 +418,71 @@ func DownloadAttachment(deps Deps) func(context.Context, *DownloadAttachmentInpu
 
 		out := &DownloadAttachmentOutput{}
 		out.Body.DownloadURL = downloadURL
+		return out, nil
+	}
+}
+
+// PreviewAttachment returns a signed inline GET URL for an allowlisted
+// raster image attachment. The URL hands out the stored bytes just as
+// download does, so it writes its own audit row.
+func PreviewAttachment(deps Deps) func(context.Context, *PreviewCalendarAttachmentInput) (*PreviewCalendarAttachmentOutput, error) {
+	return func(ctx context.Context, input *PreviewCalendarAttachmentInput) (*PreviewCalendarAttachmentOutput, error) {
+		if deps.Storage == nil {
+			return nil, httpErr(apierrors.InternalStorageNotConfigured)
+		}
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
+		if err != nil {
+			return nil, err
+		}
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
+		if err != nil {
+			return nil, err
+		}
+		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtID)
+		if err != nil {
+			return nil, err
+		}
+
+		attUID, err := uuid.Parse(input.AttID)
+		if err != nil {
+			return nil, httpErr(apierrors.CalendarAttachmentNotFound)
+		}
+
+		att, err := deps.CalendarQueries.FindCalendarEventAttachmentByPublicId(ctx, calendar.FindCalendarEventAttachmentByPublicIdParams{
+			PublicID:    types.FromUUID(attUID),
+			EventID:     handlerutil.NullInt32From(evt.ID),
+			WorkspaceID: wsID,
+		})
+		if err != nil {
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.CalendarAttachmentNotFound, apierrors.CalendarAttachmentStoreReadInterrupted))
+		}
+
+		previewURL, expiresAt, err := deps.Storage.SignedPreviewURL(att.StorageKey, att.Filename, att.ContentType)
+		if err != nil {
+			if stderrors.Is(err, storage.ErrNotPreviewable) {
+				return nil, httpErr(apierrors.ValidationFileNotPreviewable)
+			}
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+
+		// Audit only, for the same reason as download: the URL carries the
+		// stored bytes to whoever holds it.
+		attPubID := att.PublicID.String()
+		recordCalendarAudit(ctx, deps, wsID, actorID, mutationlog.Mutation{
+			AuditAction:  "calendar.attachment.preview",
+			ResourceType: "calendar.attachment",
+			ResourceID:   attPubID,
+			Payload: map[string]any{
+				"eventId":      input.EvtID,
+				"calendarId":   input.CalID,
+				"attachmentId": attPubID,
+			},
+			CallSite: "calendars.PreviewAttachment",
+		})
+
+		out := &PreviewCalendarAttachmentOutput{}
+		out.Body.PreviewURL = previewURL
+		out.Body.ExpiresAt = expiresAt.Unix()
 		return out, nil
 	}
 }
