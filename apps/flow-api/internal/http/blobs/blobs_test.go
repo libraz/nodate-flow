@@ -1,6 +1,7 @@
 package blobs_test
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/blobs"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/storage"
 )
 
@@ -135,4 +137,125 @@ func TestRelayKeyWithEscapedCharactersVerifies(t *testing.T) {
 	require.Contains(t, parsed.EscapedPath(), "a%20b")
 	resp, _ := do(t, http.MethodGet, u, "", nil, 0)
 	require.Equal(t, http.StatusServiceUnavailable, resp.StatusCode, "signature must verify for an escaped key")
+}
+
+const inlineCSP = "default-src 'none'; sandbox; frame-ancestors 'none'"
+
+var storedBody = []byte(strings.Repeat("0123456789", 10))
+
+// newStoredRelay mounts the relay behind the global security middleware, as the
+// router does, over a client that reads one fixed object from a stand-in S3
+// endpoint. The middleware sets its headers first, so a header the relay then
+// fails to override shows through here.
+func newStoredRelay(t *testing.T) (*httptest.Server, *storage.Signer) {
+	t.Helper()
+	modTime := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	s3 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Has("location") {
+			_, _ = io.WriteString(w, `<?xml version="1.0" encoding="UTF-8"?><LocationConstraint xmlns="http://s3.amazonaws.com/doc/2006-03-01/"></LocationConstraint>`)
+			return
+		}
+		w.Header().Set("ETag", `"fixed"`)
+		http.ServeContent(w, r, "", modTime, strings.NewReader(string(storedBody)))
+	}))
+	t.Cleanup(s3.Close)
+
+	signer := storage.NewSigner("", []byte("relay-unit-test-key"))
+	client, err := storage.NewClient(storage.Config{
+		Endpoint: strings.TrimPrefix(s3.URL, "http://"),
+		Bucket:   "test",
+		Signer:   signer,
+	})
+	require.NoError(t, err)
+
+	r := chi.NewRouter()
+	r.Use(middleware.SecurityHeaders())
+	r.Mount(storage.BlobPath, blobs.Handler(blobs.Deps{Storage: client, Signer: signer}))
+	srv := httptest.NewServer(r)
+	t.Cleanup(srv.Close)
+	signer.SetBase(srv.URL)
+	return srv, signer
+}
+
+func doWith(t *testing.T, method, target string, header map[string]string) (*http.Response, []byte) {
+	t.Helper()
+	req, err := http.NewRequest(method, target, nil)
+	require.NoError(t, err)
+	for k, v := range header {
+		req.Header.Set(k, v)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer func() { _ = resp.Body.Close() }()
+	raw, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	return resp, raw
+}
+
+func requireInlineHeaders(t *testing.T, resp *http.Response, contentType, filename string) {
+	t.Helper()
+	require.Equal(t, contentType, resp.Header.Get("Content-Type"))
+	require.Equal(t, storage.ContentDispositionInline(filename), resp.Header.Get("Content-Disposition"))
+	require.True(t, strings.HasPrefix(resp.Header.Get("Content-Disposition"), "inline; "))
+	require.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
+	// The security middleware's own policy must not survive on this response.
+	require.Equal(t, inlineCSP, resp.Header.Get("Content-Security-Policy"))
+	require.True(t, strings.HasPrefix(resp.Header.Get("Cache-Control"), "private, max-age="), resp.Header.Get("Cache-Control"))
+}
+
+func TestRelayInlineImageHeaders(t *testing.T) {
+	t.Parallel()
+	_, signer := newStoredRelay(t)
+	const key = "workspace/aa/obj"
+	// Alias and parameters normalize to the canonical type on the way out.
+	u, _, err := signer.PreviewURL(key, "写真 1.png", "IMAGE/X-PNG; charset=binary", time.Now())
+	require.NoError(t, err)
+
+	t.Run("200", func(t *testing.T) {
+		resp, body := doWith(t, http.MethodGet, u, nil)
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		requireInlineHeaders(t, resp, "image/png", "写真 1.png")
+		require.Equal(t, storedBody, body)
+	})
+	t.Run("206", func(t *testing.T) {
+		resp, body := doWith(t, http.MethodGet, u, map[string]string{"Range": "bytes=10-19"})
+		require.Equal(t, http.StatusPartialContent, resp.StatusCode)
+		requireInlineHeaders(t, resp, "image/png", "写真 1.png")
+		require.Equal(t, storedBody[10:20], body)
+		require.Equal(t, fmt.Sprintf("bytes 10-19/%d", len(storedBody)), resp.Header.Get("Content-Range"))
+	})
+	t.Run("HEAD", func(t *testing.T) {
+		resp, body := doWith(t, http.MethodHead, u, nil)
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		requireInlineHeaders(t, resp, "image/png", "写真 1.png")
+		require.Empty(t, body)
+	})
+}
+
+func TestRelayPlainDownloadKeepsAttachmentHeaders(t *testing.T) {
+	t.Parallel()
+	_, signer := newStoredRelay(t)
+	u, err := signer.DownloadURL("workspace/aa/obj", "a.png", time.Minute)
+	require.NoError(t, err)
+
+	resp, body := doWith(t, http.MethodGet, u, nil)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	require.Equal(t, "application/octet-stream", resp.Header.Get("Content-Type"))
+	require.Equal(t, storage.ContentDispositionAttachment("a.png"), resp.Header.Get("Content-Disposition"))
+	require.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
+	csp := resp.Header.Get("Content-Security-Policy")
+	require.True(t, strings.HasPrefix(csp, "default-src 'self'"), csp)
+	require.NotEqual(t, inlineCSP, csp)
+	require.Equal(t, storedBody, body)
+}
+
+func TestRelayRefusesInlineWrite(t *testing.T) {
+	t.Parallel()
+	_, signer := newRelay(t)
+	// A preview URL carries no size or digest and is bound to GET, so a PUT on
+	// it is turned away before storage is consulted.
+	u, _, err := signer.PreviewURL("workspace/aa/"+sha, "a.png", "image/png", time.Now())
+	require.NoError(t, err)
+	resp, _ := do(t, http.MethodPut, u, "image/png", strings.NewReader("x"), 1)
+	require.Equal(t, http.StatusForbidden, resp.StatusCode)
 }

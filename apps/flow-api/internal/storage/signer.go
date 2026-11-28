@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -23,7 +24,49 @@ var (
 	// ErrSignerUnconfigured means no signer or public base URL was given, so
 	// there is no address a browser could be sent to.
 	ErrSignerUnconfigured = errors.New("blob url base is not configured")
+	// ErrNotPreviewable means the media type is not in PreviewableImageTypes, so
+	// no inline URL is minted for it.
+	ErrNotPreviewable = errors.New("media type is not a previewable image")
 )
+
+// previewWindow is the span expiries of inline URLs are rounded to, so every
+// URL minted for one object within a window is the same string and the
+// browser's cache holds.
+const previewWindow = 15 * time.Minute
+
+// PreviewableImageTypes are the raster media types a read may be served inline
+// as. SVG is deliberately absent: opened as a page it runs script.
+var PreviewableImageTypes = []string{
+	"image/png", "image/jpeg", "image/gif", "image/webp", "image/avif",
+}
+
+var previewableAliases = map[string]string{
+	"image/jpg":   "image/jpeg",
+	"image/pjpeg": "image/jpeg",
+	"image/x-png": "image/png",
+}
+
+// NormalizePreviewableType returns the canonical media type for contentType and
+// whether it is in PreviewableImageTypes. Parameters, case and surrounding
+// space are dropped and the common aliases are mapped to their canonical name.
+func NormalizePreviewableType(contentType string) (string, bool) {
+	base, _, _ := strings.Cut(contentType, ";")
+	base = strings.ToLower(strings.TrimSpace(base))
+	if canon, ok := previewableAliases[base]; ok {
+		base = canon
+	}
+	if !slices.Contains(PreviewableImageTypes, base) {
+		return "", false
+	}
+	return base, true
+}
+
+// IsPreviewableImage reports whether contentType normalizes into
+// PreviewableImageTypes.
+func IsPreviewableImage(contentType string) bool {
+	_, ok := NormalizePreviewableType(contentType)
+	return ok
+}
 
 // BlobPath is where the relay is mounted. The signer builds it into every URL
 // it mints, so the route and the URLs cannot drift apart.
@@ -68,6 +111,9 @@ type Grant struct {
 	Sha256Hex string
 	// Filename is the name a downloaded object is saved under.
 	Filename string
+	// Inline marks a read that is served as its own image type instead of an
+	// attachment. When set, ContentType is one of PreviewableImageTypes.
+	Inline bool
 	// ExpiresAt is when the URL stops being accepted. Set by Verify and unused
 	// when minting.
 	ExpiresAt time.Time
@@ -86,6 +132,28 @@ func (s *Signer) DownloadURL(key, filename string, expires time.Duration) (strin
 		exp:   time.Now().Add(expires).Unix(),
 		Grant: Grant{Filename: filename},
 	})
+}
+
+// PreviewURL returns a URL that reads the object inline as contentType, which
+// must normalize into PreviewableImageTypes or ErrNotPreviewable is returned.
+//
+// The expiry is rounded to a 15 minute window and lands 15 to 30 minutes after
+// now, so repeated calls within a window return the same URL.
+func (s *Signer) PreviewURL(key, filename, contentType string, now time.Time) (string, time.Time, error) {
+	ct, ok := NormalizePreviewableType(contentType)
+	if !ok {
+		return "", time.Time{}, ErrNotPreviewable
+	}
+	window := int64(previewWindow / time.Second)
+	exp := (now.Unix()/window + 2) * window
+	u, err := s.mint("GET", key, params{
+		exp:   exp,
+		Grant: Grant{ContentType: ct, Filename: filename, Inline: true},
+	})
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	return u, time.Unix(exp, 0), nil
 }
 
 // PutURL returns a URL that writes exactly byteSize bytes of contentType whose
@@ -113,6 +181,10 @@ func (s *Signer) PutURL(key, contentType string, byteSize int64, sha256Hex strin
 //
 // Every field of the transfer is signed, so a caller cannot widen it by editing
 // the URL. method is the signed method: GET for both GET and HEAD.
+//
+// An inline read is only accepted for an exact PreviewableImageTypes member, and
+// a plain read carries no media type, so no combination the signer never issues
+// is honoured even when its signature is good.
 func (s *Signer) Verify(method, key string, q url.Values, now time.Time) (Grant, error) {
 	exp, err := strconv.ParseInt(q.Get("exp"), 10, 64)
 	if err != nil {
@@ -124,6 +196,13 @@ func (s *Signer) Verify(method, key string, q url.Values, now time.Time) (Grant,
 			return Grant{}, ErrURLInvalid
 		}
 	}
+	inline := false
+	if vals, ok := q["inl"]; ok {
+		if len(vals) != 1 || vals[0] != "1" {
+			return Grant{}, ErrURLInvalid
+		}
+		inline = true
+	}
 	p := params{
 		exp: exp,
 		Grant: Grant{
@@ -131,12 +210,21 @@ func (s *Signer) Verify(method, key string, q url.Values, now time.Time) (Grant,
 			ByteSize:    byteSize,
 			Sha256Hex:   q.Get("sha"),
 			Filename:    q.Get("fn"),
+			Inline:      inline,
 		},
 	}
 
 	// Constant time: a comparison that stops at the first wrong byte reports
 	// how much of a guess was right.
 	if !hmac.Equal([]byte(s.sign(method, key, p)), []byte(q.Get("sig"))) {
+		return Grant{}, ErrURLInvalid
+	}
+	switch {
+	case inline && method != "GET":
+		return Grant{}, ErrURLInvalid
+	case inline && !slices.Contains(PreviewableImageTypes, p.ContentType):
+		return Grant{}, ErrURLInvalid
+	case !inline && method == "GET" && p.ContentType != "":
 		return Grant{}, ErrURLInvalid
 	}
 	// Checked after the signature so an unsigned caller learns nothing from
@@ -167,13 +255,16 @@ func (s *Signer) mint(method, key string, p params) (string, error) {
 	if p.Filename != "" {
 		q.Set("fn", p.Filename)
 	}
+	if p.Inline {
+		q.Set("inl", "1")
+	}
 	q.Set("sig", s.sign(method, key, p))
 	return s.base + BlobPath + "/" + escapeKey(key) + "?" + q.Encode(), nil
 }
 
 func (s *Signer) sign(method, key string, p params) string {
 	mac := hmac.New(sha256.New, s.key)
-	mac.Write(canonical(
+	fields := []string{
 		method,
 		key,
 		strconv.FormatInt(p.exp, 10),
@@ -181,7 +272,13 @@ func (s *Signer) sign(method, key string, p params) string {
 		strconv.FormatInt(p.ByteSize, 10),
 		p.Sha256Hex,
 		p.Filename,
-	))
+	}
+	// A plain URL keeps its seven fields byte for byte so URLs issued before
+	// inline existed still verify; only an inline one adds the marker.
+	if p.Inline {
+		fields = append(fields, "inline")
+	}
+	mac.Write(canonical(fields...))
 	return hex.EncodeToString(mac.Sum(nil))
 }
 

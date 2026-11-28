@@ -96,6 +96,15 @@ func (c *Client) SignedDownloadURL(key, filename string, expires time.Duration) 
 	return c.signer.DownloadURL(key, filename, expires)
 }
 
+// SignedPreviewURL returns a URL the browser renders the object through inline
+// as contentType, or ErrNotPreviewable. See Signer.PreviewURL.
+func (c *Client) SignedPreviewURL(key, filename, contentType string) (string, time.Time, error) {
+	if c.signer == nil {
+		return "", time.Time{}, ErrSignerUnconfigured
+	}
+	return c.signer.PreviewURL(key, filename, contentType, time.Now())
+}
+
 // Object is an open object body. It is seekable so the relay can answer Range
 // requests without reading from the start.
 type Object struct {
@@ -236,9 +245,19 @@ func KeyForUser(userPublicIDHex, sha256Hex string) string {
 // browsers honour the percent-encoded UTF-8 parameter and render the
 // original Japanese / emoji / accented filename verbatim.
 func ContentDispositionAttachment(filename string) string {
+	return contentDisposition("attachment", filename)
+}
+
+// ContentDispositionInline formats the header like ContentDispositionAttachment
+// with the same filename handling, for a response the browser may render.
+func ContentDispositionInline(filename string) string {
+	return contentDisposition("inline", filename)
+}
+
+func contentDisposition(disposition, filename string) string {
 	ascii := asciiFallbackName(filename)
 	encoded := percentEncodeRFC5987(filename)
-	return fmt.Sprintf(`attachment; filename="%s"; filename*=UTF-8''%s`, ascii, encoded)
+	return fmt.Sprintf(`%s; filename="%s"; filename*=UTF-8''%s`, disposition, ascii, encoded)
 }
 
 // asciiFallbackName replaces every non-ASCII byte and every byte that is

@@ -10,9 +10,11 @@
 // handler that already decided the caller may touch this object. See
 // storage.Signer.
 //
-// Every read is served as an attachment of opaque bytes: the response comes from
+// A read is an attachment of opaque bytes by default: the response comes from
 // the API's own origin, so anything a browser would render or execute must never
-// be served as itself.
+// be served as itself. The one exception is a raster image on the storage
+// allowlist read through a URL signed as inline, which is served as its real
+// type under a sandboxing Content-Security-Policy.
 package blobs
 
 import (
@@ -28,6 +30,10 @@ import (
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/storage"
 )
+
+// inlineCSP is the policy on an inline image response: nothing may load or run
+// if the bytes are opened as a page, and the response cannot be framed.
+const inlineCSP = "default-src 'none'; sandbox; frame-ancestors 'none'"
 
 // Deps are the relay's collaborators.
 type Deps struct {
@@ -89,8 +95,16 @@ func read(deps Deps) http.HandlerFunc {
 		defer obj.Close()
 
 		w.Header().Set("X-Content-Type-Options", "nosniff")
-		w.Header().Set("Content-Type", "application/octet-stream")
-		w.Header().Set("Content-Disposition", storage.ContentDispositionAttachment(grant.Filename))
+		if grant.Inline {
+			// Verify has already limited ContentType to the image allowlist. Set
+			// here, after the global security middleware, so this policy wins.
+			w.Header().Set("Content-Type", grant.ContentType)
+			w.Header().Set("Content-Disposition", storage.ContentDispositionInline(grant.Filename))
+			w.Header().Set("Content-Security-Policy", inlineCSP)
+		} else {
+			w.Header().Set("Content-Type", "application/octet-stream")
+			w.Header().Set("Content-Disposition", storage.ContentDispositionAttachment(grant.Filename))
+		}
 		// Cached no longer than the URL is accepted: past the expiry the page
 		// can no longer re-fetch to revalidate.
 		if maxAge := int(time.Until(grant.ExpiresAt).Seconds()); maxAge > 0 {
@@ -115,9 +129,9 @@ func write(deps Deps) http.HandlerFunc {
 			http.Error(w, "object storage is not configured", http.StatusServiceUnavailable)
 			return
 		}
-		// The signer never mints a write without a size and digest; a signature
-		// that covers neither is not one this handler will carry out.
-		if grant.ByteSize <= 0 || grant.Sha256Hex == "" {
+		// The signer never mints a write without a size and digest, nor an inline
+		// one; a signature that is either is not one this handler will carry out.
+		if grant.Inline || grant.ByteSize <= 0 || grant.Sha256Hex == "" {
 			http.Error(w, "forbidden", http.StatusForbidden)
 			return
 		}
