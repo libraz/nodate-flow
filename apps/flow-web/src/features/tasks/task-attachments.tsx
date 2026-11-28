@@ -7,15 +7,25 @@ import Button from '@nodate-flow/ui/primitives/button';
 import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import motion from '@nodate-flow/ui/styles/list-motion.module.css';
+import { useQueries, useQueryClient } from '@tanstack/react-query';
 import { Paperclip, Upload } from 'lucide-react';
-import { type ChangeEvent, type ReactElement, useRef } from 'react';
+import { type ChangeEvent, type ReactElement, Suspense, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import {
+  AttachmentFileSlot,
+  AttachmentThumbnail,
+  GALLERY_REFRESH_MS,
+  LazyImageGallery,
+  MAX_AUTO_PREVIEW_BYTES,
+} from '../../components/image-gallery';
 import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import { formatBytes } from '../../lib/format-bytes';
 import {
+  attachmentPreviewQueryOptions,
   fetchDownloadUrl,
   type TaskAttachment,
+  useAttachmentPreview,
   useDeleteAttachment,
   useListAttachments,
   usePresignUpload,
@@ -28,14 +38,69 @@ interface TaskAttachmentsProps {
   taskId: string;
 }
 
+/** Remaining lifetime under which a failed thumbnail load is retried with a fresh URL. */
+const PREVIEW_RETRY_WINDOW_MS = 60_000;
+
+function RowThumbnail({
+  attachment,
+  taskId,
+  onOpen,
+}: {
+  attachment: TaskAttachment;
+  taskId: string;
+  onOpen: (attachmentId: string, button: HTMLButtonElement) => void;
+}): ReactElement {
+  const oversized = attachment.byteSize > MAX_AUTO_PREVIEW_BYTES;
+  const preview = useAttachmentPreview(taskId, attachment.id, attachment.previewable && !oversized);
+  const [failed, setFailed] = useState(false);
+  const [retried, setRetried] = useState(false);
+
+  if (!attachment.previewable) return <AttachmentFileSlot />;
+
+  const handleImageError = async (): Promise<void> => {
+    const current = preview.data;
+    const nearExpiry =
+      current !== undefined && current.expiresAt * 1000 - Date.now() < PREVIEW_RETRY_WINDOW_MS;
+    if (retried || !nearExpiry) {
+      setFailed(true);
+      return;
+    }
+    setRetried(true);
+    const result = await preview.refetch();
+    // The same URL within one expiry window cannot load any better.
+    if (result.data === undefined || result.data.previewUrl === current.previewUrl) {
+      setFailed(true);
+    }
+  };
+
+  let status: 'loading' | 'ready' | 'unavailable' | 'oversized' = 'ready';
+  if (oversized) status = 'oversized';
+  else if (failed || preview.isError) status = 'unavailable';
+  else if (preview.data === undefined) status = 'loading';
+
+  return (
+    <AttachmentThumbnail
+      filename={attachment.filename}
+      status={status}
+      {...(preview.data ? { src: preview.data.previewUrl } : {})}
+      onImageError={() => {
+        void handleImageError();
+      }}
+      onOpen={(button) => onOpen(attachment.id, button)}
+    />
+  );
+}
+
 function AttachmentRow({
   attachment,
   taskId,
   locale,
+  onOpenPreview,
 }: {
   attachment: TaskAttachment;
   taskId: string;
   locale: string;
+  onOpenPreview: (attachmentId: string, button: HTMLButtonElement) => void;
 }): ReactElement {
   const { t } = useTranslation('common');
   const deleteAttachment = useDeleteAttachment();
@@ -70,6 +135,7 @@ function AttachmentRow({
 
   return (
     <div className={css.row}>
+      <RowThumbnail attachment={attachment} taskId={taskId} onOpen={onOpenPreview} />
       <div className={css.rowBody}>
         <span title={attachment.filename} className={css.filename}>
           {attachment.filename}
@@ -113,6 +179,49 @@ function AttachmentRow({
   );
 }
 
+interface GalleryImage {
+  id: string;
+  filename: string;
+}
+
+function TaskGallery({
+  taskId,
+  images,
+  index,
+  onClose,
+  onDownload,
+  onExited,
+}: {
+  taskId: string;
+  images: GalleryImage[];
+  index: number;
+  onClose: () => void;
+  onDownload: (id: string) => void;
+  onExited: () => void;
+}): ReactElement {
+  const results = useQueries({
+    queries: images.map((image) => ({
+      ...attachmentPreviewQueryOptions(taskId, image.id),
+      refetchInterval: GALLERY_REFRESH_MS,
+    })),
+  });
+  const slides = images.flatMap((image, i) => {
+    const src = results[i]?.data?.previewUrl;
+    return src ? [{ id: image.id, src, filename: image.filename }] : [];
+  });
+  return (
+    <Suspense fallback={null}>
+      <LazyImageGallery
+        slides={slides}
+        index={index}
+        onClose={onClose}
+        onDownload={onDownload}
+        onExited={onExited}
+      />
+    </Suspense>
+  );
+}
+
 /** Attachment list panel for the task detail view with file upload. */
 export default function TaskAttachments({ taskId }: TaskAttachmentsProps): ReactElement {
   const { t, i18n } = useTranslation('common');
@@ -121,6 +230,41 @@ export default function TaskAttachments({ taskId }: TaskAttachmentsProps): React
   const presignUpload = usePresignUpload();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { entries, onExited } = usePresenceList(attachments, (a) => a.id);
+  const queryClient = useQueryClient();
+  const [gallery, setGallery] = useState<{ images: GalleryImage[]; index: number } | null>(null);
+  const openerRef = useRef<HTMLButtonElement | null>(null);
+
+  const handleOpenPreview = async (
+    attachmentId: string,
+    button: HTMLButtonElement,
+  ): Promise<void> => {
+    const candidates = attachments.filter((a) => a.previewable);
+    const settled = await Promise.allSettled(
+      candidates.map((a) => queryClient.fetchQuery(attachmentPreviewQueryOptions(taskId, a.id))),
+    );
+    const images = candidates
+      .filter((_, i) => settled[i]?.status === 'fulfilled')
+      .map((a) => ({ id: a.id, filename: a.filename }));
+    const index = images.findIndex((image) => image.id === attachmentId);
+    if (index < 0) {
+      toaster.show({ tone: 'danger', message: t('gallery.load_failed') });
+      return;
+    }
+    openerRef.current = button;
+    setGallery({ images, index });
+  };
+
+  const handleGalleryDownload = async (attachmentId: string): Promise<void> => {
+    try {
+      const url = await fetchDownloadUrl(taskId, attachmentId);
+      window.open(url, '_blank');
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'tasks.errors.update_failed'),
+      });
+    }
+  };
 
   const handleFileChange = async (e: ChangeEvent<HTMLInputElement>): Promise<void> => {
     const file = e.target.files?.[0];
@@ -198,10 +342,29 @@ export default function TaskAttachments({ taskId }: TaskAttachmentsProps): React
             onExited={() => onExited(key)}
             className={motion.enter}
           >
-            <AttachmentRow attachment={a} taskId={taskId} locale={locale} />
+            <AttachmentRow
+              attachment={a}
+              taskId={taskId}
+              locale={locale}
+              onOpenPreview={(id, button) => {
+                void handleOpenPreview(id, button);
+              }}
+            />
           </PresenceItem>
         ))}
       </ul>
+      {gallery ? (
+        <TaskGallery
+          taskId={taskId}
+          images={gallery.images}
+          index={gallery.index}
+          onClose={() => setGallery(null)}
+          onDownload={(id) => {
+            void handleGalleryDownload(id);
+          }}
+          onExited={() => openerRef.current?.focus()}
+        />
+      ) : null}
     </section>
   );
 }

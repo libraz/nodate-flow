@@ -1,0 +1,90 @@
+/* Attachment thumbnail slot: contact-sheet chip shared by buttons and inert slots. */
+
+.slot {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  inline-size: 56px;
+  block-size: 56px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--nf-radius-md);
+  overflow: hidden;
+  background: var(--nf-color-bg-sunken);
+}
+
+/* Hairline above the image so a white photo edge still reads on a light surface. */
+.slot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px var(--nf-color-hairline);
+  pointer-events: none;
+}
+
+.icon {
+  color: var(--nf-color-fg-subtle);
+}
+
+.fill {
+  inline-size: 100%;
+  block-size: 100%;
+  border-radius: inherit;
+}
+
+.image {
+  inline-size: 100%;
+  block-size: 100%;
+  display: block;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity var(--nf-duration-fast) var(--nf-ease-out);
+}
+
+.image[data-loaded] {
+  opacity: 1;
+}
+
+.button {
+  cursor: zoom-in;
+  transition: box-shadow var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.button .image {
+  transition:
+    opacity var(--nf-duration-fast) var(--nf-ease-out),
+    transform var(--nf-duration-base) var(--nf-ease-emphasized);
+}
+
+@media (hover: hover) {
+  .button:hover {
+    box-shadow: var(--nf-shadow-sm);
+  }
+
+  .button:hover .image {
+    transform: scale(1.04);
+  }
+}
+
+.button:active .image {
+  transform: scale(0.98);
+}
+
+.button:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .button,
+  .button .image {
+    transition: none;
+  }
+
+  .button:hover .image,
+  .button:active .image {
+    transform: none;
+  }
+}

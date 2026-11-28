@@ -46,6 +46,7 @@ import type { components, operations } from '@nodate-flow/sdk';
 import {
   type InfiniteData,
   type QueryKey,
+  queryOptions,
   type UseMutationResult,
   type UseQueryResult,
   type UseSuspenseInfiniteQueryResult,
@@ -79,6 +80,7 @@ export type AddActorInput = components['schemas']['AddTaskActorBody'];
 export type TaskActorRole = AddActorInput['role'];
 export type PresignUploadInput = components['schemas']['PresignUploadBody'];
 export type PresignUploadResult = components['schemas']['PresignUploadOutputBody'];
+export type AttachmentPreviewResult = components['schemas']['PreviewAttachmentOutputBody'];
 export type DownloadAttachmentResult = components['schemas']['DownloadAttachmentOutputBody'];
 
 /** Backend `derived_state` enum (see sql/flow/tables/tasks.sql). */
@@ -1560,6 +1562,37 @@ export async function fetchDownloadUrl(taskId: string, attachmentId: string): Pr
     'Failed to get download URL',
   );
   return data.downloadUrl;
+}
+
+/**
+ * Signed inline preview URL for an image attachment. Keyed outside the list
+ * key so list refreshes do not refetch every preview; stale once fewer than
+ * ten minutes remain.
+ */
+export function attachmentPreviewQueryOptions(taskId: string, attachmentId: string) {
+  return queryOptions({
+    queryKey: [...tasksKeys.all, 'attachment-preview', taskId, attachmentId] as const,
+    queryFn: async (): Promise<AttachmentPreviewResult> =>
+      apiRequest(
+        (client) =>
+          client.GET('/tasks/{id}/attachments/{aid}/preview', {
+            params: { path: { id: taskId, aid: attachmentId } },
+          }),
+        'Failed to get preview URL',
+      ),
+    staleTime: (query) =>
+      query.state.data ? Math.max(0, (query.state.data.expiresAt - 600) * 1000 - Date.now()) : 0,
+    retry: 1,
+  });
+}
+
+/** Preview URL for one attachment thumbnail; idle while `enabled` is false. */
+export function useAttachmentPreview(
+  taskId: string,
+  attachmentId: string,
+  enabled: boolean,
+): UseQueryResult<AttachmentPreviewResult> {
+  return useQuery({ ...attachmentPreviewQueryOptions(taskId, attachmentId), enabled });
 }
 
 export interface DeleteAttachmentArgs {

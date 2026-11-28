@@ -1,0 +1,79 @@
+/* Gallery theming: YARL variables mapped to design tokens, scoped to the portal container. */
+
+.root {
+  --yarl__portal_zindex: var(--nf-z-popover);
+  --yarl__color_backdrop: var(--nf-color-media-backdrop);
+  --yarl__color_button: var(--nf-color-fg-muted);
+  --yarl__color_button_active: var(--nf-color-fg);
+  --yarl__color_button_disabled: var(--nf-color-fg-subtle);
+  --yarl__button_filter: none;
+  --yarl__button_padding: var(--nf-space-2);
+  --yarl__button_margin: var(--nf-space-0-5);
+  --yarl__icon_size: 22px;
+  --yarl__toolbar_padding: var(--nf-space-2);
+  --yarl__counter_color: var(--nf-color-fg-muted);
+  --yarl__counter_filter: none;
+  --yarl__counter_padding: var(--nf-space-3) var(--nf-space-4);
+  --yarl__slide_title_color: var(--nf-color-fg);
+  --yarl__slide_title_font_size: var(--nf-text-sm);
+  --yarl__slide_title_font_weight: var(--nf-weight-medium);
+  --yarl__slide_captions_container_background: var(--nf-color-media-backdrop);
+  --yarl__slide_captions_container_padding: var(--nf-space-3) var(--nf-space-4);
+  --yarl__slide_icon_loading_color: var(--nf-color-fg-subtle);
+  --yarl__slide_icon_error_color: var(--nf-color-danger);
+  --yarl__thumbnails_container_background_color: transparent;
+  --yarl__thumbnails_container_padding: var(--nf-space-3);
+  --yarl__thumbnails_thumbnail_width: 64px;
+  --yarl__thumbnails_thumbnail_height: 64px;
+  --yarl__thumbnails_thumbnail_gap: var(--nf-space-2);
+  --yarl__thumbnails_thumbnail_padding: 0;
+  --yarl__thumbnails_thumbnail_border_radius: var(--nf-radius-md);
+  --yarl__thumbnails_thumbnail_border: 1px;
+  --yarl__thumbnails_thumbnail_border_color: var(--nf-color-hairline);
+  --yarl__thumbnails_thumbnail_active_border_color: var(--nf-color-accent);
+  --yarl__thumbnails_thumbnail_background: var(--nf-color-bg-sunken);
+  --yarl__thumbnails_thumbnail_focus_box_shadow: var(--nf-shadow-focus);
+  --yarl__thumbnails_thumbnail_icon_color: var(--nf-color-fg-subtle);
+  --yarl__thumbnails_vignette_size: 0px;
+  --yarl__fade_animation_duration: var(--nf-duration-base);
+  --yarl__fade_animation_timing_function: var(--nf-ease-standard);
+}
+
+.root :global(.yarl__button) {
+  border-radius: var(--nf-radius-pill);
+  transition:
+    background-color var(--nf-duration-fast) var(--nf-ease-standard),
+    color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+@media (hover: hover) {
+  .root :global(.yarl__button:hover) {
+    background: var(--nf-color-surface-hover);
+    color: var(--nf-color-fg);
+  }
+}
+
+.root :global(.yarl__button:focus-visible) {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.root :global(.yarl__counter) {
+  font-variant-numeric: tabular-nums;
+}
+
+.root :global(.yarl__slide_title) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.root :global(.yarl__thumbnails_thumbnail) {
+  opacity: 0.6;
+  transition: opacity var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.root :global(.yarl__thumbnails_thumbnail:hover),
+.root :global(.yarl__thumbnails_thumbnail_active) {
+  opacity: 1;
+}

@@ -23,9 +23,12 @@
 
 import type { components } from '@nodate-flow/sdk';
 import {
+  queryOptions,
   type UseMutationResult,
+  type UseQueryResult,
   type UseSuspenseQueryResult,
   useMutation,
+  useQuery,
   useQueryClient,
   useSuspenseQuery,
 } from '@tanstack/react-query';
@@ -35,6 +38,7 @@ import { sha256Hex } from '../../lib/crypto/sha256';
 import { resolveContentType } from '../../lib/file-mime';
 
 export type EventAttachment = components['schemas']['AttachmentResponse'];
+export type EventAttachmentPreview = components['schemas']['PreviewCalendarAttachmentOutputBody'];
 export type PresignAttachmentBody = components['schemas']['PresignAttachmentInputBody'];
 export type PresignAttachmentResult = components['schemas']['PresignAttachmentOutputBody'];
 
@@ -43,6 +47,8 @@ export const eventAttachmentKeys = {
     ['events', 'attachments', wsId, calId, evtId] as const,
   download: (wsId: string, calId: string, evtId: string, attId: string) =>
     ['events', 'attachments', wsId, calId, evtId, 'download', attId] as const,
+  preview: (wsId: string, calId: string, evtId: string, attId: string) =>
+    ['events', 'attachment-preview', wsId, calId, evtId, attId] as const,
 };
 
 /** GET /workspaces/{wsId}/calendars/{calId}/events/{evtId}/attachments. */
@@ -209,6 +215,49 @@ export function useEventAttachmentDownloadUrl(
     queryKey: eventAttachmentKeys.download(wsId, calId, evtId, attachmentId),
     queryFn: () => fetchEventAttachmentDownloadUrl({ wsId, calId, evtId, attachmentId }),
   });
+}
+
+export interface EventAttachmentPreviewArgs {
+  wsId: string;
+  calId: string;
+  evtId: string;
+  attachmentId: string;
+}
+
+/**
+ * Signed inline preview URL for an image attachment. Keyed outside the list
+ * key so list refreshes do not refetch every preview; stale once fewer than
+ * ten minutes remain. Each fetch is audited server-side.
+ */
+export function eventAttachmentPreviewQueryOptions({
+  wsId,
+  calId,
+  evtId,
+  attachmentId,
+}: EventAttachmentPreviewArgs) {
+  return queryOptions({
+    queryKey: eventAttachmentKeys.preview(wsId, calId, evtId, attachmentId),
+    queryFn: async (): Promise<EventAttachmentPreview> =>
+      apiRequest(
+        (client) =>
+          client.GET(
+            '/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attachments/{attId}/preview',
+            { params: { path: { wsId, calId, evtId, attId: attachmentId } } },
+          ),
+        'Failed to get preview URL',
+      ),
+    staleTime: (query) =>
+      query.state.data ? Math.max(0, (query.state.data.expiresAt - 600) * 1000 - Date.now()) : 0,
+    retry: 1,
+  });
+}
+
+/** Preview URL for one attachment thumbnail; idle while `enabled` is false. */
+export function useEventAttachmentPreview(
+  args: EventAttachmentPreviewArgs,
+  enabled: boolean,
+): UseQueryResult<EventAttachmentPreview> {
+  return useQuery({ ...eventAttachmentPreviewQueryOptions(args), enabled });
 }
 
 export interface DeleteEventAttachmentArgs {
